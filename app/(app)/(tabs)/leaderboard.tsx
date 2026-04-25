@@ -13,6 +13,7 @@ import {
 
 import {
   Badge,
+  Button,
   Card,
   ScreenWrapper,
   StaggeredItem,
@@ -93,8 +94,8 @@ function BoardViewToggle({
 }) {
   return (
     <View
-      className="flex-row rounded-xl border border-white/10 bg-white/[0.04]"
-      style={{ padding: 3 }}>
+      className="flex-row rounded-2xl border border-white/10 bg-white/[0.04]"
+      style={{ padding: 4 }}>
       {BOARD_VIEW_OPTIONS.map((option) => {
         const active = option.value === value;
         return (
@@ -104,19 +105,32 @@ function BoardViewToggle({
             style={{ flex: 1 }}>
             <View
               className={cn(
-                'h-9 flex-row items-center justify-center gap-1.5 rounded-lg',
-                active ? 'bg-electric-green/15' : 'bg-transparent',
-              )}>
+                'h-11 w-full flex-row items-center justify-center gap-2 rounded-xl border',
+                active
+                  ? 'border-electric-green/45 bg-electric-green/15'
+                  : 'border-transparent bg-transparent',
+              )}
+              style={
+                active
+                  ? {
+                      shadowColor: THEME_COLORS.electricGreen,
+                      shadowOffset: { width: 0, height: 0 },
+                      shadowOpacity: 0.35,
+                      shadowRadius: 8,
+                    }
+                  : undefined
+              }>
               <Ionicons
-                color={active ? THEME_COLORS.electricGreen : 'rgba(255,255,255,0.55)'}
+                color={active ? THEME_COLORS.electricGreen : 'rgba(255,255,255,0.6)'}
                 name={option.icon}
-                size={13}
+                size={16}
               />
               <Text
                 className={cn(
-                  'text-xs font-semibold',
-                  active ? 'text-electric-green' : 'text-white/60',
-                )}>
+                  'text-sm font-bold',
+                  active ? 'text-electric-green' : 'text-white/65',
+                )}
+                style={{ letterSpacing: 0.2 }}>
                 {option.label}
               </Text>
             </View>
@@ -534,7 +548,7 @@ export default function LeaderboardScreen() {
 
         {leaderboardQuery.isLoading ? <LoadingState /> : null}
 
-        {!leaderboardQuery.isLoading && leaderboardQuery.data ? (
+        {!leaderboardQuery.isLoading && leaderboardQuery.data && sortedRows.length > 0 ? (
           <View className="gap-4">
             {leaderboardQuery.data.leagueOptions.length > 1 ? (
               <View className="flex-row flex-wrap gap-2">
@@ -545,15 +559,15 @@ export default function LeaderboardScreen() {
                     <TapTarget key={league.id} onPress={() => setSelectedLeagueId(league.id)}>
                       <View
                         className={cn(
-                          'rounded-full border px-3 py-1.5',
+                          'rounded-full border px-4 py-2',
                           active
                             ? 'border-electric-green/55 bg-electric-green/15'
                             : 'border-white/10 bg-white/[0.04]',
                         )}>
                         <Text
                           className={cn(
-                            'text-xs font-semibold',
-                            active ? 'text-electric-green' : 'text-white/65',
+                            'text-sm font-bold',
+                            active ? 'text-electric-green' : 'text-white/70',
                           )}>
                           {league.label}
                         </Text>
@@ -626,18 +640,18 @@ export default function LeaderboardScreen() {
               <View>
                 <View className="flex-row items-center gap-3 px-4 pb-2 pt-3">
                   <Text
-                    className="w-12 text-[11px] font-semibold uppercase text-white/45"
-                    style={{ letterSpacing: 0.4 }}>
+                    className="w-12 text-xs font-bold uppercase text-white/55"
+                    style={{ letterSpacing: 1.2 }}>
                     Rank
                   </Text>
                   <Text
-                    className="flex-1 text-[11px] font-semibold uppercase text-white/45"
-                    style={{ letterSpacing: 0.4 }}>
+                    className="flex-1 text-xs font-bold uppercase text-white/55"
+                    style={{ letterSpacing: 1.2 }}>
                     Player
                   </Text>
                   <Text
-                    className="text-[11px] font-semibold uppercase text-white/45"
-                    style={{ letterSpacing: 0.4 }}>
+                    className="text-xs font-bold uppercase text-white/55"
+                    style={{ letterSpacing: 1.2 }}>
                     {boardView === 'week' ? 'Week' : 'Total'}
                   </Text>
                 </View>
@@ -674,18 +688,28 @@ export default function LeaderboardScreen() {
 
         {!leaderboardQuery.isLoading && sortedRows.length === 0 ? (
           <Card>
-            <View className="items-center gap-2.5 py-1">
-              <View className="h-11 w-11 items-center justify-center rounded-full border border-electric-green/30 bg-electric-green/10">
-                <Ionicons color={THEME_COLORS.electricGreen} name="trophy" size={20} />
+            <View className="items-center gap-5 py-4">
+              <View className="h-20 w-20 items-center justify-center rounded-full border border-electric-green/30 bg-electric-green/10">
+                <Ionicons color={THEME_COLORS.electricGreen} name="trophy" size={36} />
               </View>
-              <Text
-                className="text-lg font-bold text-white"
-                style={{ letterSpacing: -0.2 }}>
-                No standings yet
-              </Text>
-              <Text className="px-2 text-center text-base font-medium text-white/65">
-                Join a league to start climbing the ladder.
-              </Text>
+              <View className="items-center gap-2.5">
+                <Text
+                  className="text-2xl font-black uppercase text-white"
+                  style={{ letterSpacing: -0.4 }}>
+                  No Standings Yet
+                </Text>
+                <Text className="px-2 text-center text-base font-semibold leading-snug text-white/65">
+                  Join a league to start climbing the ladder and stacking profit on the board.
+                </Text>
+              </View>
+              <View className="w-full gap-3">
+                <Button title="Join a League" onPress={() => router.push('/leagues/join')} />
+                <Button
+                  title="Create a League"
+                  variant="secondary"
+                  onPress={() => router.push('/leagues/create')}
+                />
+              </View>
             </View>
           </Card>
         ) : null}
