@@ -1,0 +1,291 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { useEffect, useState } from 'react';
+import { Alert, RefreshControl, ScrollView, Text, View } from 'react-native';
+
+import {
+  Badge,
+  Button,
+  Card,
+  ScreenWrapper,
+  SkeletonLoader,
+  TextInput,
+  ToggleRow,
+} from '@/components/ui';
+import { THEME_COLORS } from '@/constants/theme';
+import { useAuth } from '@/hooks/use-auth';
+import { type LeagueSummary, useLeaveLeagueMutation, useMyLeagues } from '@/hooks/use-leagues';
+import {
+  NOTIFICATION_PREFERENCE_LABELS,
+  useNotificationPreferences,
+  useUpdateNotificationPreferences,
+} from '@/hooks/use-notifications';
+import { useProfileData } from '@/hooks/use-profile-stats';
+import { useUpdateUserProfile } from '@/hooks/use-user-profile';
+import { cn } from '@/lib/cn';
+import { formatLeagueType } from '@/lib/format';
+import type { NotificationPreferencesUpdate, NotificationType } from '@/types/database';
+
+function SettingsSkeleton() {
+  return (
+    <View className="gap-4">
+      {[0, 1, 2].map((item) => (
+        <Card key={item}>
+          <View className="gap-3">
+            <SkeletonLoader height={18} width="50%" />
+            <SkeletonLoader height={70} />
+          </View>
+        </Card>
+      ))}
+    </View>
+  );
+}
+
+function LeagueManagementRow({
+  item,
+  onLeave,
+}: {
+  item: LeagueSummary;
+  onLeave: (leagueId: string, leagueName: string) => void;
+}) {
+  return (
+    <View className="flex-row items-center gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.04] p-3">
+      <View className="h-10 w-10 items-center justify-center rounded-2xl border border-electric-green/25 bg-electric-green/10">
+        <Ionicons color={THEME_COLORS.electricGreen} name="shield" size={18} />
+      </View>
+      <View className="flex-1">
+        <Text className="text-base font-black text-white" numberOfLines={1}>
+          {item.league.name}
+        </Text>
+        <View className="mt-1 flex-row items-center gap-2">
+          <Badge label={formatLeagueType(item.league.type)} tone={item.league.type === 'h2h' ? 'cyan' : 'gold'} />
+          <Text className="text-xs font-semibold text-white/45">
+            {item.memberCount}/{item.league.max_members}
+          </Text>
+        </View>
+      </View>
+      <Button
+        onPress={() => onLeave(item.league.id, item.league.name)}
+        title="Leave"
+        variant="destructive"
+      />
+    </View>
+  );
+}
+
+export default function SettingsScreen() {
+  const { signOut, user } = useAuth();
+  const profileQuery = useProfileData({
+    targetUserId: user?.id,
+    viewerUserId: user?.id,
+  });
+  const leaguesQuery = useMyLeagues(user?.id);
+  const preferencesQuery = useNotificationPreferences(user?.id);
+  const updatePreferences = useUpdateNotificationPreferences(user?.id);
+  const updateProfile = useUpdateUserProfile(user?.id);
+  const leaveLeague = useLeaveLeagueMutation(user?.id);
+  const [displayName, setDisplayName] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState('');
+
+  useEffect(() => {
+    if (profileQuery.data?.profile) {
+      setDisplayName(profileQuery.data.profile.display_name);
+      setAvatarUrl(profileQuery.data.profile.avatar_url ?? '');
+    }
+  }, [profileQuery.data?.profile]);
+
+  const isLoading = profileQuery.isLoading || leaguesQuery.isLoading || preferencesQuery.isLoading;
+
+  const saveProfile = async () => {
+    if (!displayName.trim()) {
+      Alert.alert('Display name required', 'Add the name you want league members to see.');
+      return;
+    }
+
+    try {
+      await updateProfile.mutateAsync({ avatar_url: avatarUrl, display_name: displayName });
+      Alert.alert('Profile updated', 'Your player card is refreshed.');
+    } catch (error) {
+      Alert.alert('Could not update profile', error instanceof Error ? error.message : 'Try again.');
+    }
+  };
+
+  const togglePreference = async (key: NotificationType, enabled: boolean) => {
+    const update: NotificationPreferencesUpdate = { [key]: !enabled };
+
+    try {
+      await updatePreferences.mutateAsync(update);
+    } catch (error) {
+      Alert.alert('Could not update preference', error instanceof Error ? error.message : 'Try again.');
+    }
+  };
+
+  const confirmLeaveLeague = (leagueId: string, leagueName: string) => {
+    Alert.alert('Leave league?', `You will leave ${leagueName}. Your historical bets remain visible.`, [
+      { style: 'cancel', text: 'Cancel' },
+      {
+        onPress: async () => {
+          try {
+            await leaveLeague.mutateAsync(leagueId);
+          } catch (error) {
+            Alert.alert('Could not leave league', error instanceof Error ? error.message : 'Try again.');
+          }
+        },
+        style: 'destructive',
+        text: 'Leave',
+      },
+    ]);
+  };
+
+  return (
+    <ScreenWrapper className="pb-0">
+      <ScrollView
+        contentContainerStyle={{ gap: 18, paddingBottom: 36 }}
+        refreshControl={
+          <RefreshControl
+            tintColor={THEME_COLORS.electricGreen}
+            refreshing={profileQuery.isRefetching || leaguesQuery.isRefetching || preferencesQuery.isRefetching}
+            onRefresh={() => {
+              void profileQuery.refetch();
+              void leaguesQuery.refetch();
+              void preferencesQuery.refetch();
+            }}
+          />
+        }
+        showsVerticalScrollIndicator={false}>
+        <View>
+          <View className="flex-row items-center gap-2">
+            <View className="h-1.5 w-1.5 rounded-full bg-electric-green" />
+            <Text
+              className="text-[11px] font-semibold uppercase text-electric-green"
+              style={{ letterSpacing: 1.2 }}>
+              Control Room
+            </Text>
+          </View>
+          <Text
+            className="mt-1 text-2xl font-extrabold text-white"
+            style={{ letterSpacing: -0.4 }}>
+            Settings
+          </Text>
+          <Text className="mt-1 text-sm font-medium text-white/55">
+            Profile, alerts, leagues, and the boring legal furniture.
+          </Text>
+        </View>
+
+        {isLoading ? <SettingsSkeleton /> : null}
+
+        {!isLoading ? (
+          <>
+            <Card>
+              <View className="gap-4">
+                <Text className="text-[10px] font-black uppercase text-electric-green" style={{ letterSpacing: 2 }}>
+                  Player Profile
+                </Text>
+                <TextInput label="Display name" onChangeText={setDisplayName} value={displayName} />
+                <TextInput
+                  autoCapitalize="none"
+                  label="Avatar URL"
+                  onChangeText={setAvatarUrl}
+                  placeholder="https://..."
+                  value={avatarUrl}
+                />
+                <Button loading={updateProfile.isPending} onPress={saveProfile} title="Save Profile" />
+              </View>
+            </Card>
+
+            <Card>
+              <View className="gap-3">
+                <Text className="text-[10px] font-black uppercase text-electric-green" style={{ letterSpacing: 2 }}>
+                  Notification Preferences
+                </Text>
+                {preferencesQuery.data
+                  ? NOTIFICATION_PREFERENCE_LABELS.map((preference) => (
+                      <ToggleRow
+                        description={preference.description}
+                        enabled={preferencesQuery.data[preference.key]}
+                        key={preference.key}
+                        onToggle={() =>
+                          togglePreference(preference.key, preferencesQuery.data[preference.key])
+                        }
+                        title={preference.title}
+                      />
+                    ))
+                  : null}
+              </View>
+            </Card>
+
+            <Card>
+              <View className="gap-3">
+                <Text className="text-[10px] font-black uppercase text-electric-green" style={{ letterSpacing: 2 }}>
+                  Manage Leagues
+                </Text>
+                {(leaguesQuery.data ?? []).length === 0 ? (
+                  <Text className="text-sm font-semibold text-white/55">
+                    Joined leagues will show here.
+                  </Text>
+                ) : (
+                  (leaguesQuery.data ?? []).map((league) => (
+                    <LeagueManagementRow
+                      item={league}
+                      key={league.league.id}
+                      onLeave={confirmLeaveLeague}
+                    />
+                  ))
+                )}
+              </View>
+            </Card>
+
+            <Card tone="highlight">
+              <View className="gap-3">
+                <View className="flex-row items-center gap-2">
+                  <Ionicons color={THEME_COLORS.gold} name="sparkles" size={16} />
+                  <Text className="text-[10px] font-black uppercase text-gold" style={{ letterSpacing: 2 }}>
+                    Premium
+                  </Text>
+                </View>
+                <Text className="text-xl font-black uppercase text-white">Action Arena Plus</Text>
+                <Text className="text-sm font-semibold text-white/55">
+                  Premium league customization, deeper stat cards, and commissioner tools are coming soon.
+                </Text>
+                <Button title="Upgrade Placeholder" variant="secondary" />
+              </View>
+            </Card>
+
+            <Card>
+              <View className="gap-3">
+                <Text className="text-[10px] font-black uppercase text-white/45" style={{ letterSpacing: 2 }}>
+                  About
+                </Text>
+                {['About Action Arena', 'Terms of Service', 'Privacy Policy'].map((label) => (
+                  <View
+                    className="rounded-2xl border border-white/[0.07] bg-white/[0.04] p-3"
+                    key={label}>
+                    <Text className="text-sm font-black text-white">{label}</Text>
+                    <Text className="mt-1 text-xs font-semibold leading-5 text-white/45">
+                      Placeholder copy for development. Final legal and product text will live here before launch.
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </Card>
+
+            <Button
+              onPress={() => {
+                void signOut();
+              }}
+              title="Sign Out"
+              variant="destructive"
+            />
+          </>
+        ) : null}
+
+        {profileQuery.isError || leaguesQuery.isError || preferencesQuery.isError ? (
+          <Card>
+            <Text className={cn('text-sm font-semibold text-coral-red')}>
+              Some settings could not be loaded. Pull to refresh and try again.
+            </Text>
+          </Card>
+        ) : null}
+      </ScrollView>
+    </ScreenWrapper>
+  );
+}
