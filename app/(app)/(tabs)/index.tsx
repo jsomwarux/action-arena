@@ -66,17 +66,17 @@ function Header() {
         <View className="flex-row items-center gap-2">
           <View className="h-1.5 w-1.5 rounded-full bg-electric-green" />
           <Text
-            className="text-[11px] font-semibold uppercase text-electric-green"
+            className="text-xs font-semibold uppercase text-electric-green"
             style={{ letterSpacing: 1.2 }}>
             Command Center
           </Text>
         </View>
         <Text
-          className="mt-1 text-2xl font-extrabold text-white"
-          style={{ letterSpacing: -0.4 }}>
+          className="mt-1 text-3xl font-extrabold text-white"
+          style={{ letterSpacing: -0.5 }}>
           Home
         </Text>
-        <Text className="mt-1 text-sm font-medium text-white/55">
+        <Text className="mt-1.5 text-base font-medium text-white/60">
           Track the week, spot urgent leagues, and jump into picks.
         </Text>
       </View>
@@ -90,22 +90,22 @@ function Header() {
             shadowOpacity: 0.45,
             shadowRadius: 16,
           }}>
-          <View className="h-10 w-10 items-center justify-center rounded-xl bg-arena-bg/15">
-            <Ionicons color={THEME_COLORS.background} name="flash" size={20} />
+          <View className="h-11 w-11 items-center justify-center rounded-xl bg-arena-bg/15">
+            <Ionicons color={THEME_COLORS.background} name="flash" size={22} />
           </View>
           <View className="flex-1">
             <Text
-              className="text-[10px] font-semibold uppercase text-arena-bg/70"
+              className="text-[11px] font-bold uppercase text-arena-bg/75"
               style={{ letterSpacing: 0.8 }}>
               Quick Action
             </Text>
             <Text
-              className="text-base font-bold text-arena-bg"
+              className="text-lg font-black text-arena-bg"
               style={{ letterSpacing: -0.2 }}>
               Open Bet Board
             </Text>
           </View>
-          <Ionicons color={THEME_COLORS.background} name="arrow-forward" size={20} />
+          <Ionicons color={THEME_COLORS.background} name="arrow-forward" size={22} />
         </View>
       </PressableScale>
     </View>
@@ -134,15 +134,15 @@ function EmptyState() {
     <Card>
       <View className="items-center gap-5 py-4">
         <View className="h-20 w-20 items-center justify-center rounded-full border border-electric-green/30 bg-electric-green/10">
-          <Ionicons color={THEME_COLORS.electricGreen} name="shield" size={34} />
+          <Ionicons color={THEME_COLORS.electricGreen} name="shield" size={36} />
         </View>
-        <View className="items-center gap-2">
+        <View className="items-center gap-2.5">
           <Text
             className="text-2xl font-black uppercase text-white"
             style={{ letterSpacing: -0.4 }}>
             No Leagues Yet
           </Text>
-          <Text className="text-center text-base font-semibold text-white/55">
+          <Text className="px-2 text-center text-base font-semibold leading-snug text-white/65">
             Join a league to see your weekly matchups and results here.
           </Text>
         </View>

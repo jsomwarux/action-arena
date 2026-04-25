@@ -374,7 +374,7 @@ function HeroStats({ summary }: { summary: ProfileSummary }) {
           <View className="flex-row items-center gap-2">
             <View className="h-2 w-2 rounded-full bg-electric-green" />
             <Text
-              className="text-[10px] font-black uppercase text-electric-green"
+              className="text-xs font-black uppercase text-electric-green"
               style={{ letterSpacing: 2.5 }}>
               Season Stats
             </Text>
@@ -416,7 +416,7 @@ function HeroStats({ summary }: { summary: ProfileSummary }) {
 
           <View>
             <Text
-              className="text-[10px] font-black uppercase text-white/45"
+              className="text-xs font-black uppercase text-white/55"
               style={{ letterSpacing: 2 }}>
               Total Profit
             </Text>
@@ -431,11 +431,11 @@ function HeroStats({ summary }: { summary: ProfileSummary }) {
               }}>
               {formatProfit(stats.totalProfit)}
             </Text>
-            <Text className="text-base font-black text-white/45" style={{ letterSpacing: -0.3 }}>
+            <Text className="text-base font-black text-white/55" style={{ letterSpacing: -0.3 }}>
               total
             </Text>
           </View>
-          <Text className="mt-2 text-xs font-semibold text-white/55">
+          <Text className="mt-2 text-sm font-semibold text-white/65">
             {formatRecord(stats.wins, stats.losses, stats.ties)} record over{' '}
             {stats.totalSettledBets} settled bet{stats.totalSettledBets === 1 ? '' : 's'}
           </Text>
@@ -475,12 +475,12 @@ function StatTile({
   return (
     <View className="flex-1 rounded-2xl border border-white/[0.07] bg-white/[0.04] px-3 py-3">
       <Text
-        className="text-[10px] font-black uppercase text-white/40"
+        className="text-[11px] font-black uppercase text-white/55"
         style={{ letterSpacing: 1.4 }}>
         {label}
       </Text>
       <Text
-        className={cn('mt-1.5 text-lg font-black text-white', accent)}
+        className={cn('mt-1.5 text-xl font-black text-white', accent)}
         numberOfLines={1}
         style={{ letterSpacing: -0.4 }}>
         {value}
@@ -658,7 +658,7 @@ function BestWorst({ summary }: { summary: ProfileSummary }) {
             <View className="h-14 w-14 items-center justify-center rounded-full border border-white/10 bg-white/[0.04]">
               <Ionicons color="rgba(255,255,255,0.4)" name="medal-outline" size={26} />
             </View>
-            <Text className="text-center text-sm font-semibold text-white/55">
+            <Text className="px-2 text-center text-base font-semibold leading-snug text-white/65">
               Best & worst bets show up once you settle a few cards.
             </Text>
           </View>
@@ -700,7 +700,7 @@ function BreakdownRow({ breakdown }: { breakdown: BetTypeBreakdown }) {
           </View>
           <View>
             <Text
-              className={cn('text-[10px] font-black uppercase', meta.textClass)}
+              className={cn('text-xs font-black uppercase', meta.textClass)}
               style={{ letterSpacing: 2 }}>
               {meta.label}
             </Text>
@@ -1384,13 +1384,13 @@ function SectionLabel({ caption, title }: { caption?: string; title: string }) {
       <View className="flex-row items-center gap-2">
         <View className="h-1 w-6 rounded-full bg-electric-green" />
         <Text
-          className="text-[10px] font-black uppercase text-electric-green"
+          className="text-xs font-black uppercase text-electric-green"
           style={{ letterSpacing: 2.2 }}>
           {title}
         </Text>
       </View>
       {caption ? (
-        <Text className="text-[10px] font-semibold text-white/45">{caption}</Text>
+        <Text className="text-xs font-semibold text-white/55">{caption}</Text>
       ) : null}
     </View>
   );
@@ -1422,17 +1422,17 @@ export function ProfileContent({
           <View className="flex-row items-center gap-2">
             <View className="h-1.5 w-1.5 rounded-full bg-electric-green" />
             <Text
-              className="text-[11px] font-semibold uppercase text-electric-green"
+              className="text-xs font-semibold uppercase text-electric-green"
               style={{ letterSpacing: 1.2 }}>
               Player Card
             </Text>
           </View>
           <Text
-            className="mt-1 text-2xl font-extrabold text-white"
-            style={{ letterSpacing: -0.4 }}>
+            className="mt-1 text-3xl font-extrabold text-white"
+            style={{ letterSpacing: -0.5 }}>
             {title}
           </Text>
-          <Text className="mt-1 text-sm font-medium text-white/55">
+          <Text className="mt-1.5 text-base font-medium text-white/60">
             {data.profile.display_name}
           </Text>
         </View>
