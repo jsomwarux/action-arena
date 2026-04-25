@@ -2,8 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import type { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { Platform, Pressable, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Pressable, View } from 'react-native';
 
 import { THEME_COLORS } from '@/constants/theme';
 
@@ -11,16 +10,22 @@ type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
 const ICON_SIZE = 24;
 const ICON_BOX = 28;
+const INDICATOR_SLOT_HEIGHT = 6;
 
 function TabBarIcon({ color, focused, name }: { color: string; focused: boolean; name: IoniconName }) {
   return (
-    <View style={{ alignItems: 'center', height: ICON_BOX + 8, justifyContent: 'center', width: ICON_BOX + 24 }}>
+    <View
+      style={{
+        alignItems: 'center',
+        height: INDICATOR_SLOT_HEIGHT + ICON_BOX,
+        justifyContent: 'flex-end',
+        width: 56,
+      }}>
       <View
         style={{
           alignItems: 'center',
-          height: 3,
+          height: INDICATOR_SLOT_HEIGHT,
           justifyContent: 'center',
-          marginBottom: 4,
           width: 22,
         }}>
         {focused ? (
@@ -38,7 +43,13 @@ function TabBarIcon({ color, focused, name }: { color: string; focused: boolean;
           />
         ) : null}
       </View>
-      <View style={{ alignItems: 'center', height: ICON_BOX, justifyContent: 'center', width: ICON_BOX }}>
+      <View
+        style={{
+          alignItems: 'center',
+          height: ICON_BOX,
+          justifyContent: 'center',
+          width: ICON_BOX,
+        }}>
         <Ionicons color={color} name={name} size={ICON_SIZE} />
       </View>
     </View>
@@ -76,10 +87,6 @@ function TabButton({
 }
 
 export default function TabLayout() {
-  const insets = useSafeAreaInsets();
-  const bottomInset = Math.max(insets.bottom, Platform.OS === 'android' ? 8 : 0);
-  const tabBarHeight = 64 + bottomInset;
-
   return (
     <Tabs
       screenOptions={{
@@ -88,14 +95,13 @@ export default function TabLayout() {
         tabBarButton: (props) => <TabButton {...props} />,
         tabBarInactiveTintColor: THEME_COLORS.textMuted,
         tabBarItemStyle: {
-          height: tabBarHeight,
-          paddingTop: 8,
+          paddingVertical: 6,
         },
         tabBarLabelStyle: {
           fontSize: 12,
           fontWeight: '700',
           letterSpacing: 0.2,
-          marginTop: 2,
+          marginTop: 4,
           textTransform: 'none',
         },
         tabBarStyle: {
@@ -103,9 +109,9 @@ export default function TabLayout() {
           borderTopColor: 'rgba(255,255,255,0.06)',
           borderTopWidth: 1,
           elevation: 0,
-          height: tabBarHeight,
-          paddingBottom: bottomInset,
-          paddingTop: 0,
+          height: 84,
+          paddingBottom: 14,
+          paddingTop: 6,
         },
       }}>
       <Tabs.Screen
