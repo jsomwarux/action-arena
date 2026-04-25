@@ -140,7 +140,7 @@ function EmptyState() {
             style={{ letterSpacing: -0.4 }}>
             Your Arena Awaits
           </Text>
-          <Text className="px-2 text-center text-base font-semibold text-white/55">
+          <Text className="px-2 text-center text-base font-semibold leading-snug text-white/65">
             Spin up a league for your crew or jump into a public room and start stacking profit.
           </Text>
         </View>
@@ -170,17 +170,17 @@ export default function LeaguesScreen() {
           <View className="flex-row items-center gap-2">
             <View className="h-1.5 w-1.5 rounded-full bg-electric-green" />
             <Text
-              className="text-[11px] font-semibold uppercase text-electric-green"
+              className="text-xs font-semibold uppercase text-electric-green"
               style={{ letterSpacing: 1.2 }}>
               The Arena
             </Text>
           </View>
           <Text
-            className="mt-1 text-2xl font-extrabold text-white"
-            style={{ letterSpacing: -0.4 }}>
+            className="mt-1 text-3xl font-extrabold text-white"
+            style={{ letterSpacing: -0.5 }}>
             My Leagues
           </Text>
-          <Text className="mt-1 text-sm font-medium text-white/55">
+          <Text className="mt-1.5 text-base font-medium text-white/60">
             Track your standings, matchups, and league rooms.
           </Text>
         </View>

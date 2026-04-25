@@ -517,17 +517,17 @@ export default function LeaderboardScreen() {
           <View className="flex-row items-center gap-2">
             <View className="h-1.5 w-1.5 rounded-full bg-electric-green" />
             <Text
-              className="text-[11px] font-semibold uppercase text-electric-green"
+              className="text-xs font-semibold uppercase text-electric-green"
               style={{ letterSpacing: 1.2 }}>
               League Ladder
             </Text>
           </View>
           <Text
-            className="mt-1 text-2xl font-extrabold text-white"
-            style={{ letterSpacing: -0.4 }}>
+            className="mt-1 text-3xl font-extrabold text-white"
+            style={{ letterSpacing: -0.5 }}>
             Leaderboard
           </Text>
-          <Text className="mt-1 text-sm font-medium text-white/55">
+          <Text className="mt-1.5 text-base font-medium text-white/60">
             Profit, records, and weekly movement across your league.
           </Text>
         </View>
@@ -679,11 +679,11 @@ export default function LeaderboardScreen() {
                 <Ionicons color={THEME_COLORS.electricGreen} name="trophy" size={20} />
               </View>
               <Text
-                className="text-base font-semibold text-white"
+                className="text-lg font-bold text-white"
                 style={{ letterSpacing: -0.2 }}>
                 No standings yet
               </Text>
-              <Text className="text-center text-xs font-medium text-white/55">
+              <Text className="px-2 text-center text-base font-medium text-white/65">
                 Join a league to start climbing the ladder.
               </Text>
             </View>

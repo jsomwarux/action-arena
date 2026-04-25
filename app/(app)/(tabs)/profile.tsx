@@ -73,15 +73,15 @@ export default function ProfileScreen() {
             <View className="flex-row items-center justify-between gap-3">
               <View className="flex-1">
                 <Text
-                  className="text-[10px] font-black uppercase text-electric-green"
+                  className="text-xs font-black uppercase text-electric-green"
                   style={{ letterSpacing: 2 }}>
                   Preferences
                 </Text>
-                <Text className="mt-1 text-base font-black text-white">
+                <Text className="mt-1 text-lg font-black text-white">
                   App Settings
                 </Text>
               </View>
-              <Ionicons color={THEME_COLORS.electricGreen} name="settings" size={22} />
+              <Ionicons color={THEME_COLORS.electricGreen} name="settings" size={24} />
             </View>
           </Card>
         </Pressable>
