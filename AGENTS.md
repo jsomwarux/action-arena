@@ -85,6 +85,7 @@ No web version — mobile only for now.
 - result: 'pending' | 'win' | 'loss' | 'push'
 - profit (decimal, nullable — filled after settlement)
 - teaser_points (decimal, nullable — 6, 6.5, or 7; only for teasers)
+- is_lock (boolean, default false — exactly one Lock of the Week per player/week)
 - created_at
 
 ### bet_legs
@@ -109,6 +110,15 @@ No web version — mobile only for now.
 - weekly_profit (decimal)
 - total_profit (decimal — running cumulative)
 - rank (int)
+
+### seasons
+- id (uuid, PK)
+- league_id (FK leagues)
+- season_year (int)
+- champion_user_id (FK users, nullable)
+- final_standings (jsonb — permanent standings snapshot at season completion)
+- awards (jsonb — permanent end-of-season awards snapshot)
+- completed_at
 
 ## Bet Types
 
@@ -158,6 +168,9 @@ A special parlay where the player buys extra points on spreads and/or totals. Al
 - Maximum single bet: $35 (applies to straights, parlays, and teasers equally)
 - Maximum parlay payout: $500 cap
 - Must allocate entire $100 budget exactly — no leftover, no overage
+- Each player must designate exactly one bet per week as their "Lock of the Week"
+- The Lock bet receives a 1.5x multiplier on profit and loss (wins pay 1.5x, losses cost 1.5x)
+- Bets cannot be submitted without exactly one Lock designation
 - Bets lock at the leg level — each leg locks when its specific game starts
 - For parlays/teasers: if any leg hasn't locked yet, the entire multi-leg bet can still be edited or cancelled. Once all legs are locked, the bet is fully locked.
 - Cannot place multiple bets on the same side of the same game within the same league. One selection per game per league, across all bet types.
