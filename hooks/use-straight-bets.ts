@@ -29,6 +29,7 @@ export type BetSubmissionLeg = {
 export type MixedBetSubmission = {
   amount: number;
   bet_type: BetType;
+  is_lock: boolean;
   odds: number;
   potential_payout: number;
   teaser_points: TeaserPoints | null;
@@ -126,6 +127,7 @@ export function useSubmitBetsMutation(
             bet_type: bet.bet_type,
             created_at: new Date().toISOString(),
             id: betId,
+            is_lock: bet.is_lock,
             league_id: leagueId,
             odds: bet.odds,
             potential_payout: bet.potential_payout,

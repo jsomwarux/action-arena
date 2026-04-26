@@ -153,6 +153,24 @@ function ResultPill({ bet }: { bet: BetWithLegs }) {
   );
 }
 
+function LockPill() {
+  return (
+    <View
+      className="flex-row items-center gap-1 rounded-full border border-gold/55 bg-gold/15 px-2.5 py-1"
+      style={{
+        shadowColor: THEME_COLORS.gold,
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.35,
+        shadowRadius: 8,
+      }}>
+      <Ionicons color={THEME_COLORS.gold} name="star" size={11} />
+      <Text className="text-[10px] font-black uppercase text-gold" style={{ letterSpacing: 1.2 }}>
+        Lock 1.5x
+      </Text>
+    </View>
+  );
+}
+
 function LegResultPill({ result }: { result: BetResult }) {
   const tone = resultTone(result);
   return (
@@ -182,12 +200,23 @@ function BetCard({ bet, isUser }: { bet: BetWithLegs; isUser: boolean }) {
   const inProgress = isInProgress(bet);
   const isMultiLeg = bet.bet_type !== 'straight';
   const firstLeg = bet.bet_legs[0];
+  const isLock = bet.is_lock;
 
   const inner = (
     <View
-      className={cn('rounded-2xl border p-4', accent.border, accent.bg)}
+      className={cn(
+        'rounded-2xl border p-4',
+        isLock ? 'border-gold/70 bg-gold/[0.07]' : cn(accent.border, accent.bg),
+      )}
       style={
-        isUser
+        isLock
+          ? {
+              shadowColor: THEME_COLORS.gold,
+              shadowOffset: { width: 0, height: 0 },
+              shadowOpacity: 0.42,
+              shadowRadius: 14,
+            }
+          : isUser
           ? {
               shadowColor: accent.hex,
               shadowOffset: { width: 0, height: 0 },
@@ -201,6 +230,7 @@ function BetCard({ bet, isUser }: { bet: BetWithLegs; isUser: boolean }) {
           <View className="flex-1 gap-2">
             <View className="flex-row items-center gap-2">
               <Badge betType={bet.bet_type} />
+              {isLock ? <LockPill /> : null}
               <Text
                 className="text-[10px] font-black uppercase text-white/45"
                 style={{ letterSpacing: 1.4 }}>

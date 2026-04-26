@@ -8,6 +8,7 @@ import type {
   LeagueSport,
   LeagueType,
   LeagueVisibility,
+  SeasonRow,
   StandingRow,
   UserRow,
   WeeklyMatchupRow,
@@ -39,6 +40,7 @@ export type LeagueDetail = {
   matchups: WeeklyMatchupRow[];
   members: LeagueMemberRow[];
   profilesById: Record<string, UserRow>;
+  seasonSnapshot: SeasonRow | null;
   standings: StandingRow[];
 };
 
@@ -192,7 +194,7 @@ export function useLeagueDetail(leagueId: string | undefined, userId: string | u
         .single();
       const leagueRow = assertSupabaseResult(league, leagueError);
 
-      const [membersResult, standingsResult, matchupsResult] = await Promise.all([
+      const [membersResult, standingsResult, matchupsResult, seasonResult] = await Promise.all([
         supabase.from('league_members').select('*').eq('league_id', leagueId).order('joined_at'),
         supabase
           .from('standings')
@@ -205,11 +207,20 @@ export function useLeagueDetail(leagueId: string | undefined, userId: string | u
           .select('*')
           .eq('league_id', leagueId)
           .order('week_number'),
+        supabase
+          .from('seasons')
+          .select('*')
+          .eq('league_id', leagueId)
+          .eq('season_year', leagueRow.season_year)
+          .maybeSingle(),
       ]);
 
       const members = assertSupabaseResult(membersResult.data, membersResult.error);
       const standings = assertSupabaseResult(standingsResult.data, standingsResult.error);
       const matchups = assertSupabaseResult(matchupsResult.data, matchupsResult.error);
+      if (seasonResult.error) {
+        throw new Error(seasonResult.error.message);
+      }
 
       const profileIds = uniqueValues([
         leagueRow.commissioner_id,
@@ -233,6 +244,7 @@ export function useLeagueDetail(leagueId: string | undefined, userId: string | u
         matchups,
         members,
         profilesById: indexUsers(profiles),
+        seasonSnapshot: (seasonResult.data as SeasonRow | null) ?? null,
         standings,
       };
     },

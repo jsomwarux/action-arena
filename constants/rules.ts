@@ -4,6 +4,7 @@ export const WEEKLY_BUDGET = 100;
 export const MINIMUM_BETS_PER_WEEK = 5;
 export const MAX_SINGLE_BET = 35;
 export const PARLAY_PAYOUT_CAP = 500;
+export const LOCK_OF_THE_WEEK_MULTIPLIER = 1.5;
 export const DEFAULT_MAX_LEAGUE_MEMBERS = 10;
 export const DEFAULT_MIN_LEAGUE_MEMBERS = 2;
 export const DEFAULT_LEAGUE_SEASON_WEEKS = 17;

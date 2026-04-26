@@ -81,6 +81,16 @@ export default function BetDetailScreen() {
                   <View className="flex-1">
                     <View className="flex-row items-center gap-2">
                       <Badge betType={betQuery.data.bet_type} />
+                      {betQuery.data.is_lock ? (
+                        <View className="flex-row items-center gap-1 rounded-full border border-gold/55 bg-gold/15 px-2.5 py-1">
+                          <Ionicons color={THEME_COLORS.gold} name="star" size={11} />
+                          <Text
+                            className="text-[10px] font-black uppercase text-gold"
+                            style={{ letterSpacing: 1.2 }}>
+                            Lock 1.5x
+                          </Text>
+                        </View>
+                      ) : null}
                       <Badge label={betQuery.data.result} tone={betQuery.data.result === 'win' ? 'green' : betQuery.data.result === 'loss' ? 'red' : 'gold'} />
                     </View>
                     <Text

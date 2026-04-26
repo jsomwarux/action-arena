@@ -1,5 +1,50 @@
 # Action Arena Changelog
 
+## 2026-04-26 Session Update
+
+### Lock of the Week
+
+- Added the Lock of the Week mechanic.
+- Each weekly submission now requires exactly one bet marked as the user's Lock.
+- The Lock bet gets a `1.5x` multiplier on settled profit or loss.
+- Added client-side validation to block submission until exactly one Lock is selected.
+- Added server-side `submit_bets` validation so the database also enforces exactly one Lock per weekly card.
+- Added `bets.is_lock` plus a partial unique index to ensure one Lock per league/user/week.
+- Added prominent Lock UI in:
+  - Bet slip cards
+  - Submission confirmation modal
+  - Submitted/read-only Bet Board
+  - Matchup detail bet cards
+  - Profile bet history/highlight cards
+  - Bet detail screen
+  - Shared bet chat cards
+- Updated bet share metadata and chat body copy so shared Locks are clearly identified.
+
+### Season Completion and Awards
+
+- Added `seasons` table for permanent completed-season snapshots.
+- Season snapshots store:
+  - `league_id`
+  - `season_year`
+  - `champion_user_id`
+  - final standings JSON
+  - season awards JSON
+  - completion timestamp
+- Added a league status trigger that captures the season snapshot when a league changes to `complete`.
+- Added end-of-season award calculations:
+  - Season MVP
+  - Best Record for H2H leagues
+  - Parlay King
+  - Most Consistent
+  - Biggest Single Bet
+- Added a completed-season trophy case section to League Detail.
+
+### Backend Settlement
+
+- Updated `settle_completed_scores` so Lock bets multiply decisive win/loss profit by `1.5`.
+- Pushes remain `$0`, including Lock pushes.
+- The settlement function remains idempotent because it only rolls up bets still marked `pending`.
+
 ## 2026-04-25 Session Handoff
 
 This file summarizes the major changes made during the initial build session so future agents can continue from the actual current state instead of rediscovering context.

@@ -27,6 +27,12 @@ export type NotificationType =
   | 'opponent_bets_locked';
 export type NotificationStatus = 'pending' | 'sent' | 'skipped' | 'failed';
 export type ChatMessageType = 'user' | 'system' | 'bet_share';
+export type SeasonAwardKey =
+  | 'season_mvp'
+  | 'best_record'
+  | 'parlay_king'
+  | 'most_consistent'
+  | 'biggest_single_bet';
 
 export type UserRow = {
   avatar_url: string | null;
@@ -139,6 +145,7 @@ export type BetRow = {
   bet_type: BetType;
   created_at: string;
   id: string;
+  is_lock: boolean;
   league_id: string;
   odds: number;
   potential_payout: number;
@@ -154,6 +161,7 @@ export type BetInsert = {
   bet_type: BetType;
   created_at?: string;
   id?: string;
+  is_lock?: boolean;
   league_id: string;
   odds: number;
   potential_payout: number;
@@ -333,6 +341,46 @@ export type LeagueChatMessageInsert = {
 };
 
 export type LeagueChatMessageUpdate = Partial<LeagueChatMessageInsert>;
+
+export type SeasonAward = {
+  award_key: SeasonAwardKey;
+  award_label: string;
+  metric: number | null;
+  user_id: string | null;
+  value_label: string | null;
+};
+
+export type SeasonStandingSnapshot = {
+  losses: number;
+  rank: number;
+  ties: number;
+  total_profit: number;
+  user_id: string;
+  weekly_profit: number;
+  wins: number;
+};
+
+export type SeasonRow = {
+  awards: Json;
+  champion_user_id: string | null;
+  completed_at: string;
+  final_standings: Json;
+  id: string;
+  league_id: string;
+  season_year: number;
+};
+
+export type SeasonInsert = {
+  awards?: Json;
+  champion_user_id?: string | null;
+  completed_at?: string;
+  final_standings?: Json;
+  id?: string;
+  league_id: string;
+  season_year: number;
+};
+
+export type SeasonUpdate = Partial<SeasonInsert>;
 
 export type StraightBet = BetRow & {
   bet_type: 'straight';
@@ -543,6 +591,27 @@ export type Database = {
         ];
         Row: LeagueChatMessageRow;
         Update: LeagueChatMessageUpdate;
+      };
+      seasons: {
+        Insert: SeasonInsert;
+        Relationships: [
+          {
+            columns: ['league_id'];
+            foreignKeyName: 'seasons_league_id_fkey';
+            isOneToOne: false;
+            referencedColumns: ['id'];
+            referencedRelation: 'leagues';
+          },
+          {
+            columns: ['champion_user_id'];
+            foreignKeyName: 'seasons_champion_user_id_fkey';
+            isOneToOne: false;
+            referencedColumns: ['id'];
+            referencedRelation: 'users';
+          },
+        ];
+        Row: SeasonRow;
+        Update: SeasonUpdate;
       };
       leagues: {
         Insert: LeagueInsert;

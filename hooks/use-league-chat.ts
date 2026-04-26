@@ -23,6 +23,7 @@ export type ShareableBet = BetRow & {
 export type SharedBetMetadata = {
   amount: number;
   betType: BetWithLegs['bet_type'];
+  isLock?: boolean;
   legs: {
     adjustedLine: number | null;
     market: string;
@@ -55,17 +56,22 @@ function assertSupabaseResult<T>(data: T | null, error: { message: string } | nu
 }
 
 function messageBodyForBet(bet: ShareableBet) {
+  const lockPrefix = bet.is_lock ? 'Shared a Lock of the Week: ' : 'Shared a bet: ';
+
   if (bet.bet_type === 'straight') {
-    return `Shared a bet: ${bet.bet_legs[0]?.selection ?? 'Straight bet'}`;
+    return `${lockPrefix}${bet.bet_legs[0]?.selection ?? 'Straight bet'}`;
   }
 
-  return `Shared a ${bet.bet_legs.length}-leg ${bet.bet_type}`;
+  return bet.is_lock
+    ? `Shared a Lock of the Week: ${bet.bet_legs.length}-leg ${bet.bet_type}`
+    : `Shared a ${bet.bet_legs.length}-leg ${bet.bet_type}`;
 }
 
 function metadataForBet(bet: ShareableBet): SharedBetMetadata {
   return {
     amount: bet.amount,
     betType: bet.bet_type,
+    isLock: bet.is_lock,
     legs: bet.bet_legs.map((leg) => ({
       adjustedLine: leg.adjusted_line,
       market: leg.market,

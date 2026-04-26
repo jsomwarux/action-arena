@@ -297,6 +297,24 @@ function legDescriptor(bet: BetWithLegs, index: number) {
   return `${leg.selection} ${leg.adjusted_line ?? leg.original_line ?? ''}`;
 }
 
+function LockPill() {
+  return (
+    <View
+      className="flex-row items-center gap-1 rounded-full border border-gold/55 bg-gold/15 px-2.5 py-1"
+      style={{
+        shadowColor: THEME_COLORS.gold,
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.35,
+        shadowRadius: 8,
+      }}>
+      <Ionicons color={THEME_COLORS.gold} name="star" size={11} />
+      <Text className="text-[10px] font-black uppercase text-gold" style={{ letterSpacing: 1.2 }}>
+        Lock 1.5x
+      </Text>
+    </View>
+  );
+}
+
 // ============================================================
 // League selector chips
 // ============================================================
@@ -529,7 +547,10 @@ function BestBetCard({ bet }: { bet: BetWithLegs }) {
                 </Text>
               </View>
             </View>
-            <Badge betType={bet.bet_type} />
+            <View className="items-end gap-1">
+              <Badge betType={bet.bet_type} />
+              {bet.is_lock ? <LockPill /> : null}
+            </View>
           </View>
 
           <View className="flex-row items-end justify-between">
@@ -635,6 +656,7 @@ function WorstBetCard({ bet }: { bet: BetWithLegs }) {
           </View>
           <View className="items-end">
             <Badge betType={bet.bet_type} />
+            {bet.is_lock ? <LockPill /> : null}
             <Text className="mt-1 text-base font-black text-coral-red">
               {formatProfit(bet.profit ?? 0)}
             </Text>
@@ -937,6 +959,7 @@ function BetHistoryCard({ bet }: { bet: BetWithLegs }) {
           <View className="flex-1 gap-2">
             <View className="flex-row items-center gap-2">
               <Badge betType={bet.bet_type} />
+              {bet.is_lock ? <LockPill /> : null}
               <Text
                 className="text-[10px] font-black uppercase text-white/45"
                 style={{ letterSpacing: 1.4 }}>

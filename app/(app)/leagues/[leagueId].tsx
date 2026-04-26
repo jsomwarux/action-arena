@@ -46,7 +46,14 @@ import {
   formatSport,
   getProfitTone,
 } from '@/lib/format';
-import type { BetType, Json, LeagueVisibility, StandingRow, WeeklyMatchupRow } from '@/types/database';
+import type {
+  BetType,
+  Json,
+  LeagueVisibility,
+  SeasonAward,
+  StandingRow,
+  WeeklyMatchupRow,
+} from '@/types/database';
 
 type DetailTab = 'standings' | 'schedule' | 'members' | 'chat';
 type PlayoffStatus = 'clinched' | 'eliminated' | null;
@@ -103,6 +110,28 @@ function isSharedBetMetadata(value: Json): value is SharedBetMetadata {
     typeof value.betType === 'string' &&
     Array.isArray(value.legs)
   );
+}
+
+function isSeasonAward(value: Json): value is SeasonAward {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.award_key === 'string' &&
+    typeof value.award_label === 'string' &&
+    (typeof value.user_id === 'string' || value.user_id === null) &&
+    (typeof value.metric === 'number' || value.metric === null) &&
+    (typeof value.value_label === 'string' || value.value_label === null)
+  );
+}
+
+function seasonAwardsFromJson(value: Json): SeasonAward[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter(isSeasonAward);
 }
 
 function betTypeAccent(type: BetType) {
@@ -520,6 +549,90 @@ function WeeklyAwardsCard({ awards }: { awards: WeeklyAwards | undefined }) {
   );
 }
 
+function seasonAwardIcon(key: SeasonAward['award_key']): React.ComponentProps<typeof Ionicons>['name'] {
+  if (key === 'season_mvp') return 'trophy';
+  if (key === 'best_record') return 'medal';
+  if (key === 'parlay_king') return 'link';
+  if (key === 'most_consistent') return 'analytics';
+  return 'flash';
+}
+
+function SeasonAwardsCard({ detail }: { detail: LeagueDetail }) {
+  if (detail.league.status !== 'complete' || !detail.seasonSnapshot) {
+    return null;
+  }
+
+  const awards = seasonAwardsFromJson(detail.seasonSnapshot.awards);
+  const championName = detail.seasonSnapshot.champion_user_id
+    ? getDisplayName(detail, detail.seasonSnapshot.champion_user_id)
+    : 'Champion pending';
+
+  if (awards.length === 0 && !detail.seasonSnapshot.champion_user_id) {
+    return null;
+  }
+
+  return (
+    <Card tone="highlight">
+      <View className="gap-4">
+        <View className="flex-row items-start justify-between gap-3">
+          <View className="flex-1">
+            <View className="flex-row items-center gap-2">
+              <Ionicons color={THEME_COLORS.gold} name="trophy" size={14} />
+              <Text className="text-[10px] font-black uppercase text-gold" style={{ letterSpacing: 2 }}>
+                Season Awards
+              </Text>
+            </View>
+            <Text
+              className="mt-2 text-2xl font-black uppercase text-white"
+              style={{ letterSpacing: -0.4 }}>
+              {detail.league.season_year} Trophy Case
+            </Text>
+            <Text className="mt-1 text-sm font-semibold text-white/55">
+              Final standings and awards are saved for this completed season.
+            </Text>
+          </View>
+          <View className="items-end rounded-2xl border border-gold/35 bg-gold/10 px-3 py-2">
+            <Text className="text-[10px] font-black uppercase text-gold" style={{ letterSpacing: 1.4 }}>
+              Champion
+            </Text>
+            <Text className="mt-1 text-sm font-black text-white" numberOfLines={1}>
+              {championName}
+            </Text>
+          </View>
+        </View>
+
+        <View className="gap-2">
+          {awards.map((award) => {
+            const winnerName = award.user_id ? getDisplayName(detail, award.user_id) : 'No winner';
+            return (
+              <View
+                className="flex-row items-center gap-3 rounded-2xl border border-gold/20 bg-gold/[0.06] p-3"
+                key={award.award_key}>
+                <View className="h-10 w-10 items-center justify-center rounded-2xl border border-gold/40 bg-gold/15">
+                  <Ionicons color={THEME_COLORS.gold} name={seasonAwardIcon(award.award_key)} size={18} />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-[10px] font-black uppercase text-gold" style={{ letterSpacing: 1.6 }}>
+                    {award.award_label}
+                  </Text>
+                  <Text className="mt-1 text-base font-black text-white" numberOfLines={1}>
+                    {winnerName}
+                  </Text>
+                </View>
+                {award.value_label ? (
+                  <Text className="text-sm font-black text-white/70" numberOfLines={1}>
+                    {award.value_label}
+                  </Text>
+                ) : null}
+              </View>
+            );
+          })}
+        </View>
+      </View>
+    </Card>
+  );
+}
+
 function StandingsBoard({
   detail,
   userId,
@@ -745,13 +858,33 @@ function MembersList({ detail }: { detail: LeagueDetail }) {
 
 function SharedBetCard({ metadata }: { metadata: SharedBetMetadata }) {
   const accent = betTypeAccent(metadata.betType);
+  const isLock = metadata.isLock === true;
 
   return (
     <PressableScale>
-      <View className="mt-2 rounded-2xl border bg-arena-bg/50 p-3" style={{ borderColor: `${accent}55` }}>
+      <View
+        className={cn(
+          'mt-2 rounded-2xl border bg-arena-bg/50 p-3',
+          isLock ? 'bg-gold/[0.07]' : null,
+        )}
+        style={{
+          borderColor: isLock ? THEME_COLORS.gold : `${accent}55`,
+          shadowColor: isLock ? THEME_COLORS.gold : accent,
+          shadowOffset: { width: 0, height: 0 },
+          shadowOpacity: isLock ? 0.3 : 0,
+          shadowRadius: isLock ? 10 : 0,
+        }}>
         <View className="flex-row items-center justify-between gap-3">
           <View className="flex-row items-center gap-2">
             <Badge betType={metadata.betType} />
+            {isLock ? (
+              <View className="flex-row items-center gap-1 rounded-full border border-gold/55 bg-gold/15 px-2 py-0.5">
+                <Ionicons color={THEME_COLORS.gold} name="star" size={10} />
+                <Text className="text-[9px] font-black uppercase text-gold" style={{ letterSpacing: 1 }}>
+                  Lock 1.5x
+                </Text>
+              </View>
+            ) : null}
             <Text
               className="text-[10px] font-black uppercase text-white/45"
               style={{ letterSpacing: 1.4 }}>
@@ -1221,6 +1354,7 @@ export default function LeagueDetailScreen() {
         <HeroHeader detail={detail} />
         <InviteCodeCard detail={detail} />
 
+        <SeasonAwardsCard detail={detail} />
         {awardsQuery.data ? <WeeklyAwardsCard awards={awardsQuery.data} /> : null}
 
         {detail.league.type === 'h2h' && currentUserMatchup ? (
