@@ -1,4 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, RefreshControl, ScrollView, Text, View } from 'react-native';
 
@@ -74,6 +75,7 @@ function LeagueManagementRow({
 
 export default function SettingsScreen() {
   const { signOut, user } = useAuth();
+  const router = useRouter();
   const profileQuery = useProfileData({
     targetUserId: user?.id,
     viewerUserId: user?.id,
@@ -244,9 +246,13 @@ export default function SettingsScreen() {
                 </View>
                 <Text className="text-xl font-black uppercase text-white">Action Arena Plus</Text>
                 <Text className="text-sm font-semibold text-white/55">
-                  Premium league customization, deeper stat cards, and commissioner tools are coming soon.
+                  Season Pass unlocks exclusive cosmetics, advanced analytics, early odds access, and future ad-free hooks.
                 </Text>
-                <Button title="Upgrade Placeholder" variant="secondary" />
+                <Button
+                  onPress={() => router.push('/season-pass')}
+                  title="View Season Pass"
+                  variant="secondary"
+                />
               </View>
             </Card>
 

@@ -1,5 +1,33 @@
 # Action Arena Changelog
 
+## 2026-04-26 Monetization Foundation
+
+### Arena Coins and Cosmetics
+
+- Added `arena_coins` to users with a 500-coin default for development/testing.
+- Added `cosmetic_catalog` and `user_cosmetics` infrastructure.
+- Added one-equipped-item-per-category enforcement for cosmetics.
+- Added coin store screen with placeholder purchase buttons for future Apple IAP.
+- Added Arena Shop screen with coin purchases, equip flow, category browsing, and animated previews.
+- Added cosmetic categories for team logos, trophy skins, Lock effects, win celebrations, chat sticker packs, and profile frames.
+- Added Season 1 exclusive cosmetics that are granted through Season Pass redemption.
+
+### Season Pass and Ads
+
+- Added `season_passes`, redeem-code support, and seed tester codes.
+- Added Season Pass screen with redeem-code flow and pass benefits.
+- Added advanced analytics screen gated behind Season Pass or a rewarded-ad placeholder unlock.
+- Added `odds_release_windows` and server-side Bet Board early-access enforcement.
+- Added invisible ad hooks for leaderboard banner and matchup-result interstitial placements.
+
+### Rendering and Analytics
+
+- Added reusable cosmetic rendering components for avatars, trophies, Lock effects, win celebrations, and chat stickers.
+- Rendered cosmetic avatars/profile frames in profile, leaderboard, league members, standings, chat, and matchup-related surfaces.
+- Added chat sticker sending/rendering.
+- Added lightweight console analytics for gameplay and monetization events.
+- Updated `AGENTS.md` with monetization schema and no-gameplay-gating rules.
+
 ## 2026-04-26 Session Update
 
 ### Lock of the Week

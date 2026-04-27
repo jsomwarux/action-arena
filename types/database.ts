@@ -26,15 +26,23 @@ export type NotificationType =
   | 'weekly_awards'
   | 'opponent_bets_locked';
 export type NotificationStatus = 'pending' | 'sent' | 'skipped' | 'failed';
-export type ChatMessageType = 'user' | 'system' | 'bet_share';
+export type ChatMessageType = 'user' | 'system' | 'bet_share' | 'sticker';
 export type SeasonAwardKey =
   | 'season_mvp'
   | 'best_record'
   | 'parlay_king'
   | 'most_consistent'
   | 'biggest_single_bet';
+export type CosmeticCategory =
+  | 'team_logo'
+  | 'trophy_skin'
+  | 'lock_effect'
+  | 'win_celebration'
+  | 'chat_sticker_pack'
+  | 'profile_frame';
 
 export type UserRow = {
+  arena_coins: number;
   avatar_url: string | null;
   created_at: string;
   display_name: string;
@@ -45,6 +53,7 @@ export type UserRow = {
 };
 
 export type UserInsert = {
+  arena_coins?: number;
   avatar_url?: string | null;
   created_at?: string;
   display_name: string;
@@ -342,6 +351,93 @@ export type LeagueChatMessageInsert = {
 
 export type LeagueChatMessageUpdate = Partial<LeagueChatMessageInsert>;
 
+export type CosmeticCatalogRow = {
+  category: CosmeticCategory;
+  coin_cost: number;
+  created_at: string;
+  is_season_pass_exclusive: boolean;
+  item_id: string;
+  name: string;
+  season_label: string | null;
+};
+
+export type CosmeticCatalogInsert = {
+  category: CosmeticCategory;
+  coin_cost?: number;
+  created_at?: string;
+  is_season_pass_exclusive?: boolean;
+  item_id: string;
+  name: string;
+  season_label?: string | null;
+};
+
+export type CosmeticCatalogUpdate = Partial<CosmeticCatalogInsert>;
+
+export type UserCosmeticRow = {
+  category: CosmeticCategory;
+  equipped_at: string | null;
+  id: string;
+  is_equipped: boolean;
+  item_id: string;
+  metadata: Json;
+  purchased_at: string;
+  user_id: string;
+};
+
+export type UserCosmeticInsert = {
+  category: CosmeticCategory;
+  equipped_at?: string | null;
+  id?: string;
+  is_equipped?: boolean;
+  item_id: string;
+  metadata?: Json;
+  purchased_at?: string;
+  user_id: string;
+};
+
+export type UserCosmeticUpdate = Partial<UserCosmeticInsert>;
+
+export type EquippedCosmeticsByCategory = Partial<Record<CosmeticCategory, UserCosmeticRow>>;
+
+export type SeasonPassRow = {
+  created_at: string;
+  id: string;
+  redeemed_code: string | null;
+  season_year: number;
+  source: string;
+  user_id: string;
+};
+
+export type SeasonPassInsert = {
+  created_at?: string;
+  id?: string;
+  redeemed_code?: string | null;
+  season_year: number;
+  source?: string;
+  user_id: string;
+};
+
+export type SeasonPassUpdate = Partial<SeasonPassInsert>;
+
+export type SeasonPassRedeemCodeRow = {
+  active: boolean;
+  code: string;
+  created_at: string;
+  expires_at: string | null;
+  max_redemptions: number | null;
+  redeemed_count: number;
+  season_year: number;
+};
+
+export type OddsReleaseWindowRow = {
+  created_at: string;
+  id: string;
+  odds_available_at: string;
+  season_year: number;
+  sport: LeagueSport;
+  week_number: number;
+};
+
 export type SeasonAward = {
   award_key: SeasonAwardKey;
   award_label: string;
@@ -452,6 +548,27 @@ export type Database = {
         };
         Returns: boolean;
       };
+      can_access_bet_board: {
+        Args: {
+          p_league_id: string;
+          p_user_id?: string;
+          p_week_number: number;
+        };
+        Returns: boolean;
+      };
+      equip_cosmetic: {
+        Args: {
+          p_item_id: string;
+        };
+        Returns: string;
+      };
+      has_season_pass: {
+        Args: {
+          target_season_year?: number;
+          target_user_id?: string;
+        };
+        Returns: boolean;
+      };
       join_league: {
         Args: {
           p_league_id: string;
@@ -475,6 +592,19 @@ export type Database = {
       };
       make_invite_code: {
         Args: Record<PropertyKey, never>;
+        Returns: string;
+      };
+      purchase_cosmetic: {
+        Args: {
+          p_item_id: string;
+        };
+        Returns: string;
+      };
+      redeem_season_pass: {
+        Args: {
+          p_code: string;
+          p_season_year?: number;
+        };
         Returns: string;
       };
       resolve_ready_weekly_standings: {
@@ -508,6 +638,12 @@ export type Database = {
       };
     };
     Tables: {
+      cosmetic_catalog: {
+        Insert: CosmeticCatalogInsert;
+        Relationships: [];
+        Row: CosmeticCatalogRow;
+        Update: CosmeticCatalogUpdate;
+      };
       bet_legs: {
         Insert: BetLegInsert;
         Relationships: [
@@ -676,6 +812,62 @@ export type Database = {
         Row: NotificationPreferencesRow;
         Update: NotificationPreferencesUpdate;
       };
+      odds_release_windows: {
+        Insert: {
+          created_at?: string;
+          id?: string;
+          odds_available_at: string;
+          season_year: number;
+          sport?: LeagueSport;
+          week_number: number;
+        };
+        Relationships: [];
+        Row: OddsReleaseWindowRow;
+        Update: Partial<{
+          created_at: string;
+          id: string;
+          odds_available_at: string;
+          season_year: number;
+          sport: LeagueSport;
+          week_number: number;
+        }>;
+      };
+      season_passes: {
+        Insert: SeasonPassInsert;
+        Relationships: [
+          {
+            columns: ['user_id'];
+            foreignKeyName: 'season_passes_user_id_fkey';
+            isOneToOne: false;
+            referencedColumns: ['id'];
+            referencedRelation: 'users';
+          },
+        ];
+        Row: SeasonPassRow;
+        Update: SeasonPassUpdate;
+      };
+      season_pass_redeem_codes: {
+        Insert: {
+          active?: boolean;
+          code: string;
+          created_at?: string;
+          expires_at?: string | null;
+          max_redemptions?: number | null;
+          redeemed_count?: number;
+          season_year: number;
+        };
+        Relationships: [];
+        Row: SeasonPassRedeemCodeRow;
+        Update: Partial<{
+          active: boolean;
+          code: string;
+          created_at: string;
+          expires_at: string | null;
+          max_redemptions: number | null;
+          redeemed_count: number;
+          season_year: number;
+        }>;
+      };
       standings: {
         Insert: StandingInsert;
         Relationships: [
@@ -717,6 +909,27 @@ export type Database = {
         ];
         Row: UserAchievementRow;
         Update: UserAchievementUpdate;
+      };
+      user_cosmetics: {
+        Insert: UserCosmeticInsert;
+        Relationships: [
+          {
+            columns: ['item_id'];
+            foreignKeyName: 'user_cosmetics_item_id_fkey';
+            isOneToOne: false;
+            referencedColumns: ['item_id'];
+            referencedRelation: 'cosmetic_catalog';
+          },
+          {
+            columns: ['user_id'];
+            foreignKeyName: 'user_cosmetics_user_id_fkey';
+            isOneToOne: false;
+            referencedColumns: ['id'];
+            referencedRelation: 'users';
+          },
+        ];
+        Row: UserCosmeticRow;
+        Update: UserCosmeticUpdate;
       };
       users: {
         Insert: UserInsert;

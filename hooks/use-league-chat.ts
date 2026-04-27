@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
+import { logAnalyticsEvent } from '@/lib/analytics';
 import { supabase } from '@/lib/supabase';
 import type {
   BetWithLegs,
@@ -36,6 +37,11 @@ export type SharedBetMetadata = {
   potentialPayout: number;
   result: BetWithLegs['result'];
   weekNumber: number;
+};
+
+export type StickerMessageMetadata = {
+  stickerId: string;
+  stickerName: string;
 };
 
 const chatKeys = {
@@ -171,6 +177,47 @@ export function useSendLeagueChatMessage(leagueId: string | undefined, userId: s
       return assertSupabaseResult(data, error);
     },
     onSuccess: async () => {
+      logAnalyticsEvent('chat_message_sent', {
+        league_id: leagueId,
+        user_id: userId,
+      });
+      await queryClient.invalidateQueries({ queryKey: ['league-chat', leagueId] });
+    },
+  });
+}
+
+export function useSendLeagueChatSticker(leagueId: string | undefined, userId: string | undefined) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (sticker: StickerMessageMetadata) => {
+      if (!leagueId || !userId) {
+        throw new Error('League and user are required.');
+      }
+
+      const payload: LeagueChatMessageInsert = {
+        body: sticker.stickerName,
+        league_id: leagueId,
+        message_type: 'sticker',
+        metadata: sticker as unknown as Json,
+        user_id: userId,
+      };
+
+      const { data, error } = await supabase
+        .from('league_chat_messages')
+        .insert(payload)
+        .select('*')
+        .single();
+
+      return assertSupabaseResult(data, error);
+    },
+    onSuccess: async (_data, sticker) => {
+      logAnalyticsEvent('chat_message_sent', {
+        league_id: leagueId,
+        message_type: 'sticker',
+        sticker_id: sticker.stickerId,
+        user_id: userId,
+      });
       await queryClient.invalidateQueries({ queryKey: ['league-chat', leagueId] });
     },
   });
@@ -203,6 +250,13 @@ export function useShareBetToChat(userId: string | undefined) {
       return assertSupabaseResult(data, error);
     },
     onSuccess: async (_data, bet) => {
+      logAnalyticsEvent('bet_shared_to_chat', {
+        bet_id: bet.id,
+        bet_type: bet.bet_type,
+        is_lock: bet.is_lock,
+        league_id: bet.league_id,
+        user_id: userId,
+      });
       await queryClient.invalidateQueries({ queryKey: ['league-chat', bet.league_id] });
     },
   });

@@ -229,6 +229,12 @@ Deno.serve(async (request) => {
 
     const durationMs = Date.now() - startedAt;
     console.info('Completed bet settlement run', { durationMs, settlement: data });
+    console.info('[analytics]', 'bet_settled', {
+      durationMs,
+      result: 'summary',
+      settled_bets: data?.settled_bets ?? 0,
+      sportKey,
+    });
 
     return new Response(
       JSON.stringify({

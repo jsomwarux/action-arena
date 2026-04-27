@@ -1,5 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect } from 'react';
 import { RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -8,6 +9,7 @@ import { Card, PressableScale, SkeletonLoader } from '@/components/ui';
 import { THEME_COLORS } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
 import { buildMemberComparison, useProfileData } from '@/hooks/use-profile-stats';
+import { logAnalyticsEvent } from '@/lib/analytics';
 
 function getParamValue(param: string | string[] | undefined) {
   return Array.isArray(param) ? param[0] : param;
@@ -36,6 +38,15 @@ export default function MemberProfileScreen() {
     targetUserId: resolvedMemberId,
     viewerUserId: user?.id,
   });
+
+  useEffect(() => {
+    if (!resolvedMemberId) return;
+    logAnalyticsEvent('profile_viewed', {
+      league_id: resolvedLeagueId,
+      target_user_id: resolvedMemberId,
+      user_id: user?.id,
+    });
+  }, [resolvedLeagueId, resolvedMemberId, user?.id]);
 
   if (profileQuery.isLoading) {
     return <LoadingState />;

@@ -3,9 +3,11 @@ import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ScrollView, Text, View } from 'react-native';
 
+import { LockEffect } from '@/components/cosmetics';
 import { Badge, Button, Card, ScreenWrapper, SkeletonLoader } from '@/components/ui';
 import { THEME_COLORS } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
+import { useUserCosmetics } from '@/hooks/use-cosmetics';
 import { useShareBetToChat } from '@/hooks/use-league-chat';
 import { supabase } from '@/lib/supabase';
 import {
@@ -59,6 +61,7 @@ export default function BetDetailScreen() {
   const resolvedBetId = getParamValue(betId);
   const betQuery = useBetDetail(resolvedBetId);
   const shareBet = useShareBetToChat(user?.id);
+  const cosmeticsQuery = useUserCosmetics(user?.id);
 
   return (
     <ScreenWrapper className="pb-0">
@@ -75,8 +78,10 @@ export default function BetDetailScreen() {
 
         {betQuery.data ? (
           <>
-            <Card tone={betQuery.data.result === 'win' ? 'highlight' : 'default'}>
-              <View className="gap-5">
+            <LockEffect
+              cosmetics={betQuery.data.is_lock ? cosmeticsQuery.data?.equippedByCategory : undefined}>
+              <Card tone={betQuery.data.result === 'win' ? 'highlight' : 'default'}>
+                <View className="gap-5">
                 <View className="flex-row items-start justify-between gap-3">
                   <View className="flex-1">
                     <View className="flex-row items-center gap-2">
@@ -133,8 +138,9 @@ export default function BetDetailScreen() {
                   title="Share to Chat"
                   variant="secondary"
                 />
-              </View>
-            </Card>
+                </View>
+              </Card>
+            </LockEffect>
 
             <View className="gap-3">
               {betQuery.data.bet_legs.map((leg, index) => (

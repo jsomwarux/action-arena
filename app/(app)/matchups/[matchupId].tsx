@@ -1,8 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
 import { RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { LockEffect, WinCelebration } from '@/components/cosmetics';
 import {
   AnimatedNumber,
   Badge,
@@ -12,13 +14,19 @@ import {
   SkeletonLoader,
   StaggeredItem,
 } from '@/components/ui';
+import { LOCK_OF_THE_WEEK_MULTIPLIER } from '@/constants/rules';
 import { THEME_COLORS } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
+import { useEquippedCosmeticsForUsers } from '@/hooks/use-cosmetics';
+import { useLocalFlag } from '@/hooks/use-local-flags';
 import {
   type BetWithLegs,
   type MatchupDetail,
   useMatchupDetail,
 } from '@/hooks/use-matchups';
+import { useSeasonPass } from '@/hooks/use-season-pass';
+import { logAnalyticsEvent } from '@/lib/analytics';
+import { triggerAdHook } from '@/lib/ad-hooks';
 import { cn } from '@/lib/cn';
 import {
   formatAmericanOdds,
@@ -28,7 +36,13 @@ import {
   formatRecord,
   getProfitTone,
 } from '@/lib/format';
-import type { BetLegRow, BetResult, BetType, UserRow } from '@/types/database';
+import type {
+  BetLegRow,
+  BetResult,
+  BetType,
+  EquippedCosmeticsByCategory,
+  UserRow,
+} from '@/types/database';
 
 type Side = 'home' | 'away';
 
@@ -195,7 +209,15 @@ function EmptyBets({ side }: { side: 'You' | 'Opponent' | 'Player' }) {
   );
 }
 
-function BetCard({ bet, isUser }: { bet: BetWithLegs; isUser: boolean }) {
+function BetCard({
+  bet,
+  cosmetics,
+  isUser,
+}: {
+  bet: BetWithLegs;
+  cosmetics?: EquippedCosmeticsByCategory;
+  isUser: boolean;
+}) {
   const accent = betTypeAccent(bet.bet_type);
   const inProgress = isInProgress(bet);
   const isMultiLeg = bet.bet_type !== 'straight';
@@ -339,12 +361,12 @@ function BetCard({ bet, isUser }: { bet: BetWithLegs; isUser: boolean }) {
   if (inProgress) {
     return (
       <LivePulse color={THEME_COLORS.gold} intensity={0.55}>
-        {inner}
+        {isLock ? <LockEffect cosmetics={cosmetics}>{inner}</LockEffect> : inner}
       </LivePulse>
     );
   }
 
-  return inner;
+  return isLock ? <LockEffect cosmetics={cosmetics}>{inner}</LockEffect> : inner;
 }
 
 function PlayerSide({
@@ -610,8 +632,202 @@ function FightCardHeader({
   );
 }
 
+function LockShowdownSide({
+  bet,
+  cosmetics,
+  isUser,
+  name,
+  sideLabel,
+}: {
+  bet: BetWithLegs | null;
+  cosmetics?: EquippedCosmeticsByCategory;
+  isUser: boolean;
+  name: string;
+  sideLabel: string;
+}) {
+  const lockProfit = bet?.profit ?? null;
+  const settled = bet?.result === 'win' || bet?.result === 'loss';
+  const inProgress = bet ? isInProgress(bet) : false;
+  const result = bet?.result ?? 'pending';
+
+  return (
+    <View className="flex-1 gap-3">
+      <View className="items-center gap-1">
+        <Text
+          className="text-[10px] font-black uppercase text-gold/85"
+          style={{ letterSpacing: 1.5 }}>
+          {sideLabel}
+        </Text>
+        <Text
+          className="text-base font-black text-white"
+          numberOfLines={1}
+          style={{ letterSpacing: -0.2 }}>
+          {name}
+        </Text>
+      </View>
+      {bet ? (
+        <LockEffect cosmetics={cosmetics}>
+          <View
+            className={cn(
+              'overflow-hidden rounded-2xl border bg-gold/[0.10]',
+              isUser ? 'border-gold' : 'border-gold/55',
+            )}
+            style={{
+              borderWidth: 2,
+              shadowColor: THEME_COLORS.gold,
+              shadowOffset: { width: 0, height: 6 },
+              shadowOpacity: isUser ? 0.5 : 0.35,
+              shadowRadius: isUser ? 16 : 12,
+            }}>
+          <View className="gap-2 p-3">
+            <View className="flex-row flex-wrap items-center gap-1.5">
+              <Badge betType={bet.bet_type} />
+              <View className="flex-row items-center gap-1 rounded-full border border-gold/55 bg-gold/15 px-1.5 py-0.5">
+                <Ionicons color={THEME_COLORS.gold} name="star" size={9} />
+                <Text className="text-[9px] font-black uppercase text-gold" style={{ letterSpacing: 1 }}>
+                  1.5x
+                </Text>
+              </View>
+            </View>
+            <Text
+              className="text-sm font-black text-white"
+              numberOfLines={2}
+              style={{ letterSpacing: -0.2 }}>
+              {bet.bet_type === 'straight'
+                ? bet.bet_legs[0]?.selection ?? 'Straight bet'
+                : `${bet.bet_legs.length}-leg ${bet.bet_type}`}
+            </Text>
+            <Text className="text-[11px] font-semibold text-white/55">
+              {formatAmericanOdds(bet.odds)} · {formatCurrency(bet.amount)}
+            </Text>
+            <View className="mt-1 flex-row items-center justify-between border-t border-gold/25 pt-2">
+              <Text
+                className={cn(
+                  'text-[10px] font-black uppercase',
+                  inProgress
+                    ? 'text-gold'
+                    : result === 'win'
+                      ? 'text-electric-green'
+                      : result === 'loss'
+                        ? 'text-coral-red'
+                        : 'text-white/55',
+                )}
+                style={{ letterSpacing: 1.2 }}>
+                {inProgress
+                  ? 'Live'
+                  : result === 'win'
+                    ? 'Win · 1.5x'
+                    : result === 'loss'
+                      ? 'Loss · 1.5x'
+                      : result === 'push'
+                        ? 'Push'
+                        : 'Pending'}
+              </Text>
+              <Text
+                className={cn(
+                  'text-base font-black',
+                  settled && lockProfit !== null
+                    ? getProfitTone(lockProfit)
+                    : 'text-white/65',
+                )}
+                style={{ letterSpacing: -0.3 }}>
+                {settled && lockProfit !== null ? formatProfit(lockProfit) : '–'}
+              </Text>
+            </View>
+          </View>
+          </View>
+        </LockEffect>
+      ) : (
+        <View className="items-center justify-center rounded-2xl border border-dashed border-gold/25 bg-white/[0.02] px-3 py-5">
+          <Ionicons color="rgba(255,215,0,0.55)" name="star-outline" size={22} />
+          <Text className="mt-2 text-center text-xs font-semibold text-white/45">
+            No Lock filed
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
+function LockShowdown({
+  awayBet,
+  awayCosmetics,
+  awayName,
+  homeBet,
+  homeCosmetics,
+  homeIsUser,
+  homeName,
+  awayIsUser,
+}: {
+  awayBet: BetWithLegs | null;
+  awayCosmetics?: EquippedCosmeticsByCategory;
+  awayName: string;
+  awayIsUser: boolean;
+  homeBet: BetWithLegs | null;
+  homeCosmetics?: EquippedCosmeticsByCategory;
+  homeIsUser: boolean;
+  homeName: string;
+}) {
+  if (!homeBet && !awayBet) return null;
+
+  return (
+    <Card>
+      <View className="gap-4">
+        <View className="items-center gap-1">
+          <View className="flex-row items-center gap-1.5">
+            <Ionicons color={THEME_COLORS.gold} name="star" size={13} />
+            <Text
+              className="text-[10px] font-black uppercase text-gold"
+              style={{ letterSpacing: 2.4 }}>
+              Lock vs Lock · Headline Fight
+            </Text>
+            <Ionicons color={THEME_COLORS.gold} name="star" size={13} />
+          </View>
+          <Text className="text-[11px] font-medium text-white/55">
+            Each Lock pays or costs {LOCK_OF_THE_WEEK_MULTIPLIER}x. The biggest swing of the week.
+          </Text>
+        </View>
+
+        <View className="flex-row items-stretch gap-3">
+          <LockShowdownSide
+            bet={homeBet}
+            cosmetics={homeCosmetics}
+            isUser={homeIsUser}
+            name={homeName}
+            sideLabel="Home Lock"
+          />
+          <View className="items-center justify-center">
+            <View
+              className="h-10 w-10 items-center justify-center rounded-full border border-gold/55 bg-gold/15"
+              style={{
+                shadowColor: THEME_COLORS.gold,
+                shadowOffset: { width: 0, height: 0 },
+                shadowOpacity: 0.5,
+                shadowRadius: 10,
+              }}>
+              <Text
+                className="text-xs font-black text-gold"
+                style={{ letterSpacing: 0.5 }}>
+                VS
+              </Text>
+            </View>
+          </View>
+          <LockShowdownSide
+            bet={awayBet}
+            cosmetics={awayCosmetics}
+            isUser={awayIsUser}
+            name={awayName}
+            sideLabel="Away Lock"
+          />
+        </View>
+      </View>
+    </Card>
+  );
+}
+
 function BetColumnSection({
   bets,
+  cosmetics,
   emptyVariant,
   isUser,
   side,
@@ -619,6 +835,7 @@ function BetColumnSection({
   title,
 }: {
   bets: BetWithLegs[];
+  cosmetics?: EquippedCosmeticsByCategory;
   emptyVariant: 'You' | 'Opponent' | 'Player';
   isUser: boolean;
   side: Side;
@@ -682,7 +899,7 @@ function BetColumnSection({
         <View className="gap-3">
           {bets.map((bet, index) => (
             <StaggeredItem index={index} key={bet.id} perItemDelay={60}>
-              <BetCard bet={bet} isUser={isUser} />
+              <BetCard bet={bet} cosmetics={cosmetics} isUser={isUser} />
             </StaggeredItem>
           ))}
         </View>
@@ -711,6 +928,57 @@ export default function MatchupDetailScreen() {
   const { user } = useAuth();
   const matchupQuery = useMatchupDetail(resolvedMatchupId);
   const detail = matchupQuery.data;
+  const userId = user?.id;
+  const seasonPassQuery = useSeasonPass(userId);
+  const cosmeticsQuery = useEquippedCosmeticsForUsers([
+    detail?.matchup.home_user_id,
+    detail?.matchup.away_user_id,
+    userId,
+  ]);
+  const celebrationFlag = useLocalFlag(
+    resolvedMatchupId ? `action-arena.win-celebration.${resolvedMatchupId}` : 'action-arena.win-celebration.pending',
+  );
+  const [celebrationVisible, setCelebrationVisible] = useState(false);
+  const adHookTriggered = useRef(false);
+  const userWonMatchupForEffect = Boolean(
+    userId && detail?.matchup.winner_id && detail.matchup.winner_id === userId,
+  );
+
+  useEffect(() => {
+    if (!detail) return;
+    logAnalyticsEvent('matchup_viewed', {
+      league_id: detail.matchup.league_id,
+      matchup_id: detail.matchup.id,
+      user_id: userId,
+      week_number: detail.matchup.week_number,
+    });
+  }, [detail, userId]);
+
+  useEffect(() => {
+    if (!detail || adHookTriggered.current || seasonPassQuery.isLoading) {
+      return;
+    }
+
+    const isSettled = detail.matchup.home_profit !== null || detail.matchup.away_profit !== null;
+    if (!isSettled) {
+      return;
+    }
+
+    adHookTriggered.current = true;
+    triggerAdHook({
+      isSeasonPassHolder: Boolean(seasonPassQuery.data),
+      placement: 'matchup_result_interstitial',
+      userId,
+    });
+  }, [detail, seasonPassQuery.data, seasonPassQuery.isLoading, userId]);
+
+  useEffect(() => {
+    if (!userWonMatchupForEffect || celebrationFlag.isLoading || celebrationFlag.value) {
+      return;
+    }
+
+    setCelebrationVisible(true);
+  }, [celebrationFlag.isLoading, celebrationFlag.value, userWonMatchupForEffect]);
 
   if (matchupQuery.isLoading) {
     return <LoadingState />;
@@ -740,14 +1008,30 @@ export default function MatchupDetailScreen() {
   const awayProfit = detail.matchup.away_profit ?? detail.awayStanding?.weekly_profit ?? 0;
   const homeName = detail.homeUser?.display_name ?? 'Home';
   const awayName = detail.awayUser?.display_name ?? 'Bye Week';
-  const userId = user?.id;
+  const cosmeticsByUserId = cosmeticsQuery.data ?? {};
 
   const userWonMatchup = Boolean(
     userId && detail.matchup.winner_id && detail.matchup.winner_id === userId,
   );
 
+  const homeLockBet = detail.homeBets.find((bet) => bet.is_lock) ?? null;
+  const awayLockBet = detail.awayBets.find((bet) => bet.is_lock) ?? null;
+  const homeNonLockBets = detail.homeBets.filter((bet) => !bet.is_lock);
+  const awayNonLockBets = detail.awayBets.filter((bet) => !bet.is_lock);
+  const homeIsUser = detail.matchup.home_user_id === userId;
+  const awayIsUser = Boolean(detail.matchup.away_user_id) && detail.matchup.away_user_id === userId;
+
   return (
     <SafeAreaView className="flex-1 bg-arena-bg">
+      <WinCelebration
+        cosmetics={userId ? cosmeticsByUserId[userId] : undefined}
+        fireKey={resolvedMatchupId}
+        onComplete={() => {
+          setCelebrationVisible(false);
+          void celebrationFlag.markComplete();
+        }}
+        visible={celebrationVisible}
+      />
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ gap: 18, padding: 20, paddingBottom: 36 }}
@@ -806,27 +1090,47 @@ export default function MatchupDetailScreen() {
           homeName={homeName}
           homeProfit={homeProfit}
         />
+        <LockShowdown
+          awayBet={awayLockBet}
+          awayCosmetics={
+            detail.matchup.away_user_id
+              ? cosmeticsByUserId[detail.matchup.away_user_id]
+              : undefined
+          }
+          awayIsUser={awayIsUser}
+          awayName={awayName}
+          homeBet={homeLockBet}
+          homeCosmetics={cosmeticsByUserId[detail.matchup.home_user_id]}
+          homeIsUser={homeIsUser}
+          homeName={homeName}
+        />
         <View className="gap-5">
           <BetColumnSection
-            bets={detail.homeBets}
-            emptyVariant={detail.matchup.home_user_id === userId ? 'You' : 'Opponent'}
-            isUser={detail.matchup.home_user_id === userId}
+            bets={homeNonLockBets}
+            cosmetics={cosmeticsByUserId[detail.matchup.home_user_id]}
+            emptyVariant={homeIsUser ? 'You' : 'Opponent'}
+            isUser={homeIsUser}
             side="home"
-            subtitle={`${detail.homeBets.length === 0 ? 'No' : detail.homeBets.length} ${
-              detail.homeBets.length === 1 ? 'bet' : 'bets'
-            } locked in for the slate`}
+            subtitle={`${homeNonLockBets.length === 0 ? 'No' : homeNonLockBets.length} undercard ${
+              homeNonLockBets.length === 1 ? 'bet' : 'bets'
+            } besides the Lock`}
             title={homeName}
           />
           <BetColumnSection
-            bets={detail.awayBets}
-            emptyVariant={detail.matchup.away_user_id === userId ? 'You' : detail.matchup.away_user_id ? 'Opponent' : 'Player'}
-            isUser={Boolean(detail.matchup.away_user_id) && detail.matchup.away_user_id === userId}
+            bets={awayNonLockBets}
+            cosmetics={
+              detail.matchup.away_user_id
+                ? cosmeticsByUserId[detail.matchup.away_user_id]
+                : undefined
+            }
+            emptyVariant={awayIsUser ? 'You' : detail.matchup.away_user_id ? 'Opponent' : 'Player'}
+            isUser={awayIsUser}
             side="away"
             subtitle={
               detail.matchup.away_user_id
-                ? `${detail.awayBets.length === 0 ? 'No' : detail.awayBets.length} ${
-                    detail.awayBets.length === 1 ? 'bet' : 'bets'
-                  } locked in for the slate`
+                ? `${awayNonLockBets.length === 0 ? 'No' : awayNonLockBets.length} undercard ${
+                    awayNonLockBets.length === 1 ? 'bet' : 'bets'
+                  } besides the Lock`
                 : 'Opponent has a bye this week.'
             }
             title={awayName}

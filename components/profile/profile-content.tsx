@@ -10,9 +10,11 @@ import {
   type ViewStyle,
 } from 'react-native';
 
+import { CosmeticAvatar } from '@/components/cosmetics';
 import { Badge, Card, StaggeredItem } from '@/components/ui';
 import { THEME_COLORS } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
+import { useEquippedCosmeticsForUsers } from '@/hooks/use-cosmetics';
 import { useShareBetToChat } from '@/hooks/use-league-chat';
 import {
   buildProfileSummary,
@@ -950,16 +952,29 @@ function BetHistoryCard({ bet }: { bet: BetWithLegs }) {
   const tone = RESULT_TONE[bet.result];
   const profit = bet.profit ?? 0;
   const isMultiLeg = bet.bet_type !== 'straight';
+  const isLock = bet.is_lock;
 
   return (
-    <View className="overflow-hidden rounded-2xl border bg-white/[0.04]" style={{ borderColor: `${meta.accent}26` }}>
-      <View className={cn('h-[3px] w-full', tone.bar)} />
+    <View
+      className={cn(
+        'overflow-hidden rounded-2xl border',
+        isLock ? 'bg-gold/[0.06]' : 'bg-white/[0.04]',
+      )}
+      style={{
+        borderColor: isLock ? THEME_COLORS.gold : `${meta.accent}26`,
+        borderWidth: isLock ? 1.5 : 1,
+        shadowColor: isLock ? THEME_COLORS.gold : 'transparent',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: isLock ? 0.25 : 0,
+        shadowRadius: isLock ? 10 : 0,
+      }}>
+      <View className={cn('h-[3px] w-full', isLock ? 'bg-gold' : tone.bar)} />
       <View className="gap-3 p-4">
         <View className="flex-row items-start justify-between gap-3">
           <View className="flex-1 gap-2">
-            <View className="flex-row items-center gap-2">
+            <View className="flex-row flex-wrap items-center gap-2">
               <Badge betType={bet.bet_type} />
-              {bet.is_lock ? <LockPill /> : null}
+              {isLock ? <LockPill /> : null}
               <Text
                 className="text-[10px] font-black uppercase text-white/45"
                 style={{ letterSpacing: 1.4 }}>
@@ -1431,6 +1446,7 @@ export function ProfileContent({
   title,
 }: ProfileContentProps) {
   const [selectedLeagueId, setSelectedLeagueId] = useState<string | 'all'>(initialLeagueId);
+  const cosmeticsQuery = useEquippedCosmeticsForUsers([data.profile.id]);
   const resolvedLeagueId =
     readOnlyLeague && data.leagueOptions[0] ? data.leagueOptions[0].id : selectedLeagueId;
   const summary = useMemo(
@@ -1441,23 +1457,30 @@ export function ProfileContent({
   return (
     <View className="gap-4">
       <View className="gap-3">
-        <View>
-          <View className="flex-row items-center gap-2">
-            <View className="h-1.5 w-1.5 rounded-full bg-electric-green" />
+        <View className="flex-row items-center gap-4">
+          <CosmeticAvatar
+            cosmetics={cosmeticsQuery.data?.[data.profile.id]}
+            name={data.profile.display_name}
+            size="lg"
+          />
+          <View className="flex-1">
+            <View className="flex-row items-center gap-2">
+              <View className="h-1.5 w-1.5 rounded-full bg-electric-green" />
+              <Text
+                className="text-xs font-semibold uppercase text-electric-green"
+                style={{ letterSpacing: 1.2 }}>
+                Player Card
+              </Text>
+            </View>
             <Text
-              className="text-xs font-semibold uppercase text-electric-green"
-              style={{ letterSpacing: 1.2 }}>
-              Player Card
+              className="mt-1 text-3xl font-extrabold text-white"
+              style={{ letterSpacing: -0.5 }}>
+              {title}
+            </Text>
+            <Text className="mt-1.5 text-base font-medium text-white/60">
+              {data.profile.display_name}
             </Text>
           </View>
-          <Text
-            className="mt-1 text-3xl font-extrabold text-white"
-            style={{ letterSpacing: -0.5 }}>
-            {title}
-          </Text>
-          <Text className="mt-1.5 text-base font-medium text-white/60">
-            {data.profile.display_name}
-          </Text>
         </View>
         <LeagueSelector
           onSelect={setSelectedLeagueId}

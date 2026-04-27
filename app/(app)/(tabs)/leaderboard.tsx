@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
-import { type ReactNode, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Pressable,
   RefreshControl,
@@ -11,6 +11,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 
+import { CosmeticAvatar } from '@/components/cosmetics';
 import {
   Badge,
   Button,
@@ -20,9 +21,13 @@ import {
 } from '@/components/ui';
 import { THEME_COLORS } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
+import { useEquippedCosmeticsForUsers } from '@/hooks/use-cosmetics';
 import { type LeaderboardRow, useLeaderboardData } from '@/hooks/use-profile-stats';
+import { useSeasonPass } from '@/hooks/use-season-pass';
+import { triggerAdHook } from '@/lib/ad-hooks';
 import { cn } from '@/lib/cn';
 import { formatProfit, formatRecord, getProfitTone } from '@/lib/format';
+import type { EquippedCosmeticsByCategory } from '@/types/database';
 
 type BoardView = 'season' | 'week';
 
@@ -242,12 +247,14 @@ function LoadingState() {
 }
 
 function PodiumCard({
+  cosmetics,
   index,
   isUser,
   onPress,
   row,
   value,
 }: {
+  cosmetics?: EquippedCosmeticsByCategory;
   index: number;
   isUser: boolean;
   onPress: () => void;
@@ -256,7 +263,7 @@ function PodiumCard({
 }) {
   const accent = rankAccent(row.standing?.rank ?? index + 1);
   const trend = trendDescriptor(row.trend);
-  const initials = getInitials(row.member.team_name || row.profile?.display_name || '?');
+  const avatarName = row.member.team_name || row.profile?.display_name || '?';
 
   return (
     <TapTarget onPress={onPress} style={{ flex: 1 }}>
@@ -273,15 +280,8 @@ function PodiumCard({
             : undefined
         }>
         <Ionicons color={accent.iconColor} name={accent.icon} size={16} />
-        <View
-          className={cn(
-            'mt-1.5 h-10 w-10 items-center justify-center rounded-xl border',
-            accent.border,
-            accent.bg,
-          )}>
-          <Text className={cn('text-sm font-bold uppercase', accent.text)}>
-            {initials || '?'}
-          </Text>
+        <View className="mt-1.5">
+          <CosmeticAvatar cosmetics={cosmetics} name={avatarName} size="md" />
         </View>
         <Text
           className="mt-1.5 text-center text-xs font-semibold text-white"
@@ -305,12 +305,14 @@ function PodiumCard({
 }
 
 function LeaderboardListRow({
+  cosmetics,
   isUser,
   onPress,
   row,
   showRank,
   value,
 }: {
+  cosmetics?: EquippedCosmeticsByCategory;
   isUser: boolean;
   onPress: () => void;
   row: LeaderboardRow;
@@ -360,6 +362,11 @@ function LeaderboardListRow({
 
         <View className="flex-1">
           <View className="flex-row items-center gap-2">
+            <CosmeticAvatar
+              cosmetics={cosmetics}
+              name={row.member.team_name || row.profile?.display_name || 'Player'}
+              size="sm"
+            />
             <Text
               className="text-base font-bold text-white"
               numberOfLines={1}
@@ -401,6 +408,7 @@ function LeaderboardListRow({
 
 function StickyUserBar({
   boardView,
+  cosmetics,
   isLeading,
   onPress,
   row,
@@ -408,6 +416,7 @@ function StickyUserBar({
   value,
 }: {
   boardView: BoardView;
+  cosmetics?: EquippedCosmeticsByCategory;
   isLeading: boolean;
   onPress: () => void;
   row: LeaderboardRow;
@@ -427,16 +436,11 @@ function StickyUserBar({
           shadowOpacity: 0.35,
           shadowRadius: 12,
         }}>
-        <View
-          className="h-10 w-10 items-center justify-center rounded-xl border border-electric-green/55 bg-electric-green/15"
-          style={{
-            shadowColor: THEME_COLORS.electricGreen,
-            shadowOffset: { width: 0, height: 0 },
-            shadowOpacity: 0.45,
-            shadowRadius: 8,
-          }}>
-          <Text className="text-sm font-bold text-electric-green">#{rank}</Text>
-        </View>
+        <CosmeticAvatar
+          cosmetics={cosmetics}
+          name={row.member.team_name || row.profile?.display_name || 'Player'}
+          size="md"
+        />
         <View className="flex-1">
           <Text
             className="text-[10px] font-semibold uppercase text-electric-green"
@@ -485,6 +489,8 @@ export default function LeaderboardScreen() {
   const [selectedLeagueId, setSelectedLeagueId] = useState<string | undefined>();
   const [boardView, setBoardView] = useState<BoardView>('season');
   const leaderboardQuery = useLeaderboardData(user?.id, selectedLeagueId);
+  const seasonPassQuery = useSeasonPass(user?.id);
+  const adHookTriggered = useRef(false);
   const selectedLeague = useMemo(
     () =>
       leaderboardQuery.data?.leagues.find((league) => league.id === selectedLeagueId) ??
@@ -506,6 +512,23 @@ export default function LeaderboardScreen() {
   const userRowIndex = sortedRows.findIndex((row) => row.member.user_id === user?.id);
   const userRow = userRowIndex >= 0 ? sortedRows[userRowIndex] : null;
   const podiumRows = sortedRows.slice(0, Math.min(3, sortedRows.length));
+  const cosmeticsQuery = useEquippedCosmeticsForUsers(
+    sortedRows.map((row) => row.member.user_id),
+  );
+  const cosmeticsByUserId = cosmeticsQuery.data ?? {};
+
+  useEffect(() => {
+    if (adHookTriggered.current || leaderboardQuery.isLoading || seasonPassQuery.isLoading) {
+      return;
+    }
+
+    adHookTriggered.current = true;
+    triggerAdHook({
+      isSeasonPassHolder: Boolean(seasonPassQuery.data),
+      placement: 'leaderboard_banner',
+      userId: user?.id,
+    });
+  }, [leaderboardQuery.isLoading, seasonPassQuery.data, seasonPassQuery.isLoading, user?.id]);
 
   const valueFor = (row: LeaderboardRow | undefined) =>
     row && row.standing
@@ -584,6 +607,7 @@ export default function LeaderboardScreen() {
               <View className="flex-row items-end gap-3">
                 {/* Reorder so #2 - #1 - #3 visually podium */}
                 <PodiumCard
+                  cosmetics={podiumRows[1] ? cosmeticsByUserId[podiumRows[1].member.user_id] : undefined}
                   index={1}
                   isUser={podiumRows[1]?.member.user_id === user?.id}
                   onPress={() =>
@@ -601,6 +625,7 @@ export default function LeaderboardScreen() {
                 />
                 <View className="flex-1" style={{ marginBottom: 12 }}>
                   <PodiumCard
+                    cosmetics={podiumRows[0] ? cosmeticsByUserId[podiumRows[0].member.user_id] : undefined}
                     index={0}
                     isUser={podiumRows[0]?.member.user_id === user?.id}
                     onPress={() =>
@@ -618,6 +643,7 @@ export default function LeaderboardScreen() {
                   />
                 </View>
                 <PodiumCard
+                  cosmetics={podiumRows[2] ? cosmeticsByUserId[podiumRows[2].member.user_id] : undefined}
                   index={2}
                   isUser={podiumRows[2]?.member.user_id === user?.id}
                   onPress={() =>
@@ -663,6 +689,7 @@ export default function LeaderboardScreen() {
                   return (
                     <StaggeredItem index={index} key={row.member.id} perItemDelay={45}>
                       <LeaderboardListRow
+                        cosmetics={cosmeticsByUserId[row.member.user_id]}
                         isUser={isUser}
                         onPress={() =>
                           router.push({
@@ -726,6 +753,7 @@ export default function LeaderboardScreen() {
           }}>
           <StickyUserBar
             boardView={boardView}
+            cosmetics={cosmeticsByUserId[userRow.member.user_id]}
             isLeading={userRowIndex === 0}
             onPress={() =>
               router.push({

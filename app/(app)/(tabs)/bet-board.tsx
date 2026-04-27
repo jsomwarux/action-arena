@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 
+import { LockEffect } from '@/components/cosmetics';
 import {
   AnimatedBar,
   AnimatedNumber,
@@ -40,10 +41,12 @@ import {
 } from '@/constants/rules';
 import { THEME_COLORS } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
+import { useUserCosmetics } from '@/hooks/use-cosmetics';
 import { useShareBetToChat } from '@/hooks/use-league-chat';
 import { LOCAL_FLAG_KEYS, useLocalFlag } from '@/hooks/use-local-flags';
 import { useMyLeagues } from '@/hooks/use-leagues';
 import { useUpcomingNflOdds } from '@/hooks/use-odds';
+import { useBetBoardAccess } from '@/hooks/use-season-pass';
 import {
   type BetSubmissionLeg,
   type MixedBetSubmission,
@@ -62,7 +65,14 @@ import {
 } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import type { OddsGame, OddsSelection } from '@/lib/odds-api';
-import type { BetMarket, BetType, LeagueRow, TeaserLegCount, TeaserPoints } from '@/types/database';
+import type {
+  BetMarket,
+  BetType,
+  EquippedCosmeticsByCategory,
+  LeagueRow,
+  TeaserLegCount,
+  TeaserPoints,
+} from '@/types/database';
 
 type BetMode = BetType;
 
@@ -333,8 +343,10 @@ function getValidationState(slipBets: SlipBet[]): ValidationState {
     errors.push(`Add ${remaining} more bet${remaining === 1 ? '' : 's'} to hit the weekly minimum.`);
   }
 
-  if (lockCount !== 1) {
-    errors.push('Designate exactly one Lock of the Week before submitting.');
+  if (lockCount === 0) {
+    errors.push('Choose your Lock — every weekly card needs one Lock of the Week (1.5x).');
+  } else if (lockCount > 1) {
+    errors.push('Only one bet can be your Lock of the Week. Tap the gold star to swap.');
   }
 
   if (slipBets.some((bet) => bet.amount > MAX_SINGLE_BET)) {
@@ -1158,10 +1170,14 @@ function TeaserBuilder({
 
 function SlipBetCard({
   bet,
+  cosmetics,
+  hasAnyLock,
   onRemove,
   onToggleLock,
 }: {
   bet: SlipBet;
+  cosmetics?: EquippedCosmeticsByCategory;
+  hasAnyLock: boolean;
   onRemove: (id: string) => void;
   onToggleLock: (id: string) => void;
 }) {
@@ -1170,24 +1186,43 @@ function SlipBetCard({
     : bet.bet_type === 'teaser'
       ? THEME_COLORS.cyanAccent
       : THEME_COLORS.electricGreen;
+  const isLock = bet.is_lock;
+  const dim = hasAnyLock && !isLock;
+  const lockMultiplierPayout = bet.potential_payout * LOCK_OF_THE_WEEK_MULTIPLIER;
 
   return (
-    <View style={{ marginBottom: 10 }}>
+    <View style={{ marginBottom: isLock ? 14 : 10, opacity: dim ? 0.5 : 1 }}>
       <SwipeableRow onRemove={() => onRemove(bet.id)}>
+        {isLock ? (
+          <View className="mb-1 flex-row items-center justify-center gap-1.5">
+            <Ionicons color={THEME_COLORS.gold} name="star" size={11} />
+            <Text
+              className="text-[10px] font-black uppercase text-gold"
+              style={{ letterSpacing: 1.6 }}>
+              Lock of the Week
+            </Text>
+          </View>
+        ) : null}
+        <LockEffect cosmetics={isLock ? cosmetics : undefined}>
         <View
-          className={cn('rounded-2xl border bg-white/[0.04] p-4', bet.is_lock ? 'bg-gold/[0.07]' : null)}
+          className={cn(
+            'rounded-2xl border bg-white/[0.04] p-4',
+            isLock ? 'bg-gold/[0.10]' : null,
+          )}
           style={{
-            borderColor: bet.is_lock ? THEME_COLORS.gold : `${accentByType}66`,
-            shadowColor: bet.is_lock ? THEME_COLORS.gold : accentByType,
-            shadowOffset: { width: 0, height: 0 },
-            shadowOpacity: bet.is_lock ? 0.35 : 0,
-            shadowRadius: bet.is_lock ? 14 : 0,
+            borderColor: isLock ? THEME_COLORS.gold : `${accentByType}66`,
+            borderWidth: isLock ? 2 : 1,
+            shadowColor: isLock ? THEME_COLORS.gold : accentByType,
+            shadowOffset: { width: 0, height: isLock ? 6 : 0 },
+            shadowOpacity: isLock ? 0.5 : 0,
+            shadowRadius: isLock ? 18 : 0,
+            transform: [{ scale: isLock ? 1.015 : 1 }],
           }}>
           <View className="flex-row items-center justify-between gap-3">
             <View className="flex-1 gap-2">
               <View className="flex-row items-center gap-2">
                 <Badge betType={bet.bet_type} />
-                {bet.is_lock ? <LockBadge compact /> : null}
+                {isLock ? <LockBadge compact /> : null}
                 <Text
                   className="text-[10px] font-black uppercase text-white/45"
                   style={{ letterSpacing: 1.5 }}>
@@ -1245,12 +1280,15 @@ function SlipBetCard({
               <Text
                 className="text-[10px] font-black uppercase text-white/45"
                 style={{ letterSpacing: 1.5 }}>
-                Pays
+                {isLock ? 'Pays · 1.5x' : 'Pays'}
               </Text>
               <Text
                 className="mt-0.5 text-base font-black"
-                style={{ color: accentByType, letterSpacing: -0.3 }}>
-                {formatCurrency(bet.potential_payout)}
+                style={{
+                  color: isLock ? THEME_COLORS.gold : accentByType,
+                  letterSpacing: -0.3,
+                }}>
+                {formatCurrency(isLock ? lockMultiplierPayout : bet.potential_payout)}
               </Text>
             </View>
           </View>
@@ -1258,34 +1296,43 @@ function SlipBetCard({
           <Pressable
             accessibilityRole="button"
             onPress={() => {
-              haptics.selection();
+              haptics.medium();
               onToggleLock(bet.id);
             }}>
             <View
               className={cn(
                 'mt-3 flex-row items-center justify-center gap-2 rounded-2xl border px-3 py-3',
-                bet.is_lock
-                  ? 'border-gold/55 bg-gold/15'
-                  : 'border-white/10 bg-white/[0.04]',
-              )}>
+                isLock ? 'border-gold/55 bg-gold/15' : 'border-white/10 bg-white/[0.04]',
+              )}
+              style={
+                isLock
+                  ? {
+                      shadowColor: THEME_COLORS.gold,
+                      shadowOffset: { width: 0, height: 0 },
+                      shadowOpacity: 0.45,
+                      shadowRadius: 10,
+                    }
+                  : undefined
+              }>
               <Ionicons
-                color={bet.is_lock ? THEME_COLORS.gold : 'rgba(255,255,255,0.55)'}
-                name={bet.is_lock ? 'star' : 'star-outline'}
+                color={isLock ? THEME_COLORS.gold : 'rgba(255,255,255,0.55)'}
+                name={isLock ? 'star' : 'star-outline'}
                 size={15}
               />
               <Text
                 className={cn(
                   'text-[11px] font-black uppercase',
-                  bet.is_lock ? 'text-gold' : 'text-white/55',
+                  isLock ? 'text-gold' : 'text-white/55',
                 )}
                 style={{ letterSpacing: 1.4 }}>
-                {bet.is_lock
+                {isLock
                   ? `Lock of the Week · ${LOCK_OF_THE_WEEK_MULTIPLIER}x profit/loss`
                   : 'Mark as Lock of the Week'}
               </Text>
             </View>
           </Pressable>
         </View>
+        </LockEffect>
       </SwipeableRow>
     </View>
   );
@@ -1317,16 +1364,33 @@ function SlipSummary({
         </Text>
         <Text className="text-sm font-black text-white">{formatCurrency(totalAllocated)}</Text>
       </View>
-      <View className="flex-row items-center justify-between">
+      <View
+        className={cn(
+          'flex-row items-center justify-between rounded-xl border px-3 py-2',
+          lockBet ? 'border-gold/45 bg-gold/[0.08]' : 'border-white/10 bg-white/[0.03]',
+        )}>
+        <View className="flex-row items-center gap-2">
+          <Ionicons
+            color={lockBet ? THEME_COLORS.gold : 'rgba(255,255,255,0.45)'}
+            name={lockBet ? 'star' : 'star-outline'}
+            size={14}
+          />
+          <Text
+            className={cn(
+              'text-[11px] font-black uppercase',
+              lockBet ? 'text-gold' : 'text-white/55',
+            )}
+            style={{ letterSpacing: 1.5 }}>
+            Lock of the Week
+          </Text>
+        </View>
         <Text
-          className="text-[11px] font-black uppercase text-white/55"
-          style={{ letterSpacing: 1.5 }}>
-          Lock
-        </Text>
-        <Text
-          className={cn('text-sm font-black', lockBet ? 'text-gold' : 'text-white/40')}
+          className={cn(
+            'flex-1 pl-3 text-right text-sm font-black',
+            lockBet ? 'text-white' : 'text-white/40',
+          )}
           numberOfLines={1}>
-          {lockBet ? lockBet.label : 'Required'}
+          {lockBet ? lockBet.label : 'Tap a bet to choose'}
         </Text>
       </View>
       <View className="flex-row justify-between">
@@ -1393,6 +1457,7 @@ function SlipSummary({
 // ============================================================
 
 function BetSlipSheet({
+  cosmetics,
   isSubmitting,
   onRemove,
   onSnapChange,
@@ -1403,6 +1468,7 @@ function BetSlipSheet({
   validation,
   visible,
 }: {
+  cosmetics?: EquippedCosmeticsByCategory;
   isSubmitting: boolean;
   onRemove: (id: string) => void;
   onSnapChange: (index: SnapIndex) => void;
@@ -1416,6 +1482,7 @@ function BetSlipSheet({
   const totalAllocated = slipBets.reduce((sum, bet) => sum + bet.amount, 0);
   const remaining = WEEKLY_BUDGET - totalAllocated;
   const canSubmit = validation.errors.length === 0 && slipBets.length > 0;
+  const hasAnyLock = slipBets.some((bet) => bet.is_lock);
 
   return (
     <BottomSheet
@@ -1497,7 +1564,13 @@ function BetSlipSheet({
           }
           renderItem={({ index, item }) => (
             <StaggeredItem index={index} perItemDelay={45}>
-              <SlipBetCard bet={item} onRemove={onRemove} onToggleLock={onToggleLock} />
+              <SlipBetCard
+                bet={item}
+                cosmetics={cosmetics}
+                hasAnyLock={hasAnyLock}
+                onRemove={onRemove}
+                onToggleLock={onToggleLock}
+              />
             </StaggeredItem>
           )}
           showsVerticalScrollIndicator={false}
@@ -2016,10 +2089,169 @@ function BetBoardTour({
 // Placed Bets View
 // ============================================================
 
-function PlacedBetsView({ bets, userId }: { bets: PlacedBet[]; userId: string | undefined }) {
+function PlacedBetCard({
+  bet,
+  cosmetics,
+  isLockHeadline,
+  onShare,
+  shareLoading,
+}: {
+  bet: PlacedBet;
+  cosmetics?: EquippedCosmeticsByCategory;
+  isLockHeadline: boolean;
+  onShare: () => Promise<void>;
+  shareLoading: boolean;
+}) {
+  const allLocked = bet.bet_legs.every(
+    (leg) => leg.locked || new Date(leg.game_start_time).getTime() <= Date.now(),
+  );
+  const isLock = bet.is_lock;
+  const lockMultiplierPayout = bet.potential_payout * LOCK_OF_THE_WEEK_MULTIPLIER;
+  const dim = !isLockHeadline && !isLock; // gently de-emphasize non-lock bets after headline
+
+  return (
+    <LockEffect cosmetics={isLock ? cosmetics : undefined}>
+    <View
+      className={cn(
+        'overflow-hidden rounded-2xl border bg-white/[0.04]',
+        isLock ? 'border-gold/70 bg-gold/[0.10]' : 'border-white/[0.08]',
+      )}
+      style={
+        isLock
+          ? {
+              borderWidth: 2,
+              shadowColor: THEME_COLORS.gold,
+              shadowOffset: { width: 0, height: 8 },
+              shadowOpacity: 0.55,
+              shadowRadius: 18,
+              opacity: 1,
+            }
+          : { opacity: dim ? 0.78 : 1 }
+      }>
+      {isLock ? (
+        <View className="flex-row items-center justify-center gap-1.5 border-b border-gold/40 bg-gold/15 px-3 py-1.5">
+          <Ionicons color={THEME_COLORS.gold} name="star" size={11} />
+          <Text
+            className="text-[10px] font-black uppercase text-gold"
+            style={{ letterSpacing: 1.6 }}>
+            Lock of the Week · {LOCK_OF_THE_WEEK_MULTIPLIER}x profit/loss
+          </Text>
+        </View>
+      ) : null}
+      <View className="gap-3 p-4">
+        <View className="flex-row items-start justify-between gap-3">
+          <View className="flex-1 gap-2">
+            <View className="flex-row flex-wrap items-center gap-2">
+              <Badge betType={bet.bet_type} />
+              {isLock ? <LockBadge compact /> : null}
+            </View>
+            <Text
+              className={cn(
+                'font-black uppercase text-white',
+                isLock ? 'text-xl' : 'text-base',
+              )}
+              style={{ letterSpacing: -0.3 }}
+              numberOfLines={2}>
+              {bet.bet_type === 'straight'
+                ? bet.bet_legs[0]?.selection ?? 'Straight bet'
+                : `${bet.bet_legs.length}-leg ${bet.bet_type}`}
+            </Text>
+          </View>
+          <Badge label={allLocked ? 'Locked' : 'Editable'} tone={allLocked ? 'red' : 'green'} />
+        </View>
+        {bet.bet_legs.map((leg) => {
+          const legLocked =
+            leg.locked || new Date(leg.game_start_time).getTime() <= Date.now();
+          return (
+            <View className="rounded-2xl bg-white/[0.04] p-3" key={leg.id}>
+              <View className="flex-row justify-between gap-3">
+                <View className="flex-1">
+                  <Text className="text-sm font-black text-white">{leg.selection}</Text>
+                  <Text className="mt-1 text-[11px] font-semibold text-white/45">
+                    {marketLabel(leg.market)} · {formatGameTime(leg.game_start_time)}
+                  </Text>
+                </View>
+                <Badge
+                  label={legLocked ? 'Locked' : 'Open'}
+                  tone={legLocked ? 'red' : 'green'}
+                />
+              </View>
+              {bet.bet_type === 'teaser' ? (
+                <Text className="mt-2 text-[11px] font-black text-cyan-accent">
+                  {formatLine(leg.original_line)} → {formatLine(leg.adjusted_line)}
+                </Text>
+              ) : null}
+            </View>
+          );
+        })}
+        <View className="flex-row items-center justify-between border-t border-white/[0.08] pt-3">
+          <Text
+            className="text-[11px] font-black uppercase text-white/55"
+            style={{ letterSpacing: 1.5 }}>
+            {formatAmericanOdds(bet.odds)} · {formatCurrency(bet.amount)}
+          </Text>
+          <View className="items-end">
+            <Text
+              className={cn(
+                'text-sm font-black',
+                isLock ? 'text-gold' : 'text-electric-green',
+              )}>
+              Pays {formatCurrency(isLock ? lockMultiplierPayout : bet.potential_payout)}
+            </Text>
+            {isLock ? (
+              <Text
+                className="mt-0.5 text-[10px] font-semibold text-gold/85"
+                style={{ letterSpacing: 0.4 }}>
+                base {formatCurrency(bet.potential_payout)} × 1.5
+              </Text>
+            ) : null}
+          </View>
+        </View>
+        <Button
+          loading={shareLoading}
+          onPress={() => {
+            void onShare();
+          }}
+          title="Share to Chat"
+          variant="secondary"
+        />
+      </View>
+    </View>
+    </LockEffect>
+  );
+}
+
+function PlacedBetsView({
+  bets,
+  cosmetics,
+  userId,
+}: {
+  bets: PlacedBet[];
+  cosmetics?: EquippedCosmeticsByCategory;
+  userId: string | undefined;
+}) {
   const shareBet = useShareBetToChat(userId);
   const totalAllocated = bets.reduce((sum, bet) => sum + bet.amount, 0);
   const totalPayout = bets.reduce((sum, bet) => sum + bet.potential_payout, 0);
+
+  // Surface Lock first, the rest follow.
+  const orderedBets = useMemo(() => {
+    const lock = bets.find((bet) => bet.is_lock);
+    const rest = bets.filter((bet) => !bet.is_lock);
+    return lock ? [lock, ...rest] : bets;
+  }, [bets]);
+
+  const handleShare = async (bet: PlacedBet) => {
+    try {
+      await shareBet.mutateAsync(bet);
+      Alert.alert('Shared to chat', 'This bet is now in league chat.');
+    } catch (error) {
+      Alert.alert(
+        'Could not share bet',
+        error instanceof Error ? error.message : 'Try again.',
+      );
+    }
+  };
 
   return (
     <View className="gap-4">
@@ -2062,82 +2294,16 @@ function PlacedBetsView({ bets, userId }: { bets: PlacedBet[]; userId: string | 
         </View>
       </Card>
 
-      {bets.map((bet) => {
-        const allLocked = bet.bet_legs.every(
-          (leg) => leg.locked || new Date(leg.game_start_time).getTime() <= Date.now(),
-        );
-        return (
-          <Card key={bet.id}>
-            <View className="gap-3">
-              <View className="flex-row items-start justify-between gap-3">
-                <View className="flex-1 gap-2">
-                  <View className="flex-row flex-wrap items-center gap-2">
-                    <Badge betType={bet.bet_type} />
-                    {bet.is_lock ? <LockBadge compact /> : null}
-                  </View>
-                  <Text
-                    className="text-lg font-black uppercase text-white"
-                    style={{ letterSpacing: -0.3 }}
-                    numberOfLines={2}>
-                    {bet.bet_type === 'straight'
-                      ? bet.bet_legs[0]?.selection ?? 'Straight bet'
-                      : `${bet.bet_legs.length}-leg ${bet.bet_type}`}
-                  </Text>
-                </View>
-                <Badge label={allLocked ? 'Locked' : 'Editable'} tone={allLocked ? 'red' : 'green'} />
-              </View>
-              {bet.bet_legs.map((leg) => {
-                const legLocked =
-                  leg.locked || new Date(leg.game_start_time).getTime() <= Date.now();
-                return (
-                  <View className="rounded-2xl bg-white/[0.04] p-3" key={leg.id}>
-                    <View className="flex-row justify-between gap-3">
-                      <View className="flex-1">
-                        <Text className="text-sm font-black text-white">{leg.selection}</Text>
-                        <Text className="mt-1 text-[11px] font-semibold text-white/45">
-                          {marketLabel(leg.market)} · {formatGameTime(leg.game_start_time)}
-                        </Text>
-                      </View>
-                      <Badge label={legLocked ? 'Locked' : 'Open'} tone={legLocked ? 'red' : 'green'} />
-                    </View>
-                    {bet.bet_type === 'teaser' ? (
-                      <Text className="mt-2 text-[11px] font-black text-cyan-accent">
-                        {formatLine(leg.original_line)} → {formatLine(leg.adjusted_line)}
-                      </Text>
-                    ) : null}
-                  </View>
-                );
-              })}
-              <View className="flex-row items-center justify-between border-t border-white/[0.08] pt-3">
-                <Text
-                  className="text-[11px] font-black uppercase text-white/55"
-                  style={{ letterSpacing: 1.5 }}>
-                  {formatAmericanOdds(bet.odds)} · {formatCurrency(bet.amount)}
-                </Text>
-                <Text className="text-sm font-black text-electric-green">
-                  Pays {formatCurrency(bet.potential_payout)}
-                </Text>
-              </View>
-              <Button
-                loading={shareBet.isPending}
-                onPress={async () => {
-                  try {
-                    await shareBet.mutateAsync(bet);
-                    Alert.alert('Shared to chat', 'This bet is now in league chat.');
-                  } catch (error) {
-                    Alert.alert(
-                      'Could not share bet',
-                      error instanceof Error ? error.message : 'Try again.',
-                    );
-                  }
-                }}
-                title="Share to Chat"
-                variant="secondary"
-              />
-            </View>
-          </Card>
-        );
-      })}
+      {orderedBets.map((bet, index) => (
+        <PlacedBetCard
+          bet={bet}
+          cosmetics={cosmetics}
+          isLockHeadline={index === 0 && bet.is_lock}
+          key={bet.id}
+          onShare={() => handleShare(bet)}
+          shareLoading={shareBet.isPending}
+        />
+      ))}
     </View>
   );
 }
@@ -2171,6 +2337,7 @@ export default function BetBoardScreen() {
   const { user } = useAuth();
   const leaguesQuery = useMyLeagues(user?.id);
   const oddsQuery = useUpcomingNflOdds();
+  const cosmeticsQuery = useUserCosmetics(user?.id);
   const tourFlag = useLocalFlag(LOCAL_FLAG_KEYS.betBoardTourComplete);
   const [selectedLeagueId, setSelectedLeagueId] = useState<string | undefined>();
   const [mode, setMode] = useState<BetMode>('straight');
@@ -2189,10 +2356,16 @@ export default function BetBoardScreen() {
   const leagueSummaries = leaguesQuery.data ?? [];
   const leagues = leagueSummaries.map((summary) => summary.league);
   const selectedLeague = leagues.find((league) => league.id === selectedLeagueId) ?? leagues[0];
+  const accessQuery = useBetBoardAccess({
+    leagueId: selectedLeague?.id,
+    userId: user?.id,
+    weekNumber: selectedLeague?.current_week,
+  });
   const placedBetsQuery = usePlacedBets(selectedLeague?.id, user?.id, selectedLeague?.current_week);
   const submitBets = useSubmitBetsMutation(selectedLeague?.id, user?.id, selectedLeague?.current_week);
   const placedBets = placedBetsQuery.data ?? [];
   const isReadOnly = placedBets.length > 0;
+  const canAccessBetBoard = accessQuery.data ?? true;
   const validation = useMemo(() => getValidationState(slipBets), [slipBets]);
 
   const builderLegSelectionKeys = useMemo(() => {
@@ -2253,6 +2426,15 @@ export default function BetBoardScreen() {
     if (!selectedLeague) {
       haptics.warning();
       Alert.alert('Choose a league', 'Join or create a league before placing bets.');
+      return;
+    }
+
+    if (!canAccessBetBoard) {
+      haptics.warning();
+      Alert.alert(
+        'Early access window',
+        'Season Pass holders get the first 30 minutes when new odds drop.',
+      );
       return;
     }
 
@@ -2419,7 +2601,7 @@ export default function BetBoardScreen() {
       <ScreenWrapper className="pb-0">
         <FlatList
           contentContainerStyle={{ paddingBottom: slipBottomPadding }}
-          data={isReadOnly ? [] : oddsQuery.data ?? []}
+          data={isReadOnly || !canAccessBetBoard ? [] : oddsQuery.data ?? []}
           keyExtractor={(game) => game.id}
           ListHeaderComponent={
             <View className="gap-5 pb-5">
@@ -2455,7 +2637,22 @@ export default function BetBoardScreen() {
                 slipBets={slipBets}
               />
 
-              {!isReadOnly && mode === 'parlay' ? (
+              {!isReadOnly && !canAccessBetBoard ? (
+                <Card tone="highlight">
+                  <View className="items-center gap-3 py-3">
+                    <Ionicons color={THEME_COLORS.gold} name="time" size={28} />
+                    <Text className="text-center text-xl font-black uppercase text-white">
+                      Early Access Window
+                    </Text>
+                    <Text className="text-center text-sm font-semibold leading-5 text-white/60">
+                      Season Pass holders can build cards for the first 30 minutes after new odds drop.
+                      Free access opens automatically after the window ends.
+                    </Text>
+                  </View>
+                </Card>
+              ) : null}
+
+              {!isReadOnly && canAccessBetBoard && mode === 'parlay' ? (
                 <ParlayBuilder
                   amountText={parlayAmount}
                   legs={parlayLegs}
@@ -2467,7 +2664,7 @@ export default function BetBoardScreen() {
                 />
               ) : null}
 
-              {!isReadOnly && mode === 'teaser' ? (
+              {!isReadOnly && canAccessBetBoard && mode === 'teaser' ? (
                 <TeaserBuilder
                   amountText={teaserAmount}
                   legs={teaserLegs}
@@ -2506,9 +2703,15 @@ export default function BetBoardScreen() {
               ) : null}
 
               {placedBetsQuery.isLoading ? <OddsSkeletons /> : null}
-              {isReadOnly ? <PlacedBetsView bets={placedBets} userId={user?.id} /> : null}
+              {isReadOnly ? (
+                <PlacedBetsView
+                  bets={placedBets}
+                  cosmetics={cosmeticsQuery.data?.equippedByCategory}
+                  userId={user?.id}
+                />
+              ) : null}
 
-              {!isReadOnly && oddsQuery.isError ? (
+              {!isReadOnly && canAccessBetBoard && oddsQuery.isError ? (
                 <Card>
                   <View className="flex-row items-center gap-2">
                     <Ionicons color={THEME_COLORS.coralRed} name="alert-circle" size={16} />
@@ -2520,11 +2723,11 @@ export default function BetBoardScreen() {
                   </View>
                 </Card>
               ) : null}
-              {!isReadOnly && oddsQuery.isLoading ? <OddsSkeletons /> : null}
+              {!isReadOnly && canAccessBetBoard && oddsQuery.isLoading ? <OddsSkeletons /> : null}
             </View>
           }
           ListEmptyComponent={
-            !isReadOnly && !oddsQuery.isLoading && !oddsQuery.isError ? (
+            !isReadOnly && canAccessBetBoard && !oddsQuery.isLoading && !oddsQuery.isError ? (
               <Card>
                 <View className="items-center gap-2 py-2">
                   <Ionicons color={THEME_COLORS.electricGreen} name="football" size={26} />
@@ -2538,10 +2741,11 @@ export default function BetBoardScreen() {
           refreshControl={
             <RefreshControl
               tintColor={THEME_COLORS.electricGreen}
-              refreshing={oddsQuery.isRefetching || placedBetsQuery.isRefetching}
+              refreshing={oddsQuery.isRefetching || placedBetsQuery.isRefetching || accessQuery.isRefetching}
               onRefresh={() => {
                 void oddsQuery.refetch();
                 void placedBetsQuery.refetch();
+                void accessQuery.refetch();
               }}
             />
           }
@@ -2574,6 +2778,7 @@ export default function BetBoardScreen() {
 
       <BetSlipSheet
         isSubmitting={submitBets.isPending}
+        cosmetics={cosmeticsQuery.data?.equippedByCategory}
         onRemove={(id) => {
           haptics.light();
           setSlipBets((current) => current.filter((bet) => bet.id !== id));

@@ -34,6 +34,7 @@ No web version — mobile only for now.
 - id (uuid, PK)
 - email, display_name, avatar_url
 - is_premium (boolean, default false)
+- arena_coins (int, default 500 for development/testing)
 - push_token (string, nullable)
 - created_at
 
@@ -120,6 +121,42 @@ No web version — mobile only for now.
 - awards (jsonb — permanent end-of-season awards snapshot)
 - completed_at
 
+### cosmetic_catalog
+- item_id (text, PK)
+- category: 'team_logo' | 'trophy_skin' | 'lock_effect' | 'win_celebration' | 'chat_sticker_pack' | 'profile_frame'
+- name
+- coin_cost (int)
+- is_season_pass_exclusive (boolean)
+- season_label (string, nullable)
+- created_at
+
+### user_cosmetics
+- id (uuid, PK)
+- user_id (FK users)
+- item_id (FK cosmetic_catalog)
+- category
+- is_equipped (boolean)
+- purchased_at
+- equipped_at (timestamp, nullable)
+- metadata (jsonb)
+- unique user/item purchase; only one equipped item per category per user
+
+### season_passes
+- id (uuid, PK)
+- user_id (FK users)
+- season_year (int)
+- redeemed_code (string, nullable)
+- source (string)
+- created_at
+
+### odds_release_windows
+- id (uuid, PK)
+- sport
+- season_year (int)
+- week_number (int)
+- odds_available_at (timestamp)
+- created_at
+
 ## Bet Types
 
 ### Straight Bets
@@ -182,6 +219,10 @@ A special parlay where the player buys extra points on spreads and/or totals. Al
 - NFL season structure: 14 regular weeks + 3 playoff weeks
 - Playoff seeding based on regular season standings
 - All bets within a league are public — league members can see each other's picks
+- No gameplay feature is gated behind payment: creating/joining leagues, placing bets, matchups, chat, leaderboard, profile, and bet history remain free with no limits.
+- Arena Coins are cosmetic-only currency. Test users start with 500 coins.
+- Season Pass gates only premium extras: exclusive cosmetics, advanced analytics, future ad-free hooks, and 30-minute early Bet Board access when odds release windows are configured.
+- Payment processing and ad SDKs are not integrated yet. Purchase buttons use placeholders, and ad hooks only log events.
 
 ## Design System
 - **Theme:** Dark mode primary. Deep navy/charcoal background (#0A0E1A), not pure black.

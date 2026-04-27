@@ -18,6 +18,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
+  ChatStickerPreview,
+  CosmeticAvatar,
+  LockEffect,
+  TrophySkinIcon,
+} from '@/components/cosmetics';
+import {
   Badge,
   Card,
   PressableScale,
@@ -25,14 +31,18 @@ import {
   SlidingTabIndicator,
   type SlidingTabOption,
 } from '@/components/ui';
+import { getCosmeticItem } from '@/constants/cosmetics';
 import { haptics } from '@/lib/haptics';
 import { THEME_COLORS } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
+import { useEquippedCosmeticsForUsers, useUserCosmetics } from '@/hooks/use-cosmetics';
 import {
   type LeagueChatMessage,
   type SharedBetMetadata,
+  type StickerMessageMetadata,
   useLeagueChat,
   useSendLeagueChatMessage,
+  useSendLeagueChatSticker,
 } from '@/hooks/use-league-chat';
 import { type LeagueDetail, useLeagueDetail } from '@/hooks/use-leagues';
 import { type WeeklyAward, type WeeklyAwards, useWeeklyAwards } from '@/hooks/use-profile-stats';
@@ -48,6 +58,7 @@ import {
 } from '@/lib/format';
 import type {
   BetType,
+  EquippedCosmeticsByCategory,
   Json,
   LeagueVisibility,
   SeasonAward,
@@ -110,6 +121,15 @@ function isSharedBetMetadata(value: Json): value is SharedBetMetadata {
     typeof value.betType === 'string' &&
     Array.isArray(value.legs)
   );
+}
+
+function isStickerMetadata(value: Json): value is StickerMessageMetadata {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return false;
+  }
+
+  const metadata = value as Record<string, Json | undefined>;
+  return typeof metadata.stickerId === 'string' && typeof metadata.stickerName === 'string';
 }
 
 function isSeasonAward(value: Json): value is SeasonAward {
@@ -240,10 +260,12 @@ function DetailSkeleton() {
 }
 
 function PlayerAvatar({
+  cosmetics,
   isUser,
   name,
   side,
 }: {
+  cosmetics?: EquippedCosmeticsByCategory;
   isUser?: boolean;
   name: string;
   side: 'home' | 'away';
@@ -253,11 +275,6 @@ function PlayerAvatar({
     : side === 'home'
       ? 'border-cyan-accent/40 bg-cyan-accent/10'
       : 'border-coral-red/40 bg-coral-red/10';
-  const textColor = isUser
-    ? 'text-electric-green'
-    : side === 'home'
-      ? 'text-cyan-accent'
-      : 'text-coral-red';
   return (
     <View
       className={cn('h-16 w-16 items-center justify-center rounded-2xl border', accent)}
@@ -271,14 +288,20 @@ function PlayerAvatar({
             }
           : undefined
       }>
-      <Text className={cn('text-xl font-black uppercase', textColor)} style={{ letterSpacing: 0.5 }}>
-        {getInitials(name) || '?'}
-      </Text>
+      <CosmeticAvatar cosmetics={cosmetics} name={name} size="lg" />
     </View>
   );
 }
 
-function MatchupRow({ detail, matchup }: { detail: LeagueDetail; matchup: WeeklyMatchupRow }) {
+function MatchupRow({
+  cosmeticsByUserId,
+  detail,
+  matchup,
+}: {
+  cosmeticsByUserId: Record<string, EquippedCosmeticsByCategory>;
+  detail: LeagueDetail;
+  matchup: WeeklyMatchupRow;
+}) {
   const isHomeWinner = matchup.winner_id && matchup.winner_id === matchup.home_user_id;
   const isAwayWinner =
     matchup.away_user_id && matchup.winner_id && matchup.winner_id === matchup.away_user_id;
@@ -317,10 +340,12 @@ function MatchupRow({ detail, matchup }: { detail: LeagueDetail; matchup: Weekly
 }
 
 function FightCard({
+  cosmeticsByUserId,
   detail,
   matchup,
   userId,
 }: {
+  cosmeticsByUserId: Record<string, EquippedCosmeticsByCategory>;
   detail: LeagueDetail;
   matchup: WeeklyMatchupRow;
   userId: string;
@@ -353,7 +378,12 @@ function FightCard({
 
         <View className="flex-row items-center">
           <View className="flex-1 items-center gap-3">
-            <PlayerAvatar isUser={homeIsUser} name={homeName} side="home" />
+            <PlayerAvatar
+              cosmetics={cosmeticsByUserId[matchup.home_user_id]}
+              isUser={homeIsUser}
+              name={homeName}
+              side="home"
+            />
             <View className="items-center gap-1">
               <Text
                 className="text-[10px] font-black uppercase text-white/45"
@@ -386,7 +416,12 @@ function FightCard({
           </View>
 
           <View className="flex-1 items-center gap-3">
-            <PlayerAvatar isUser={awayIsUser} name={awayName} side="away" />
+            <PlayerAvatar
+              cosmetics={matchup.away_user_id ? cosmeticsByUserId[matchup.away_user_id] : undefined}
+              isUser={awayIsUser}
+              name={awayName}
+              side="away"
+            />
             <View className="items-center gap-1">
               <Text
                 className="text-[10px] font-black uppercase text-white/45"
@@ -557,7 +592,141 @@ function seasonAwardIcon(key: SeasonAward['award_key']): React.ComponentProps<ty
   return 'flash';
 }
 
-function SeasonAwardsCard({ detail }: { detail: LeagueDetail }) {
+function ChampionBanner({
+  championName,
+  cosmetics,
+  seasonYear,
+}: {
+  championName: string;
+  cosmetics?: EquippedCosmeticsByCategory;
+  seasonYear: number;
+}) {
+  return (
+    <View
+      className="overflow-hidden rounded-2xl border border-gold bg-gold/[0.12]"
+      style={{
+        borderWidth: 2,
+        shadowColor: THEME_COLORS.gold,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.55,
+        shadowRadius: 22,
+      }}>
+      <View className="items-center gap-3 px-5 py-6">
+        <TrophySkinIcon cosmetics={cosmetics} size={30} />
+        <View className="items-center gap-1">
+          <Text
+            className="text-[10px] font-black uppercase text-gold"
+            style={{ letterSpacing: 3 }}>
+            {seasonYear} Champion
+          </Text>
+          <Text
+            className="text-3xl font-black uppercase text-white"
+            numberOfLines={1}
+            style={{ letterSpacing: -0.4 }}>
+            {championName}
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function MvpAwardCard({
+  award,
+  cosmetics,
+  winnerName,
+}: {
+  award: SeasonAward;
+  cosmetics?: EquippedCosmeticsByCategory;
+  winnerName: string;
+}) {
+  return (
+    <View
+      className="overflow-hidden rounded-2xl border border-gold/65 bg-gold/[0.10]"
+      style={{
+        borderWidth: 2,
+        shadowColor: THEME_COLORS.gold,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.45,
+        shadowRadius: 18,
+      }}>
+      <View className="flex-row items-center justify-center gap-1.5 border-b border-gold/40 bg-gold/15 px-3 py-1.5">
+        <Ionicons color={THEME_COLORS.gold} name="ribbon" size={11} />
+        <Text
+          className="text-[10px] font-black uppercase text-gold"
+          style={{ letterSpacing: 2 }}>
+          Headline Honor
+        </Text>
+      </View>
+      <View className="flex-row items-center gap-4 p-4">
+        <TrophySkinIcon cosmetics={cosmetics} size={26} />
+        <View className="flex-1 gap-1">
+          <Text
+            className="text-[11px] font-black uppercase text-gold"
+            style={{ letterSpacing: 1.8 }}>
+            {award.award_label}
+          </Text>
+          <Text
+            className="text-xl font-black uppercase text-white"
+            numberOfLines={1}
+            style={{ letterSpacing: -0.4 }}>
+            {winnerName}
+          </Text>
+          {award.value_label ? (
+            <Text className="text-xs font-semibold text-white/65">{award.value_label}</Text>
+          ) : null}
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function SeasonAwardCard({
+  award,
+  cosmetics,
+  winnerName,
+}: {
+  award: SeasonAward;
+  cosmetics?: EquippedCosmeticsByCategory;
+  winnerName: string;
+}) {
+  return (
+    <View className="flex-1 rounded-2xl border border-gold/30 bg-gold/[0.06] p-3">
+      {award.award_key === 'season_mvp' || award.award_key === 'best_record' ? (
+        <TrophySkinIcon cosmetics={cosmetics} size={16} />
+      ) : (
+        <View className="h-9 w-9 items-center justify-center rounded-2xl border border-gold/45 bg-gold/15">
+          <Ionicons color={THEME_COLORS.gold} name={seasonAwardIcon(award.award_key)} size={16} />
+        </View>
+      )}
+      <Text
+        className="mt-2 text-[10px] font-black uppercase text-gold"
+        style={{ letterSpacing: 1.5 }}
+        numberOfLines={2}>
+        {award.award_label}
+      </Text>
+      <Text
+        className="mt-1 text-sm font-black text-white"
+        numberOfLines={1}
+        style={{ letterSpacing: -0.2 }}>
+        {winnerName}
+      </Text>
+      {award.value_label ? (
+        <Text className="mt-0.5 text-[11px] font-semibold text-white/55" numberOfLines={1}>
+          {award.value_label}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+function SeasonAwardsCard({
+  cosmeticsByUserId,
+  detail,
+}: {
+  cosmeticsByUserId: Record<string, EquippedCosmeticsByCategory>;
+  detail: LeagueDetail;
+}) {
   if (detail.league.status !== 'complete' || !detail.seasonSnapshot) {
     return null;
   }
@@ -571,72 +740,78 @@ function SeasonAwardsCard({ detail }: { detail: LeagueDetail }) {
     return null;
   }
 
-  return (
-    <Card tone="highlight">
-      <View className="gap-4">
-        <View className="flex-row items-start justify-between gap-3">
-          <View className="flex-1">
-            <View className="flex-row items-center gap-2">
-              <Ionicons color={THEME_COLORS.gold} name="trophy" size={14} />
-              <Text className="text-[10px] font-black uppercase text-gold" style={{ letterSpacing: 2 }}>
-                Season Awards
-              </Text>
-            </View>
-            <Text
-              className="mt-2 text-2xl font-black uppercase text-white"
-              style={{ letterSpacing: -0.4 }}>
-              {detail.league.season_year} Trophy Case
-            </Text>
-            <Text className="mt-1 text-sm font-semibold text-white/55">
-              Final standings and awards are saved for this completed season.
-            </Text>
-          </View>
-          <View className="items-end rounded-2xl border border-gold/35 bg-gold/10 px-3 py-2">
-            <Text className="text-[10px] font-black uppercase text-gold" style={{ letterSpacing: 1.4 }}>
-              Champion
-            </Text>
-            <Text className="mt-1 text-sm font-black text-white" numberOfLines={1}>
-              {championName}
-            </Text>
-          </View>
-        </View>
+  const mvpAward = awards.find((award) => award.award_key === 'season_mvp');
+  const otherAwards = awards.filter((award) => award.award_key !== 'season_mvp');
+  // Group remaining awards into pairs for a 2-up grid that scales nicely.
+  const grid: SeasonAward[][] = [];
+  for (let i = 0; i < otherAwards.length; i += 2) {
+    grid.push(otherAwards.slice(i, i + 2));
+  }
 
-        <View className="gap-2">
-          {awards.map((award) => {
-            const winnerName = award.user_id ? getDisplayName(detail, award.user_id) : 'No winner';
-            return (
-              <View
-                className="flex-row items-center gap-3 rounded-2xl border border-gold/20 bg-gold/[0.06] p-3"
-                key={award.award_key}>
-                <View className="h-10 w-10 items-center justify-center rounded-2xl border border-gold/40 bg-gold/15">
-                  <Ionicons color={THEME_COLORS.gold} name={seasonAwardIcon(award.award_key)} size={18} />
-                </View>
-                <View className="flex-1">
-                  <Text className="text-[10px] font-black uppercase text-gold" style={{ letterSpacing: 1.6 }}>
-                    {award.award_label}
-                  </Text>
-                  <Text className="mt-1 text-base font-black text-white" numberOfLines={1}>
-                    {winnerName}
-                  </Text>
-                </View>
-                {award.value_label ? (
-                  <Text className="text-sm font-black text-white/70" numberOfLines={1}>
-                    {award.value_label}
-                  </Text>
-                ) : null}
-              </View>
-            );
-          })}
+  return (
+    <View className="gap-4">
+      <View className="items-center gap-1">
+        <View className="flex-row items-center gap-2">
+          <Ionicons color={THEME_COLORS.gold} name="ribbon" size={13} />
+          <Text
+            className="text-[10px] font-black uppercase text-gold"
+            style={{ letterSpacing: 2.5 }}>
+            Season Trophy Case
+          </Text>
+          <Ionicons color={THEME_COLORS.gold} name="ribbon" size={13} />
         </View>
+        <Text className="text-[11px] font-medium text-white/55">
+          Final standings and awards for the {detail.league.season_year} season.
+        </Text>
       </View>
-    </Card>
+
+      <ChampionBanner
+        championName={championName}
+        cosmetics={
+          detail.seasonSnapshot.champion_user_id
+            ? cosmeticsByUserId[detail.seasonSnapshot.champion_user_id]
+            : undefined
+        }
+        seasonYear={detail.league.season_year}
+      />
+
+      {mvpAward ? (
+        <MvpAwardCard
+          award={mvpAward}
+          cosmetics={mvpAward.user_id ? cosmeticsByUserId[mvpAward.user_id] : undefined}
+          winnerName={mvpAward.user_id ? getDisplayName(detail, mvpAward.user_id) : 'No winner'}
+        />
+      ) : null}
+
+      {grid.length > 0 ? (
+        <View className="gap-2">
+          {grid.map((row, rowIndex) => (
+            <View className="flex-row gap-2" key={`row-${rowIndex}`}>
+              {row.map((award) => (
+                <SeasonAwardCard
+                  award={award}
+                  cosmetics={award.user_id ? cosmeticsByUserId[award.user_id] : undefined}
+                  key={award.award_key}
+                  winnerName={
+                    award.user_id ? getDisplayName(detail, award.user_id) : 'No winner'
+                  }
+                />
+              ))}
+              {row.length === 1 ? <View className="flex-1" /> : null}
+            </View>
+          ))}
+        </View>
+      ) : null}
+    </View>
   );
 }
 
 function StandingsBoard({
+  cosmeticsByUserId,
   detail,
   userId,
 }: {
+  cosmeticsByUserId: Record<string, EquippedCosmeticsByCategory>;
   detail: LeagueDetail;
   userId: string;
 }) {
@@ -700,10 +875,19 @@ function StandingsBoard({
                   accent.bg,
                   accent.ring,
                 )}>
-                <Text className={cn('text-sm font-black', accent.text)}>{standing.rank}</Text>
+                {standing.rank === 1 ? (
+                  <TrophySkinIcon cosmetics={cosmeticsByUserId[standing.user_id]} size={15} />
+                ) : (
+                  <Text className={cn('text-sm font-black', accent.text)}>{standing.rank}</Text>
+                )}
               </View>
               <View className="flex-1">
                 <View className="flex-row items-center gap-2">
+                  <CosmeticAvatar
+                    cosmetics={cosmeticsByUserId[standing.user_id]}
+                    name={getDisplayName(detail, standing.user_id)}
+                    size="sm"
+                  />
                   <Text className="text-base font-black text-white" numberOfLines={1}>
                     {getDisplayName(detail, standing.user_id)}
                   </Text>
@@ -740,7 +924,15 @@ function StandingsBoard({
   );
 }
 
-function ScheduleList({ detail, userId }: { detail: LeagueDetail; userId: string }) {
+function ScheduleList({
+  cosmeticsByUserId,
+  detail,
+  userId,
+}: {
+  cosmeticsByUserId: Record<string, EquippedCosmeticsByCategory>;
+  detail: LeagueDetail;
+  userId: string;
+}) {
   const router = useRouter();
 
   if (detail.matchups.length === 0) {
@@ -783,7 +975,11 @@ function ScheduleList({ detail, userId }: { detail: LeagueDetail; userId: string
                     <Badge label="Your Game" tone="green" />
                   ) : null}
                 </View>
-                <MatchupRow detail={detail} matchup={matchup} />
+                <MatchupRow
+                  cosmeticsByUserId={cosmeticsByUserId}
+                  detail={detail}
+                  matchup={matchup}
+                />
               </View>
             </Card>
           </PressableScale>
@@ -793,7 +989,13 @@ function ScheduleList({ detail, userId }: { detail: LeagueDetail; userId: string
   );
 }
 
-function MembersList({ detail }: { detail: LeagueDetail }) {
+function MembersList({
+  cosmeticsByUserId,
+  detail,
+}: {
+  cosmeticsByUserId: Record<string, EquippedCosmeticsByCategory>;
+  detail: LeagueDetail;
+}) {
   const router = useRouter();
   const standingByUserId = useMemo(
     () =>
@@ -826,11 +1028,11 @@ function MembersList({ detail }: { detail: LeagueDetail }) {
                   'flex-row items-center gap-3 px-5 py-4',
                   !lastRow && 'border-b border-white/[0.05]',
                 )}>
-                <View className="h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04]">
-                  <Text className="text-sm font-black uppercase text-white/80">
-                    {getInitials(memberName) || '?'}
-                  </Text>
-                </View>
+                <CosmeticAvatar
+                  cosmetics={cosmeticsByUserId[member.user_id]}
+                  name={memberName}
+                  size="md"
+                />
                 <View className="flex-1">
                   <Text className="text-base font-black text-white" numberOfLines={1}>
                     {member.team_name}
@@ -856,24 +1058,31 @@ function MembersList({ detail }: { detail: LeagueDetail }) {
   );
 }
 
-function SharedBetCard({ metadata }: { metadata: SharedBetMetadata }) {
+function SharedBetCard({
+  cosmetics,
+  metadata,
+}: {
+  cosmetics?: EquippedCosmeticsByCategory;
+  metadata: SharedBetMetadata;
+}) {
   const accent = betTypeAccent(metadata.betType);
   const isLock = metadata.isLock === true;
 
   return (
     <PressableScale>
-      <View
-        className={cn(
-          'mt-2 rounded-2xl border bg-arena-bg/50 p-3',
-          isLock ? 'bg-gold/[0.07]' : null,
-        )}
-        style={{
-          borderColor: isLock ? THEME_COLORS.gold : `${accent}55`,
-          shadowColor: isLock ? THEME_COLORS.gold : accent,
-          shadowOffset: { width: 0, height: 0 },
-          shadowOpacity: isLock ? 0.3 : 0,
-          shadowRadius: isLock ? 10 : 0,
-        }}>
+      <LockEffect cosmetics={cosmetics} compact>
+        <View
+          className={cn(
+            'mt-2 rounded-2xl border bg-arena-bg/50 p-3',
+            isLock ? 'bg-gold/[0.07]' : null,
+          )}
+          style={{
+            borderColor: isLock ? THEME_COLORS.gold : `${accent}55`,
+            shadowColor: isLock ? THEME_COLORS.gold : accent,
+            shadowOffset: { width: 0, height: 0 },
+            shadowOpacity: isLock ? 0.3 : 0,
+            shadowRadius: isLock ? 10 : 0,
+          }}>
         <View className="flex-row items-center justify-between gap-3">
           <View className="flex-row items-center gap-2">
             <Badge betType={metadata.betType} />
@@ -921,22 +1130,27 @@ function SharedBetCard({ metadata }: { metadata: SharedBetMetadata }) {
             Pays {formatCurrency(metadata.potentialPayout)}
           </Text>
         </View>
-      </View>
+        </View>
+      </LockEffect>
     </PressableScale>
   );
 }
 
 function ChatBubble({
+  cosmetics,
   isMine,
   message,
 }: {
+  cosmetics?: EquippedCosmeticsByCategory;
   isMine: boolean;
   message: LeagueChatMessage;
 }) {
   const isSystem = message.message_type === 'system';
   const isBetShare = message.message_type === 'bet_share';
+  const isSticker = message.message_type === 'sticker';
   const displayName = message.user?.display_name ?? (isSystem ? 'Action Arena' : 'Player');
   const metadata = isSharedBetMetadata(message.metadata) ? message.metadata : null;
+  const stickerMetadata = isStickerMetadata(message.metadata) ? message.metadata : null;
 
   if (isSystem) {
     return (
@@ -956,13 +1170,7 @@ function ChatBubble({
     <View
       className={cn('flex-row items-end gap-2', isMine ? 'justify-end' : 'justify-start')}>
       {!isMine ? (
-        <View className="h-8 w-8 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04]">
-          <Text
-            className="text-[10px] font-black uppercase text-white/75"
-            style={{ letterSpacing: 0.4 }}>
-            {getInitials(displayName) || '?'}
-          </Text>
-        </View>
+        <CosmeticAvatar cosmetics={cosmetics} name={displayName} size="sm" />
       ) : null}
       <View
         className={cn(
@@ -990,15 +1198,24 @@ function ChatBubble({
             {displayName}
           </Text>
         ) : null}
-        <Text
-          className={cn(
-            'text-sm font-semibold leading-5',
-            isMine ? 'text-white' : 'text-white/85',
-          )}
-          style={{ letterSpacing: -0.1 }}>
-          {message.body}
-        </Text>
-        {isBetShare && metadata ? <SharedBetCard metadata={metadata} /> : null}
+        {isSticker && stickerMetadata ? (
+          <View className="items-center gap-2 py-1">
+            <ChatStickerPreview itemId={stickerMetadata.stickerId} />
+            <Text className="text-xs font-black uppercase text-white/70">
+              {stickerMetadata.stickerName}
+            </Text>
+          </View>
+        ) : (
+          <Text
+            className={cn(
+              'text-sm font-semibold leading-5',
+              isMine ? 'text-white' : 'text-white/85',
+            )}
+            style={{ letterSpacing: -0.1 }}>
+            {message.body}
+          </Text>
+        )}
+        {isBetShare && metadata ? <SharedBetCard cosmetics={cosmetics} metadata={metadata} /> : null}
         <Text
           className={cn(
             'mt-1.5 text-[10px] font-semibold',
@@ -1008,22 +1225,18 @@ function ChatBubble({
         </Text>
       </View>
       {isMine ? (
-        <View className="h-8 w-8 items-center justify-center rounded-2xl border border-electric-green/45 bg-electric-green/15">
-          <Text
-            className="text-[10px] font-black uppercase text-electric-green"
-            style={{ letterSpacing: 0.4 }}>
-            {getInitials(displayName) || '?'}
-          </Text>
-        </View>
+        <CosmeticAvatar cosmetics={cosmetics} name={displayName} size="sm" />
       ) : null}
     </View>
   );
 }
 
 function LeagueChat({
+  cosmeticsByUserId,
   detail,
   userId,
 }: {
+  cosmeticsByUserId: Record<string, EquippedCosmeticsByCategory>;
   detail: LeagueDetail;
   userId: string;
 }) {
@@ -1035,8 +1248,13 @@ function LeagueChat({
   const previousMessageCount = useRef(0);
   const chatQuery = useLeagueChat(detail.league.id, limit);
   const sendMessage = useSendLeagueChatMessage(detail.league.id, userId);
+  const sendSticker = useSendLeagueChatSticker(detail.league.id, userId);
+  const userCosmetics = useUserCosmetics(userId);
   const messages = chatQuery.data ?? [];
   const canSend = draft.trim().length > 0 && !sendMessage.isPending;
+  const stickerRows = (userCosmetics.data?.rows ?? []).filter(
+    (row) => row.category === 'chat_sticker_pack',
+  );
 
   const submitMessage = async () => {
     if (!canSend) {
@@ -1048,6 +1266,22 @@ function LeagueChat({
     haptics.light();
     try {
       await sendMessage.mutateAsync(nextMessage);
+    } catch {
+      haptics.warning();
+    }
+    requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
+  };
+
+  const submitSticker = async (itemId: string) => {
+    const item = getCosmeticItem(itemId);
+    if (!item) return;
+
+    haptics.light();
+    try {
+      await sendSticker.mutateAsync({
+        stickerId: item.id,
+        stickerName: item.name,
+      });
     } catch {
       haptics.warning();
     }
@@ -1132,6 +1366,7 @@ function LeagueChat({
 
             {messages.map((message) => (
               <ChatBubble
+                cosmetics={message.user_id ? cosmeticsByUserId[message.user_id] : undefined}
                 isMine={message.user_id === userId}
                 key={message.id}
                 message={message}
@@ -1157,6 +1392,33 @@ function LeagueChat({
           ) : null}
 
           <View className="border-t border-white/[0.08] p-3">
+            {stickerRows.length > 0 ? (
+              <ScrollView
+                className="mb-2"
+                contentContainerStyle={{ gap: 8 }}
+                horizontal
+                showsHorizontalScrollIndicator={false}>
+                {stickerRows.map((row) => {
+                  const item = getCosmeticItem(row.item_id);
+                  if (!item) return null;
+                  return (
+                    <PressableScale
+                      accessibilityRole="button"
+                      key={row.id}
+                      onPress={() => {
+                        void submitSticker(row.item_id);
+                      }}>
+                      <View className="items-center gap-1 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2">
+                        <ChatStickerPreview itemId={row.item_id} size="sm" />
+                        <Text className="max-w-[72px] text-center text-[9px] font-black uppercase text-white/55" numberOfLines={1}>
+                          {item.name}
+                        </Text>
+                      </View>
+                    </PressableScale>
+                  );
+                })}
+              </ScrollView>
+            ) : null}
             <View className="flex-row items-end gap-2 rounded-2xl border border-white/10 bg-arena-bg/70 p-2">
               <NativeTextInput
                 className="max-h-28 flex-1 px-2 py-2 text-base font-semibold text-white"
@@ -1210,20 +1472,30 @@ function TabSwitcher({
 }
 
 function TabContent({
+  cosmeticsByUserId,
   detail,
   tab,
   userId,
 }: {
+  cosmeticsByUserId: Record<string, EquippedCosmeticsByCategory>;
   detail: LeagueDetail;
   tab: DetailTab;
   userId: string;
 }) {
   return (
     <View key={tab}>
-      {tab === 'standings' ? <StandingsBoard detail={detail} userId={userId} /> : null}
-      {tab === 'schedule' ? <ScheduleList detail={detail} userId={userId} /> : null}
-      {tab === 'members' ? <MembersList detail={detail} /> : null}
-      {tab === 'chat' ? <LeagueChat detail={detail} userId={userId} /> : null}
+      {tab === 'standings' ? (
+        <StandingsBoard cosmeticsByUserId={cosmeticsByUserId} detail={detail} userId={userId} />
+      ) : null}
+      {tab === 'schedule' ? (
+        <ScheduleList cosmeticsByUserId={cosmeticsByUserId} detail={detail} userId={userId} />
+      ) : null}
+      {tab === 'members' ? (
+        <MembersList cosmeticsByUserId={cosmeticsByUserId} detail={detail} />
+      ) : null}
+      {tab === 'chat' ? (
+        <LeagueChat cosmeticsByUserId={cosmeticsByUserId} detail={detail} userId={userId} />
+      ) : null}
     </View>
   );
 }
@@ -1289,6 +1561,20 @@ export default function LeagueDetailScreen() {
   const detailRefetchRef = useRef(detailQuery.refetch);
   const awardsRefetchRef = useRef(awardsQuery.refetch);
   const [activeTab, setActiveTab] = useState<DetailTab>('standings');
+  const cosmeticUserIds = useMemo(
+    () =>
+      detailQuery.data
+        ? [
+            detailQuery.data.league.commissioner_id,
+            ...detailQuery.data.members.map((member) => member.user_id),
+            ...(detailQuery.data.seasonSnapshot?.champion_user_id
+              ? [detailQuery.data.seasonSnapshot.champion_user_id]
+              : []),
+          ]
+        : [],
+    [detailQuery.data],
+  );
+  const cosmeticsQuery = useEquippedCosmeticsForUsers(cosmeticUserIds);
 
   useEffect(() => {
     if (resolvedInitialTab === 'chat') {
@@ -1337,6 +1623,7 @@ export default function LeagueDetailScreen() {
   const detail = detailQuery.data;
   const userId = user.id;
   const currentUserMatchup = detail.currentUserMatchup;
+  const cosmeticsByUserId = cosmeticsQuery.data ?? {};
 
   return (
     <SafeAreaView className="flex-1 bg-arena-bg">
@@ -1354,7 +1641,7 @@ export default function LeagueDetailScreen() {
         <HeroHeader detail={detail} />
         <InviteCodeCard detail={detail} />
 
-        <SeasonAwardsCard detail={detail} />
+        <SeasonAwardsCard cosmeticsByUserId={cosmeticsByUserId} detail={detail} />
         {awardsQuery.data ? <WeeklyAwardsCard awards={awardsQuery.data} /> : null}
 
         {detail.league.type === 'h2h' && currentUserMatchup ? (
@@ -1365,12 +1652,22 @@ export default function LeagueDetailScreen() {
                 params: { matchupId: currentUserMatchup.id },
               })
             }>
-            <FightCard detail={detail} matchup={currentUserMatchup} userId={userId} />
+            <FightCard
+              cosmeticsByUserId={cosmeticsByUserId}
+              detail={detail}
+              matchup={currentUserMatchup}
+              userId={userId}
+            />
           </PressableScale>
         ) : null}
 
         <TabSwitcher activeTab={activeTab} onChange={setActiveTab} />
-        <TabContent detail={detail} tab={activeTab} userId={userId} />
+        <TabContent
+          cosmeticsByUserId={cosmeticsByUserId}
+          detail={detail}
+          tab={activeTab}
+          userId={userId}
+        />
       </ScrollView>
     </SafeAreaView>
   );

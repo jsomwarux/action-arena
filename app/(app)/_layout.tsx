@@ -38,6 +38,10 @@ export default function AppLayout() {
       <Stack.Screen name="members/[memberId]" options={{ title: 'Member Profile' }} />
       <Stack.Screen name="bets/[betId]" options={{ title: 'Bet Detail' }} />
       <Stack.Screen name="settings" options={{ title: 'Settings' }} />
+      <Stack.Screen name="shop" options={{ title: 'Arena Shop' }} />
+      <Stack.Screen name="coin-store" options={{ title: 'Coin Store' }} />
+      <Stack.Screen name="season-pass" options={{ title: 'Season Pass' }} />
+      <Stack.Screen name="analytics" options={{ title: 'Analytics' }} />
       <Stack.Screen name="notifications/preferences" options={{ title: 'Notifications' }} />
     </Stack>
   );

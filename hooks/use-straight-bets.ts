@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { logAnalyticsEvent } from '@/lib/analytics';
 import { supabase } from '@/lib/supabase';
 import type { BetLegInsert, BetLegRow, BetRow, BetType, Json, TeaserPoints } from '@/types/database';
 
@@ -157,7 +158,23 @@ export function useSubmitBetsMutation(
 
       return assertSupabaseResult(data, error);
     },
-    onSuccess: async () => {
+    onSuccess: async (_data, bets) => {
+      const counts = bets.reduce<Record<BetType, number>>(
+        (accumulator, bet) => {
+          accumulator[bet.bet_type] += 1;
+          return accumulator;
+        },
+        { parlay: 0, straight: 0, teaser: 0 },
+      );
+      logAnalyticsEvent('bets_placed', {
+        bet_count: bets.length,
+        league_id: leagueId,
+        parlay_count: counts.parlay,
+        straight_count: counts.straight,
+        teaser_count: counts.teaser,
+        user_id: userId,
+        week_number: weekNumber,
+      });
       await queryClient.invalidateQueries({
         queryKey: straightBetKeys.placed(leagueId, userId, weekNumber),
       });

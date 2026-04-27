@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { logAnalyticsEvent } from '@/lib/analytics';
 import { supabase } from '@/lib/supabase';
 import type {
   LeagueInsert,
@@ -268,6 +269,10 @@ export function useCreateLeagueMutation(userId: string | undefined) {
       return assertSupabaseResult(data, error);
     },
     onSuccess: async (leagueId) => {
+      logAnalyticsEvent('league_created', {
+        league_id: leagueId,
+        user_id: userId,
+      });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: leagueKeys.mine(userId) }),
         queryClient.invalidateQueries({ queryKey: leagueKeys.public('') }),
@@ -299,6 +304,10 @@ export function useJoinLeagueMutation(userId: string | undefined) {
       throw new Error('Choose a league or enter an invite code.');
     },
     onSuccess: async (leagueId) => {
+      logAnalyticsEvent('league_joined', {
+        league_id: leagueId,
+        user_id: userId,
+      });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: leagueKeys.mine(userId) }),
         queryClient.invalidateQueries({ queryKey: leagueKeys.public('') }),
