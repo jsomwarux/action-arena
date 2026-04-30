@@ -37,7 +37,7 @@ const PASS_FEATURES: {
     title: 'Advanced Analytics Dashboard',
   },
   {
-    body: 'See Pick Board lines 30 minutes before free users every week. Build your lineup before the weekly slate opens.',
+    body: 'See new weekly matchups 30 minutes before free users every week. Build your lineup before the slate opens.',
     highlight: '30-minute head start',
     icon: 'time',
     title: 'Early Pick Board Access',

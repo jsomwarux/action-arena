@@ -2434,7 +2434,7 @@ export default function BetBoardScreen() {
       haptics.warning();
       Alert.alert(
         'Early access window',
-        'Season Pass holders get the first 30 minutes when new lines drop.',
+        'Season Pass holders get the first 30 minutes when new matchups are posted.',
       );
       return;
     }
@@ -2646,7 +2646,7 @@ export default function BetBoardScreen() {
                       Early Access Window
                     </Text>
                     <Text className="text-center text-sm font-semibold leading-5 text-white/60">
-                      Season Pass holders can build cards for the first 30 minutes after new lines drop.
+                      Season Pass holders can build cards for the first 30 minutes after new matchups are posted.
                       Free access opens automatically after the window ends.
                     </Text>
                   </View>
