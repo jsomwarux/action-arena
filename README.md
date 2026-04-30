@@ -1,6 +1,6 @@
 # Action Arena
 
-Action Arena is a native iOS-first Expo app for social sports prediction leagues. Players join leagues, receive a weekly fake-money budget, and compete on profit through straight bets, parlays, and teasers. No real money is wagered.
+Action Arena is a native iOS-first Expo app for social sports prediction leagues. Players join leagues, receive a weekly virtual-coin budget, and compete on profit through straight picks, parlays, and teasers. No real money is wagered or won.
 
 ## Stack
 

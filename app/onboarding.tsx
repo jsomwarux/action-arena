@@ -36,26 +36,26 @@ type IntroSlide = {
 
 const SLIDES: IntroSlide[] = [
   {
-    body: 'A social sports prediction app where your crew gets a weekly fake-money budget and competes on profit. No real money, all bragging rights.',
+    body: 'Compete with friends. No real money. Just bragging rights.',
     icon: 'flame',
     kicker: 'Welcome',
-    title: 'Fantasy structure. Betting strategy.',
+    title: 'The fantasy sports league for prediction game lovers.',
   },
   {
-    body: 'Join or create a league. Get matched up each week. Best record wins.',
+    body: 'Join or create a league. Get matched up each week. Highest score wins.',
     icon: 'shield-checkmark',
     kicker: 'Leagues',
     title: 'Your weekly matchup is the main event.',
   },
   {
-    body: 'Straight bets are single picks. Parlays combine picks for higher risk and higher reward. Teasers buy extra points for safer picks at lower odds.',
+    body: 'Make picks across NFL games. Build multi-pick combos for higher rewards. Level up your strategy.',
     icon: 'pulse',
-    kicker: 'Bet Types',
-    title: 'Pick your weapon.',
+    kicker: 'Picks',
+    title: 'Build your lineup.',
   },
 ];
 
-function BetTypeExample({ accent, label, value }: { accent: string; label: string; value: string }) {
+function PickTypeExample({ accent, label, value }: { accent: string; label: string; value: string }) {
   return (
     <View className="flex-1 rounded-2xl border border-white/[0.08] bg-white/[0.04] p-3">
       <View className="mb-2 h-1.5 w-8 rounded-full" style={{ backgroundColor: accent }} />
@@ -80,7 +80,7 @@ function Slide({
   scrollX: SharedValue<number>;
   width: number;
 }) {
-  const isBetSlide = item.kicker === 'Bet Types';
+  const isPickSlide = item.kicker === 'Picks';
 
   const inputRange = [(index - 1) * width, index * width, (index + 1) * width];
 
@@ -153,15 +153,15 @@ function Slide({
                 </Text>
               </View>
 
-              {isBetSlide ? (
+              {isPickSlide ? (
                 <View className="flex-row gap-2">
-                  <BetTypeExample accent={THEME_COLORS.electricGreen} label="Straight" value="Chiefs -3.5" />
-                  <BetTypeExample
+                  <PickTypeExample accent={THEME_COLORS.electricGreen} label="Straight" value="Chiefs -3.5" />
+                  <PickTypeExample
                     accent={THEME_COLORS.amberAccent}
                     label="Parlay"
-                    value="3 picks × bigger payout"
+                    value="3 picks x bigger reward"
                   />
-                  <BetTypeExample accent={THEME_COLORS.cyanAccent} label="Teaser" value="-7.5 → -1.5" />
+                  <PickTypeExample accent={THEME_COLORS.cyanAccent} label="Teaser" value="-7.5 -> -1.5" />
                 </View>
               ) : null}
             </View>

@@ -1,11 +1,13 @@
-import { Redirect, Stack } from 'expo-router';
+import { Redirect, Stack, usePathname } from 'expo-router';
 import { ActivityIndicator, View } from 'react-native';
 
 import { THEME_COLORS } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
+import { hasSeenActionArenaDisclosure } from '@/hooks/use-disclosure';
 
 export default function AppLayout() {
   const { isLoading, session } = useAuth();
+  const pathname = usePathname();
 
   if (isLoading) {
     return (
@@ -17,6 +19,10 @@ export default function AppLayout() {
 
   if (!session) {
     return <Redirect href="/login" />;
+  }
+
+  if (!hasSeenActionArenaDisclosure(session.user) && pathname !== '/disclosure') {
+    return <Redirect href="/disclosure" />;
   }
 
   return (
@@ -31,12 +37,13 @@ export default function AppLayout() {
         },
       }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="disclosure" options={{ title: 'How Action Arena Works' }} />
       <Stack.Screen name="leagues/create" options={{ title: 'Create League' }} />
       <Stack.Screen name="leagues/join" options={{ title: 'Join League' }} />
       <Stack.Screen name="leagues/[leagueId]" options={{ title: 'League Detail' }} />
       <Stack.Screen name="matchups/[matchupId]" options={{ title: 'Matchup Detail' }} />
       <Stack.Screen name="members/[memberId]" options={{ title: 'Member Profile' }} />
-      <Stack.Screen name="bets/[betId]" options={{ title: 'Bet Detail' }} />
+      <Stack.Screen name="bets/[betId]" options={{ title: 'Pick Detail' }} />
       <Stack.Screen name="settings" options={{ title: 'Settings' }} />
       <Stack.Screen name="shop" options={{ title: 'Arena Shop' }} />
       <Stack.Screen name="coin-store" options={{ title: 'Coin Store' }} />
