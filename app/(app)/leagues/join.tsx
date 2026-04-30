@@ -53,7 +53,7 @@ function PublicLeagueCard({
               <Text
                 className="text-[10px] font-black uppercase text-white/45"
                 style={{ letterSpacing: 1.5 }}>
-                Slots
+                Members
               </Text>
               <Text className="mt-1 text-base font-black text-white">
                 {item.memberCount}

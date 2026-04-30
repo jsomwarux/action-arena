@@ -88,7 +88,7 @@ type SlipBet = Omit<MixedBetSubmission, 'legs'> & {
   id: string;
   label: string;
   legs: SlipLeg[];
-  rawPotentialPayout?: number;
+  rawPotentialReward?: number;
 };
 
 type PendingStraightSelection = {
@@ -102,7 +102,7 @@ type ValidationState = {
 };
 
 const MARKET_OPTIONS: SegmentedOption<BetMarket>[] = [
-  { icon: 'cash', label: 'Money', value: 'moneyline' },
+  { icon: 'trophy', label: 'Winner', value: 'moneyline' },
   { icon: 'swap-horizontal', label: 'Spread', value: 'spread' },
   { icon: 'remove-outline', label: 'Total', value: 'over_under' },
 ];
@@ -131,38 +131,38 @@ const TOUR_STEPS: {
 }[] = [
   {
     anchor: 'top',
-    body: 'This bar tracks the full $100 weekly budget, what is allocated, what remains, and your progress toward the 5-bet minimum.',
+    body: 'This bar tracks the full 100 coins weekly budget, what is allocated, what remains, and your progress toward the 5-pick minimum.',
     icon: 'wallet',
     title: 'Budget tracker',
   },
   {
     anchor: 'middle',
-    body: 'Tap an odds button on a game card, set the dollar amount, and the pick lands in your slip immediately.',
+    body: 'Tap a value button on a game card, set the coin amount, and the pick lands in your lineup immediately.',
     icon: 'finger-print',
-    title: 'Select a bet',
+    title: 'Select a pick',
   },
   {
     anchor: 'top',
     body: 'Use the Straight, Parlay, and Teaser toggle to change how picks are built. Parlay is amber, teaser is cyan.',
     icon: 'swap-horizontal',
-    title: 'Switch bet modes',
+    title: 'Switch pick modes',
   },
   {
     anchor: 'bottom',
-    body: 'Pull up the slip from the bottom to review picks, payouts, remaining budget, and remove anything before locking in.',
+    body: 'Pull up the lineup from the bottom to review picks, rewards, remaining budget, and remove anything before locking in.',
     icon: 'receipt',
-    title: 'Bet slip',
+    title: 'Lineup',
   },
   {
     anchor: 'middle',
-    body: 'The submit button stays disabled until you have at least 5 bets, exactly one Lock of the Week, no bet over $35, exactly $100 allocated, and no duplicate game sides.',
+    body: 'The submit button stays disabled until you have at least 5 picks, exactly one Pick of the Week, no pick over 35 coins, exactly 100 coins allocated, and no duplicate game sides.',
     icon: 'checkmark-done',
     title: 'Validation rules',
   },
 ];
 
 function marketLabel(market: BetMarket) {
-  if (market === 'moneyline') return 'Moneyline';
+  if (market === 'moneyline') return 'Winner';
   if (market === 'spread') return 'Spread';
   return 'Over/Under';
 }
@@ -214,7 +214,7 @@ function makeSlipLeg(game: OddsGame, selection: OddsSelection, adjustedLine = se
 
 function makeStraightBet(game: OddsGame, selection: OddsSelection, amount: number): SlipBet {
   const leg = makeSlipLeg(game, selection);
-  const payout = calculatePotentialPayout(amount, selection.odds);
+  const reward = calculatePotentialPayout(amount, selection.odds);
 
   return {
     amount,
@@ -224,7 +224,7 @@ function makeStraightBet(game: OddsGame, selection: OddsSelection, amount: numbe
     label: leg.label,
     legs: [leg],
     odds: selection.odds,
-    potential_payout: payout,
+    potential_payout: reward,
     teaser_points: null,
   };
 }
@@ -237,11 +237,11 @@ function getParlayOdds(legs: SlipLeg[]) {
   return decimalOddsToAmerican(calculateParlayDecimalOdds(legs));
 }
 
-function calculateParlayPayout(amount: number, legs: SlipLeg[]) {
-  const rawPayout = Number((amount * calculateParlayDecimalOdds(legs)).toFixed(2));
+function calculateParlayReward(amount: number, legs: SlipLeg[]) {
+  const rawReward = Number((amount * calculateParlayDecimalOdds(legs)).toFixed(2));
   return {
-    cappedPayout: Math.min(rawPayout, PARLAY_PAYOUT_CAP),
-    rawPayout,
+    cappedReward: Math.min(rawReward, PARLAY_PAYOUT_CAP),
+    rawReward,
   };
 }
 
@@ -340,17 +340,17 @@ function getValidationState(slipBets: SlipBet[]): ValidationState {
 
   if (slipBets.length < MINIMUM_BETS_PER_WEEK) {
     const remaining = MINIMUM_BETS_PER_WEEK - slipBets.length;
-    errors.push(`Add ${remaining} more bet${remaining === 1 ? '' : 's'} to hit the weekly minimum.`);
+    errors.push(`Add ${remaining} more pick${remaining === 1 ? '' : 's'} to hit the weekly minimum.`);
   }
 
   if (lockCount === 0) {
-    errors.push('Choose your Lock — every weekly card needs one Lock of the Week (1.5x).');
+    errors.push('Choose your Lock — every weekly card needs one Pick of the Week (1.5x).');
   } else if (lockCount > 1) {
-    errors.push('Only one bet can be your Lock of the Week. Tap the gold star to swap.');
+    errors.push('Only one pick can be your Pick of the Week. Tap the gold star to swap.');
   }
 
   if (slipBets.some((bet) => bet.amount > MAX_SINGLE_BET)) {
-    errors.push(`No single bet can exceed ${formatCurrency(MAX_SINGLE_BET)}.`);
+    errors.push(`No single pick can exceed ${formatCurrency(MAX_SINGLE_BET)}.`);
   }
 
   if (totalAllocated < WEEKLY_BUDGET) {
@@ -362,7 +362,7 @@ function getValidationState(slipBets: SlipBet[]): ValidationState {
   }
 
   if (duplicateGames.size > 0) {
-    errors.push('Only one selection per game across all bet types.');
+    errors.push('Only one selection per game across all pick types.');
   }
 
   if (duplicateSelections.size > 0) {
@@ -379,8 +379,8 @@ function getValidationState(slipBets: SlipBet[]): ValidationState {
       if (uniqueGames.size !== bet.legs.length) {
         errors.push('Parlays cannot include two legs from the same game.');
       }
-      if ((bet.rawPotentialPayout ?? bet.potential_payout) > PARLAY_PAYOUT_CAP) {
-        warnings.push(`Parlay payout is capped at ${formatCurrency(PARLAY_PAYOUT_CAP)}.`);
+      if ((bet.rawPotentialReward ?? bet.potential_payout) > PARLAY_PAYOUT_CAP) {
+        warnings.push(`Parlay reward is capped at ${formatCurrency(PARLAY_PAYOUT_CAP)}.`);
       }
     }
 
@@ -421,7 +421,7 @@ function BoardHeader({ league }: { league: LeagueRow | undefined }) {
       <Text
         className="mt-1 text-2xl font-extrabold text-white"
         style={{ letterSpacing: -0.4 }}>
-        Bet Board
+        Pick Board
       </Text>
       <Text className="mt-1 text-sm font-medium text-white/55">
         Stack straights, parlays, and teasers across the slate.
@@ -471,10 +471,10 @@ function BudgetTracker({
             <View className="mt-1 flex-row items-baseline">
               <AnimatedNumber
                 className="text-3xl font-black text-white"
-                prefix="$"
+                suffix=" coins"
                 style={{ letterSpacing: -0.8 }}
                 value={totalAllocated}
-                decimals={totalAllocated % 1 === 0 ? 0 : 2}
+                decimals={0}
               />
               <Text className="text-base font-black text-white/40" style={{ letterSpacing: -0.4 }}>
                 {' / '}
@@ -500,7 +500,7 @@ function BudgetTracker({
                 minimumMet ? 'text-electric-green' : 'text-gold',
               )}
               style={{ letterSpacing: 1.5 }}>
-              {displayedBets.length}/{MINIMUM_BETS_PER_WEEK} bets
+              {displayedBets.length}/{MINIMUM_BETS_PER_WEEK} picks
             </Text>
           </View>
         </View>
@@ -526,10 +526,11 @@ function BudgetTracker({
                       ? 'text-gold'
                       : 'text-amber-accent',
             )}
-            prefix={remaining < 0 ? '-$' : '$'}
+            prefix={remaining < 0 ? '-' : ''}
+            suffix=" coins"
             style={{ letterSpacing: -0.3 }}
             value={Math.abs(remaining)}
-            decimals={Math.abs(remaining) % 1 === 0 ? 0 : 2}
+            decimals={0}
           />
         </View>
       </View>
@@ -734,7 +735,7 @@ function GameCard({
         {selections.length === 0 ? (
           <View className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
             <Text className="text-sm font-semibold text-white/50">
-              {marketLabel(resolvedMarket)} odds aren't published for this game yet.
+              {marketLabel(resolvedMarket)} lines aren't published for this game yet.
             </Text>
           </View>
         ) : (
@@ -856,12 +857,12 @@ function ParlayBuilder({
 }) {
   const amount = Number(amountText);
   const odds = legs.length > 0 ? getParlayOdds(legs) : 0;
-  const { cappedPayout, rawPayout } =
+  const { cappedReward, rawReward } =
     legs.length > 0 && Number.isFinite(amount)
-      ? calculateParlayPayout(amount || 0, legs)
-      : { cappedPayout: 0, rawPayout: 0 };
+      ? calculateParlayReward(amount || 0, legs)
+      : { cappedReward: 0, rawReward: 0 };
   const canAdd = legs.length >= 2 && legs.length <= 6 && Number.isFinite(amount) && amount > 0;
-  const overCap = rawPayout > PARLAY_PAYOUT_CAP;
+  const overCap = rawReward > PARLAY_PAYOUT_CAP;
 
   return (
     <View>
@@ -899,7 +900,7 @@ function ParlayBuilder({
                 <Text
                   className="text-[10px] font-black uppercase text-amber-accent"
                   style={{ letterSpacing: 2 }}>
-                  Combined Odds
+                  Combo Value
                 </Text>
                 <Text
                   className="text-5xl font-black text-amber-accent"
@@ -911,14 +912,14 @@ function ParlayBuilder({
                 <Text
                   className="text-[10px] font-black uppercase text-white/45"
                   style={{ letterSpacing: 2 }}>
-                  Pays
+                  Reward
                 </Text>
                 <AnimatedNumber
                   className="text-2xl font-black text-white"
-                  decimals={2}
-                  prefix="$"
+                  decimals={0}
+                  suffix=" coins"
                   style={{ letterSpacing: -0.5 }}
-                  value={cappedPayout}
+                  value={cappedReward}
                 />
               </View>
             </View>
@@ -928,7 +929,7 @@ function ParlayBuilder({
             <View className="flex-row items-center gap-2 rounded-2xl border border-amber-accent/40 bg-amber-accent/10 p-3">
               <Ionicons color={THEME_COLORS.amberAccent} name="alert-circle" size={16} />
               <Text className="flex-1 text-xs font-semibold text-amber-accent">
-                Raw payout {formatCurrency(rawPayout)} hits the {formatCurrency(PARLAY_PAYOUT_CAP)} cap.
+                Raw reward {formatCurrency(rawReward)} hits the {formatCurrency(PARLAY_PAYOUT_CAP)} cap.
               </Text>
             </View>
           ) : null}
@@ -937,7 +938,7 @@ function ParlayBuilder({
             <View className="items-center rounded-2xl border border-dashed border-white/10 bg-white/[0.03] py-6">
               <Ionicons color={THEME_COLORS.amberAccent} name="add-circle-outline" size={28} />
               <Text className="mt-2 text-sm font-semibold text-white/55">
-                Tap odds on different games to add legs.
+                Tap values on different games to add legs.
               </Text>
             </View>
           ) : (
@@ -977,7 +978,7 @@ function ParlayBuilder({
               haptics.medium();
               onAddToSlip();
             }}
-            title="Add Parlay to Slip"
+            title="Add Parlay to Lineup"
             variant="secondary"
           />
         </View>
@@ -1009,7 +1010,7 @@ function TeaserBuilder({
 }) {
   const amount = Number(amountText);
   const odds = getTeaserOdds(legs.length, teaserPoints);
-  const payout = odds && Number.isFinite(amount) ? calculatePotentialPayout(amount || 0, odds) : 0;
+  const reward = odds && Number.isFinite(amount) ? calculatePotentialPayout(amount || 0, odds) : 0;
   const canAdd = Boolean(odds && Number.isFinite(amount) && amount > 0);
 
   return (
@@ -1065,7 +1066,7 @@ function TeaserBuilder({
                 <Text
                   className="text-[10px] font-black uppercase text-cyan-accent"
                   style={{ letterSpacing: 2 }}>
-                  Lookup Odds
+                  Boost Value
                 </Text>
                 <Text
                   className="text-5xl font-black text-cyan-accent"
@@ -1077,14 +1078,14 @@ function TeaserBuilder({
                 <Text
                   className="text-[10px] font-black uppercase text-white/45"
                   style={{ letterSpacing: 2 }}>
-                  Pays
+                  Reward
                 </Text>
                 <AnimatedNumber
                   className="text-2xl font-black text-white"
-                  decimals={2}
-                  prefix="$"
+                  decimals={0}
+                  suffix=" coins"
                   style={{ letterSpacing: -0.5 }}
-                  value={payout}
+                  value={reward}
                 />
               </View>
             </View>
@@ -1155,7 +1156,7 @@ function TeaserBuilder({
               haptics.medium();
               onAddToSlip();
             }}
-            title="Add Teaser to Slip"
+            title="Add Teaser to Lineup"
             variant="secondary"
           />
         </View>
@@ -1188,7 +1189,7 @@ function SlipBetCard({
       : THEME_COLORS.electricGreen;
   const isLock = bet.is_lock;
   const dim = hasAnyLock && !isLock;
-  const lockMultiplierPayout = bet.potential_payout * LOCK_OF_THE_WEEK_MULTIPLIER;
+  const lockMultiplierReward = bet.potential_payout * LOCK_OF_THE_WEEK_MULTIPLIER;
 
   return (
     <View style={{ marginBottom: isLock ? 14 : 10, opacity: dim ? 0.5 : 1 }}>
@@ -1199,7 +1200,7 @@ function SlipBetCard({
             <Text
               className="text-[10px] font-black uppercase text-gold"
               style={{ letterSpacing: 1.6 }}>
-              Lock of the Week
+              Pick of the Week
             </Text>
           </View>
         ) : null}
@@ -1270,7 +1271,7 @@ function SlipBetCard({
               <Text
                 className="text-[10px] font-black uppercase text-white/45"
                 style={{ letterSpacing: 1.5 }}>
-                Stake
+                Played
               </Text>
               <Text className="mt-0.5 text-base font-black text-white">
                 {formatCurrency(bet.amount)}
@@ -1280,7 +1281,7 @@ function SlipBetCard({
               <Text
                 className="text-[10px] font-black uppercase text-white/45"
                 style={{ letterSpacing: 1.5 }}>
-                {isLock ? 'Pays · 1.5x' : 'Pays'}
+                {isLock ? 'Reward · 1.5x' : 'Reward'}
               </Text>
               <Text
                 className="mt-0.5 text-base font-black"
@@ -1288,7 +1289,7 @@ function SlipBetCard({
                   color: isLock ? THEME_COLORS.gold : accentByType,
                   letterSpacing: -0.3,
                 }}>
-                {formatCurrency(isLock ? lockMultiplierPayout : bet.potential_payout)}
+                {formatCurrency(isLock ? lockMultiplierReward : bet.potential_payout)}
               </Text>
             </View>
           </View>
@@ -1326,8 +1327,8 @@ function SlipBetCard({
                 )}
                 style={{ letterSpacing: 1.4 }}>
                 {isLock
-                  ? `Lock of the Week · ${LOCK_OF_THE_WEEK_MULTIPLIER}x profit/loss`
-                  : 'Mark as Lock of the Week'}
+                  ? `Pick of the Week · ${LOCK_OF_THE_WEEK_MULTIPLIER}x profit/loss`
+                  : 'Mark as Pick of the Week'}
               </Text>
             </View>
           </Pressable>
@@ -1350,7 +1351,7 @@ function SlipSummary({
   validation: ValidationState;
 }) {
   const totalAllocated = slipBets.reduce((sum, bet) => sum + bet.amount, 0);
-  const totalPayout = slipBets.reduce((sum, bet) => sum + bet.potential_payout, 0);
+  const totalReward = slipBets.reduce((sum, bet) => sum + bet.potential_payout, 0);
   const lockBet = slipBets.find((bet) => bet.is_lock);
   const ready = validation.errors.length === 0 && slipBets.length > 0;
 
@@ -1381,7 +1382,7 @@ function SlipSummary({
               lockBet ? 'text-gold' : 'text-white/55',
             )}
             style={{ letterSpacing: 1.5 }}>
-            Lock of the Week
+            Pick of the Week
           </Text>
         </View>
         <Text
@@ -1390,16 +1391,16 @@ function SlipSummary({
             lockBet ? 'text-white' : 'text-white/40',
           )}
           numberOfLines={1}>
-          {lockBet ? lockBet.label : 'Tap a bet to choose'}
+          {lockBet ? lockBet.label : 'Tap a pick to choose'}
         </Text>
       </View>
       <View className="flex-row justify-between">
         <Text
           className="text-[11px] font-black uppercase text-white/55"
           style={{ letterSpacing: 1.5 }}>
-          Potential Payout
+          Potential Reward
         </Text>
-        <Text className="text-sm font-black text-electric-green">{formatCurrency(totalPayout)}</Text>
+        <Text className="text-sm font-black text-electric-green">{formatCurrency(totalReward)}</Text>
       </View>
       <View className="flex-row justify-between">
         <Text
@@ -1453,7 +1454,7 @@ function SlipSummary({
 }
 
 // ============================================================
-// Bet Slip Bottom Sheet
+// Lineup Bottom Sheet
 // ============================================================
 
 function BetSlipSheet({
@@ -1509,14 +1510,14 @@ function BetSlipSheet({
                 <Text
                   className="text-[10px] font-black uppercase text-electric-green"
                   style={{ letterSpacing: 2 }}>
-                  Bet Slip
+                  Lineup
                 </Text>
                 <Text
                   className="text-base font-black text-white"
                   style={{ letterSpacing: -0.3 }}>
                   {slipBets.length === 0
                     ? 'Build your weekly card'
-                    : `${slipBets.length}/${MINIMUM_BETS_PER_WEEK} bets · ${formatCurrency(totalAllocated)}`}
+                    : `${slipBets.length}/${MINIMUM_BETS_PER_WEEK} picks · ${formatCurrency(totalAllocated)}`}
                 </Text>
               </View>
             </View>
@@ -1555,10 +1556,10 @@ function BetSlipSheet({
               <Text
                 className="text-2xl font-black uppercase text-white"
                 style={{ letterSpacing: -0.4 }}>
-                Slip is Empty
+                Lineup is Empty
               </Text>
               <Text className="px-4 text-center text-sm font-semibold text-white/55">
-                Tap odds, build a parlay, or stack a teaser to get started.
+                Tap values, build a parlay, or stack a teaser to get started.
               </Text>
             </View>
           }
@@ -1618,7 +1619,7 @@ function AmountModal({
     amountText.length > 0 && (!Number.isFinite(parsedAmount) || parsedAmount <= 0)
       ? 'Enter a valid amount.'
       : parsedAmount > MAX_SINGLE_BET
-        ? `Max single bet is ${formatCurrency(MAX_SINGLE_BET)}.`
+        ? `Max single pick is ${formatCurrency(MAX_SINGLE_BET)}.`
         : undefined;
 
   const canSave =
@@ -1647,7 +1648,7 @@ function AmountModal({
                   <Text
                     className="text-[10px] font-black uppercase text-electric-green"
                     style={{ letterSpacing: 2 }}>
-                    Stake This Pick
+                    Play This Pick
                   </Text>
                 </View>
                 <Text
@@ -1685,7 +1686,7 @@ function AmountModal({
                             isSelected ? 'text-electric-green' : 'text-white',
                           )}
                           style={{ letterSpacing: -0.3 }}>
-                          ${value}
+                          {formatCurrency(value)}
                         </Text>
                       </View>
                     </PressableScale>
@@ -1704,9 +1705,9 @@ function AmountModal({
 
               {Number.isFinite(parsedAmount) && parsedAmount > 0 && pendingSelection ? (
                 <View className="flex-row items-center gap-2 rounded-2xl border border-electric-green/30 bg-electric-green/10 px-3 py-3">
-                  <Ionicons color={THEME_COLORS.electricGreen} name="cash" size={16} />
+                  <Ionicons color={THEME_COLORS.electricGreen} name="ellipse" size={16} />
                   <Text className="text-sm font-black text-electric-green">
-                    Pays{' '}
+                    Reward{' '}
                     {formatCurrency(
                       calculatePotentialPayout(
                         parsedAmount,
@@ -1728,7 +1729,7 @@ function AmountModal({
                       haptics.medium();
                       onSave(Number(parsedAmount.toFixed(2)));
                     }}
-                    title="Add to Slip"
+                    title="Add to Lineup"
                   />
                 </View>
               </View>
@@ -1798,7 +1799,7 @@ function ConfirmationModal({
   visible: boolean;
 }) {
   const totalAllocated = slipBets.reduce((sum, bet) => sum + bet.amount, 0);
-  const totalPayout = slipBets.reduce((sum, bet) => sum + bet.potential_payout, 0);
+  const totalReward = slipBets.reduce((sum, bet) => sum + bet.potential_payout, 0);
 
   const grouped = useMemo(
     () => ({
@@ -1837,7 +1838,7 @@ function ConfirmationModal({
                   Lock In Your Card
                 </Text>
                 <Text className="px-4 text-center text-sm font-semibold text-white/55">
-                  Odds and lines are frozen at submit. No edits once games kick off.
+                  Values and lines are frozen at submit. No edits once games kick off.
                 </Text>
               </View>
 
@@ -1858,7 +1859,7 @@ function ConfirmationModal({
                                 : 'text-electric-green',
                           )}
                           style={{ letterSpacing: 2 }}>
-                          {type === 'straight' ? 'Straight Bets' : type === 'parlay' ? 'Parlays' : 'Teasers'} · {items.length}
+                          {type === 'straight' ? 'Straight Picks' : type === 'parlay' ? 'Parlays' : 'Teasers'} · {items.length}
                         </Text>
                         <View className="gap-2">
                           {items.map((bet) => (
@@ -1876,7 +1877,7 @@ function ConfirmationModal({
                   <Text
                     className="text-[11px] font-black uppercase text-white/55"
                     style={{ letterSpacing: 1.5 }}>
-                    Stake
+                    Played
                   </Text>
                   <Text className="text-sm font-black text-white">
                     {formatCurrency(totalAllocated)}
@@ -1886,10 +1887,10 @@ function ConfirmationModal({
                   <Text
                     className="text-[11px] font-black uppercase text-white/55"
                     style={{ letterSpacing: 1.5 }}>
-                    Potential Payout
+                    Potential Reward
                   </Text>
                   <Text className="text-base font-black text-electric-green">
-                    {formatCurrency(totalPayout)}
+                    {formatCurrency(totalReward)}
                   </Text>
                 </View>
               </View>
@@ -1905,7 +1906,7 @@ function ConfirmationModal({
                       haptics.heavy();
                       onConfirm();
                     }}
-                    title="Lock In Bets"
+                    title="Lock In Lineup"
                   />
                 </View>
               </View>
@@ -2106,7 +2107,7 @@ function PlacedBetCard({
     (leg) => leg.locked || new Date(leg.game_start_time).getTime() <= Date.now(),
   );
   const isLock = bet.is_lock;
-  const lockMultiplierPayout = bet.potential_payout * LOCK_OF_THE_WEEK_MULTIPLIER;
+  const lockMultiplierReward = bet.potential_payout * LOCK_OF_THE_WEEK_MULTIPLIER;
   const dim = !isLockHeadline && !isLock; // gently de-emphasize non-lock bets after headline
 
   return (
@@ -2134,7 +2135,7 @@ function PlacedBetCard({
           <Text
             className="text-[10px] font-black uppercase text-gold"
             style={{ letterSpacing: 1.6 }}>
-            Lock of the Week · {LOCK_OF_THE_WEEK_MULTIPLIER}x profit/loss
+            Pick of the Week · {LOCK_OF_THE_WEEK_MULTIPLIER}x profit/loss
           </Text>
         </View>
       ) : null}
@@ -2153,7 +2154,7 @@ function PlacedBetCard({
               style={{ letterSpacing: -0.3 }}
               numberOfLines={2}>
               {bet.bet_type === 'straight'
-                ? bet.bet_legs[0]?.selection ?? 'Straight bet'
+                ? bet.bet_legs[0]?.selection ?? 'Straight pick'
                 : `${bet.bet_legs.length}-leg ${bet.bet_type}`}
             </Text>
           </View>
@@ -2196,7 +2197,7 @@ function PlacedBetCard({
                 'text-sm font-black',
                 isLock ? 'text-gold' : 'text-electric-green',
               )}>
-              Pays {formatCurrency(isLock ? lockMultiplierPayout : bet.potential_payout)}
+              Reward {formatCurrency(isLock ? lockMultiplierReward : bet.potential_payout)}
             </Text>
             {isLock ? (
               <Text
@@ -2232,7 +2233,7 @@ function PlacedBetsView({
 }) {
   const shareBet = useShareBetToChat(userId);
   const totalAllocated = bets.reduce((sum, bet) => sum + bet.amount, 0);
-  const totalPayout = bets.reduce((sum, bet) => sum + bet.potential_payout, 0);
+  const totalReward = bets.reduce((sum, bet) => sum + bet.potential_payout, 0);
 
   // Surface Lock first, the rest follow.
   const orderedBets = useMemo(() => {
@@ -2244,10 +2245,10 @@ function PlacedBetsView({
   const handleShare = async (bet: PlacedBet) => {
     try {
       await shareBet.mutateAsync(bet);
-      Alert.alert('Shared to chat', 'This bet is now in league chat.');
+      Alert.alert('Shared to chat', 'This pick is now in league chat.');
     } catch (error) {
       Alert.alert(
-        'Could not share bet',
+        'Could not share pick',
         error instanceof Error ? error.message : 'Try again.',
       );
     }
@@ -2271,7 +2272,7 @@ function PlacedBetsView({
             This Week is Locked
           </Text>
           <Text className="text-sm font-semibold text-white/55">
-            Multi-leg bets stay editable until every leg's game starts.
+            Multi-pick cards stay editable until every leg's game starts.
           </Text>
           <View className="mt-2 flex-row items-center justify-between">
             <Text
@@ -2285,10 +2286,10 @@ function PlacedBetsView({
             <Text
               className="text-[10px] font-black uppercase text-white/45"
               style={{ letterSpacing: 1.5 }}>
-              Potential Payout
+              Potential Reward
             </Text>
             <Text className="text-sm font-black text-electric-green">
-              {formatCurrency(totalPayout)}
+              {formatCurrency(totalReward)}
             </Text>
           </View>
         </View>
@@ -2402,7 +2403,7 @@ export default function BetBoardScreen() {
   const addBuilderLeg = (currentLegs: SlipLeg[], nextLeg: SlipLeg, maxLegs: number) => {
     if (currentLegs.length >= maxLegs) {
       haptics.warning();
-      Alert.alert('Leg limit reached', `This bet can have up to ${maxLegs} legs.`);
+      Alert.alert('Leg limit reached', `This pick can have up to ${maxLegs} legs.`);
       return currentLegs;
     }
 
@@ -2425,7 +2426,7 @@ export default function BetBoardScreen() {
   const handleSelectOdds = (game: OddsGame, selection: OddsSelection) => {
     if (!selectedLeague) {
       haptics.warning();
-      Alert.alert('Choose a league', 'Join or create a league before placing bets.');
+      Alert.alert('Choose a league', 'Join or create a league before submitting picks.');
       return;
     }
 
@@ -2433,7 +2434,7 @@ export default function BetBoardScreen() {
       haptics.warning();
       Alert.alert(
         'Early access window',
-        'Season Pass holders get the first 30 minutes when new odds drop.',
+        'Season Pass holders get the first 30 minutes when new lines drop.',
       );
       return;
     }
@@ -2451,7 +2452,7 @@ export default function BetBoardScreen() {
 
     if (selection.market === 'moneyline') {
       haptics.warning();
-      Alert.alert('Moneylines are unavailable for teasers', 'Use spreads or over/unders.');
+      Alert.alert('Winner picks are unavailable for teasers', 'Use spreads or over/unders.');
       return;
     }
 
@@ -2482,7 +2483,7 @@ export default function BetBoardScreen() {
     const amount = Number(parlayAmount);
     if (!Number.isFinite(amount) || amount <= 0 || parlayLegs.length < 2) return;
 
-    const { cappedPayout, rawPayout } = calculateParlayPayout(amount, parlayLegs);
+    const { cappedReward, rawReward } = calculateParlayReward(amount, parlayLegs);
     const bet: SlipBet = {
       amount: Number(amount.toFixed(2)),
       bet_type: 'parlay',
@@ -2491,8 +2492,8 @@ export default function BetBoardScreen() {
       label: `${parlayLegs.length}-leg Parlay`,
       legs: parlayLegs,
       odds: getParlayOdds(parlayLegs),
-      potential_payout: cappedPayout,
-      rawPotentialPayout: rawPayout,
+      potential_payout: cappedReward,
+      rawPotentialReward: rawReward,
       teaser_points: null,
     };
 
@@ -2558,10 +2559,10 @@ export default function BetBoardScreen() {
       setSlipSnap(0);
       setSlipBets([]);
       haptics.success();
-      Alert.alert('Bets locked in', 'Your card is set at the selected odds.');
+      Alert.alert('Lineup locked in', 'Your card is set at the selected values.');
     } catch (error) {
       haptics.error();
-      Alert.alert('Could not submit bets', error instanceof Error ? error.message : 'Try again.');
+      Alert.alert('Could not submit picks', error instanceof Error ? error.message : 'Try again.');
     }
   };
 
@@ -2583,7 +2584,7 @@ export default function BetBoardScreen() {
           <Text
             className="text-center text-3xl font-black uppercase text-white"
             style={{ letterSpacing: -0.4 }}>
-            Bet Board
+            Pick Board
           </Text>
           <Text className="px-2 text-center text-base font-semibold text-white/55">
             Join or create a league before building your weekly card.
@@ -2612,7 +2613,7 @@ export default function BetBoardScreen() {
                   <Text
                     className="text-[10px] font-black uppercase text-white/50"
                     style={{ letterSpacing: 2 }}>
-                    Bet Type
+                    Pick Type
                   </Text>
                   <SegmentedToggle
                     accent="green"
@@ -2645,7 +2646,7 @@ export default function BetBoardScreen() {
                       Early Access Window
                     </Text>
                     <Text className="text-center text-sm font-semibold leading-5 text-white/60">
-                      Season Pass holders can build cards for the first 30 minutes after new odds drop.
+                      Season Pass holders can build cards for the first 30 minutes after new lines drop.
                       Free access opens automatically after the window ends.
                     </Text>
                   </View>
@@ -2718,7 +2719,7 @@ export default function BetBoardScreen() {
                     <Text className="flex-1 text-sm font-semibold text-coral-red">
                       {oddsQuery.error instanceof Error
                         ? oddsQuery.error.message
-                        : 'Unable to load odds right now.'}
+                        : 'Unable to load lines right now.'}
                     </Text>
                   </View>
                 </Card>
@@ -2732,7 +2733,7 @@ export default function BetBoardScreen() {
                 <View className="items-center gap-2 py-2">
                   <Ionicons color={THEME_COLORS.electricGreen} name="football" size={26} />
                   <Text className="text-center text-base font-semibold text-white/55">
-                    No upcoming NFL odds available yet. Pull to refresh.
+                    No upcoming NFL lines available yet. Pull to refresh.
                   </Text>
                 </View>
               </Card>

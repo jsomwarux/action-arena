@@ -116,7 +116,7 @@ function isSharedBetMetadata(value: Json): value is SharedBetMetadata {
   return (
     typeof value.amount === 'number' &&
     typeof value.odds === 'number' &&
-    typeof value.potentialPayout === 'number' &&
+    typeof value.potentialReward === 'number' &&
     typeof value.weekNumber === 'number' &&
     typeof value.betType === 'string' &&
     Array.isArray(value.legs)
@@ -554,7 +554,7 @@ function AwardCard({ award }: { award: WeeklyAward }) {
 }
 
 function WeeklyAwardsCard({ awards }: { awards: WeeklyAwards | undefined }) {
-  if (!awards || (!awards.sharpest && !awards.degen && !awards.lock)) {
+  if (!awards || (!awards.sharpest && !awards.coldStreak && !awards.lock)) {
     return null;
   }
 
@@ -566,7 +566,7 @@ function WeeklyAwardsCard({ awards }: { awards: WeeklyAwards | undefined }) {
         </Text>
         <View className="flex-row gap-2">
           {awards.sharpest ? <AwardCard award={awards.sharpest} /> : null}
-          {awards.degen ? <AwardCard award={awards.degen} /> : null}
+          {awards.coldStreak ? <AwardCard award={awards.coldStreak} /> : null}
         </View>
         {awards.lock ? (
           <View className="rounded-2xl border border-electric-green/25 bg-electric-green/[0.06] p-3">
@@ -575,7 +575,7 @@ function WeeklyAwardsCard({ awards }: { awards: WeeklyAwards | undefined }) {
             </Text>
             <Text className="mt-2 text-sm font-black text-white">
               {awards.lock.user?.display_name ?? 'No winner yet'} ·{' '}
-              {awards.lock.bet?.bet_legs[0]?.selection ?? 'Bet'}
+              {awards.lock.bet?.bet_legs[0]?.selection ?? 'Pick'}
             </Text>
           </View>
         ) : null}
@@ -1124,10 +1124,10 @@ function SharedBetCard({
           <Text
             className="text-[10px] font-black uppercase text-white/45"
             style={{ letterSpacing: 1.4 }}>
-            {formatCurrency(metadata.amount)} stake
+            {formatCurrency(metadata.amount)} played
           </Text>
           <Text className="text-xs font-black text-electric-green">
-            Pays {formatCurrency(metadata.potentialPayout)}
+            Reward {formatCurrency(metadata.potentialReward)}
           </Text>
         </View>
         </View>

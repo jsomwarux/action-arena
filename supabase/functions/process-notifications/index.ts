@@ -162,6 +162,44 @@ function uniqueValues(values: string[]) {
   return [...new Set(values)];
 }
 
+function formatCoinsInCopy(value: string) {
+  return value.replace(/([+-]?)\$(\d+(?:\.\d+)?)/g, (_match, sign: string, amount: string) => {
+    const rounded = Math.round(Number(amount));
+    return `${sign}${rounded} coins`;
+  });
+}
+
+function sanitizeNotificationCopy(value: string) {
+  let next = formatCoinsInCopy(value);
+
+  next = next.replace(
+    /^Your bet on (.+?) hit!? ?([+-]?\d+ coins)?$/i,
+    (_match, selection: string, reward?: string) =>
+      `Your ${selection} pick hit.${reward ? ` ${reward}` : ''}`,
+  );
+  next = next.replace(
+    /^Your (.+?-leg parlay) just hit!? ?([+-]?\d+ coins)?$/i,
+    (_match, label: string, reward?: string) => `Your ${label} hit.${reward ? ` ${reward}` : ''}`,
+  );
+  next = next.replace(
+    /^You beat (.+?) (\d+) coins to (\d+) coins$/i,
+    (_match, opponent: string, left: string, right: string) => `You beat ${opponent} ${left} to ${right}`,
+  );
+
+  return next
+    .replace(/\bBets\b/g, 'Picks')
+    .replace(/\bbets\b/g, 'picks')
+    .replace(/\bBet\b/g, 'Pick')
+    .replace(/\bbet\b/g, 'pick')
+    .replace(/\bWagers\b/g, 'Picks')
+    .replace(/\bwagers\b/g, 'picks')
+    .replace(/\bWager\b/g, 'Pick')
+    .replace(/\bwager\b/g, 'pick')
+    .replace(/\blocked in their Week (\d+) picks\b/g, 'submitted their Week $1 picks')
+    .replace(/\blocked in their picks\b/g, 'submitted their picks')
+    .replace(/\bOpponent locked in\b/g, 'Opponent submitted picks');
+}
+
 function createSupabaseClient() {
   return createClient<NotificationDatabase>(
     getRequiredEnv('SUPABASE_URL'),
@@ -291,10 +329,12 @@ async function processQueuedNotifications(
     }
 
     try {
+      const title = sanitizeNotificationCopy(event.title);
+      const body = sanitizeNotificationCopy(event.body);
       await sendExpoPush({
-        body: event.body,
+        body,
         data: event.data,
-        title: event.title,
+        title,
         token: user.push_token,
       });
       sent += 1;
@@ -338,7 +378,7 @@ async function enqueueOddsAvailable(supabase: ReturnType<typeof createSupabaseCl
   const rows = (members ?? []).map((member) => {
     const league = leagueById.get(member.league_id);
     return {
-      body: `${league?.name ?? 'Your league'} Week ${league?.current_week ?? ''} lines are live. Time to build the card.`,
+      body: `${league?.name ?? 'Your league'} Week ${league?.current_week ?? ''} lines are live. Time to build your lineup.`,
       data: {
         leagueId: member.league_id,
         type: 'bet_board',
@@ -347,7 +387,7 @@ async function enqueueOddsAvailable(supabase: ReturnType<typeof createSupabaseCl
       league_id: member.league_id,
       notification_type: 'odds_available' as NotificationType,
       recipient_user_id: member.user_id,
-      title: "New week's odds are live",
+      title: "New week's lines are live",
     };
   });
 
@@ -419,7 +459,7 @@ async function enqueueBetReminders(
     }
 
     rows.push({
-      body: `${league.name}: ${MINIMUM_BETS - placed} bets still needed before kickoff.`,
+      body: `${league.name}: ${MINIMUM_BETS - placed} picks still needed before kickoff.`,
       data: {
         firstGameStartsAt,
         leagueId: member.league_id,
@@ -429,7 +469,7 @@ async function enqueueBetReminders(
       league_id: member.league_id,
       notification_type: 'bet_reminders' as NotificationType,
       recipient_user_id: member.user_id,
-      title: 'Bets still needed',
+      title: 'Picks still needed',
     });
   }
 

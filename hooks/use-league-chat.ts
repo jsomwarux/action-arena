@@ -34,7 +34,7 @@ export type SharedBetMetadata = {
     selection: string;
   }[];
   odds: number;
-  potentialPayout: number;
+  potentialReward: number;
   result: BetWithLegs['result'];
   weekNumber: number;
 };
@@ -62,14 +62,14 @@ function assertSupabaseResult<T>(data: T | null, error: { message: string } | nu
 }
 
 function messageBodyForBet(bet: ShareableBet) {
-  const lockPrefix = bet.is_lock ? 'Shared a Lock of the Week: ' : 'Shared a bet: ';
+  const lockPrefix = bet.is_lock ? 'Shared a Pick of the Week: ' : 'Shared a pick: ';
 
   if (bet.bet_type === 'straight') {
-    return `${lockPrefix}${bet.bet_legs[0]?.selection ?? 'Straight bet'}`;
+    return `${lockPrefix}${bet.bet_legs[0]?.selection ?? 'Straight pick'}`;
   }
 
   return bet.is_lock
-    ? `Shared a Lock of the Week: ${bet.bet_legs.length}-leg ${bet.bet_type}`
+    ? `Shared a Pick of the Week: ${bet.bet_legs.length}-leg ${bet.bet_type}`
     : `Shared a ${bet.bet_legs.length}-leg ${bet.bet_type}`;
 }
 
@@ -87,7 +87,7 @@ function metadataForBet(bet: ShareableBet): SharedBetMetadata {
       selection: leg.selection,
     })),
     odds: bet.odds,
-    potentialPayout: bet.potential_payout,
+    potentialReward: bet.potential_payout,
     result: bet.result,
     weekNumber: bet.week_number,
   };
@@ -250,9 +250,9 @@ export function useShareBetToChat(userId: string | undefined) {
       return assertSupabaseResult(data, error);
     },
     onSuccess: async (_data, bet) => {
-      logAnalyticsEvent('bet_shared_to_chat', {
-        bet_id: bet.id,
-        bet_type: bet.bet_type,
+      logAnalyticsEvent('pick_shared_to_chat', {
+        pick_id: bet.id,
+        pick_type: bet.bet_type,
         is_lock: bet.is_lock,
         league_id: bet.league_id,
         user_id: userId,

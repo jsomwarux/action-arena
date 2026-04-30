@@ -12,13 +12,18 @@ export function formatRecord(wins: number, losses: number, ties: number) {
   return ties > 0 ? `${wins}-${losses}-${ties}` : `${wins}-${losses}`;
 }
 
+function formatWholeCoins(value: number) {
+  return Math.round(Math.abs(value)).toLocaleString();
+}
+
 export function formatProfit(value: number) {
   const sign = value > 0 ? '+' : value < 0 ? '-' : '';
-  return `${sign}$${Math.abs(value).toFixed(2)}`;
+  return `${sign}${formatWholeCoins(value)} coins`;
 }
 
 export function formatCurrency(value: number) {
-  return `$${value.toFixed(2)}`;
+  const sign = value < 0 ? '-' : '';
+  return `${sign}${formatWholeCoins(value)} coins`;
 }
 
 export function formatAmericanOdds(odds: number) {

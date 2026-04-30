@@ -70,12 +70,7 @@ function emptyMarkets(): Record<BetMarket, OddsSelection[]> {
 }
 
 function selectBookmaker(bookmakers: OddsApiBookmaker[]) {
-  return (
-    bookmakers.find((bookmaker) => bookmaker.key === 'draftkings') ??
-    bookmakers.find((bookmaker) => bookmaker.key === 'fanduel') ??
-    bookmakers[0] ??
-    null
-  );
+  return bookmakers[0] ?? null;
 }
 
 function normalizeOutcome(outcome: OddsApiOutcome, market: BetMarket): OddsSelection {
@@ -113,7 +108,7 @@ function normalizeGame(game: OddsApiGame): OddsGame {
 
 export async function fetchUpcomingNflOdds() {
   if (!ODDS_API_KEY) {
-    throw new Error('Set EXPO_PUBLIC_ODDS_API_KEY to load real NFL odds.');
+    throw new Error('Set EXPO_PUBLIC_ODDS_API_KEY to load real NFL lines.');
   }
 
   const url = new URL(`${ODDS_API_BASE_URL}/sports/${NFL_SPORT_KEY}/odds`);
@@ -126,7 +121,7 @@ export async function fetchUpcomingNflOdds() {
   const response = await fetch(url.toString());
 
   if (!response.ok) {
-    throw new Error(`Odds API request failed with status ${response.status}.`);
+    throw new Error(`Lines request failed with status ${response.status}.`);
   }
 
   const data = (await response.json()) as OddsApiGame[];

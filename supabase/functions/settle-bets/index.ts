@@ -199,7 +199,7 @@ Deno.serve(async (request) => {
     const daysFrom = parseDaysFrom(searchParams.get('daysFrom') ?? body.daysFrom);
     const sportKey = parseSportKey(searchParams.get('sportKey') ?? body.sportKey);
 
-    console.info('Starting bet settlement run', { daysFrom, sportKey });
+    console.info('Starting pick settlement run', { daysFrom, sportKey });
 
     const scores = await fetchCompletedScores({
       daysFrom,
@@ -228,11 +228,11 @@ Deno.serve(async (request) => {
     }
 
     const durationMs = Date.now() - startedAt;
-    console.info('Completed bet settlement run', { durationMs, settlement: data });
-    console.info('[analytics]', 'bet_settled', {
+    console.info('Completed pick settlement run', { durationMs, settlement: data });
+    console.info('[analytics]', 'pick_settled', {
       durationMs,
       result: 'summary',
-      settled_bets: data?.settled_bets ?? 0,
+      settled_picks: data?.settled_bets ?? 0,
       sportKey,
     });
 
@@ -252,7 +252,7 @@ Deno.serve(async (request) => {
   } catch (error) {
     const durationMs = Date.now() - startedAt;
     const message = errorMessage(error);
-    console.error('Bet settlement run failed', { durationMs, message });
+    console.error('Pick settlement run failed', { durationMs, message });
 
     return new Response(
       JSON.stringify({

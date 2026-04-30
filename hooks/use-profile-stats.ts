@@ -119,31 +119,31 @@ export type WeeklyAward = {
 };
 
 export type WeeklyAwards = {
-  degen: WeeklyAward | null;
+  coldStreak: WeeklyAward | null;
   lock: WeeklyAward | null;
   sharpest: WeeklyAward | null;
 };
 
 export const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
   {
-    description: 'Win five settled bets in a row.',
+    description: 'Win five settled picks in a row.',
     key: 'hot_streak',
     title: 'Hot Streak',
   },
   {
-    description: 'Win a bet at +300 or longer.',
+    description: 'Win a pick at +300 or longer.',
     key: 'underdog_hunter',
     title: 'Underdog Hunter',
   },
   {
-    description: 'Win every settled bet in a single week.',
+    description: 'Win every settled pick in a single week.',
     key: 'perfect_week',
     title: 'Perfect Week',
   },
   {
     description: 'Post positive weekly profit five weeks in a row.',
     key: 'budget_master',
-    title: 'Budget Master',
+    title: 'Strategy Master',
   },
   {
     description: 'Hit a parlay with four or more legs.',
@@ -751,20 +751,20 @@ export function calculateWeeklyAwards(
   const lockBet = [...settled].sort((left, right) => (right.profit ?? 0) - (left.profit ?? 0))[0] ?? null;
 
   return {
-    degen: roiRows.sort((left, right) => left.roi - right.roi)[0]
-      ? { ...roiRows.sort((left, right) => left.roi - right.roi)[0], label: 'Degen of the Week' }
+    coldStreak: roiRows.sort((left, right) => left.roi - right.roi)[0]
+      ? { ...roiRows.sort((left, right) => left.roi - right.roi)[0], label: 'Cold Streak' }
       : null,
     lock: lockBet
       ? {
           bet: lockBet,
-          label: 'Lock of the Week',
+          label: 'Pick of the Week',
           profit: lockBet.profit ?? 0,
           roi: lockBet.amount > 0 ? ((lockBet.profit ?? 0) / lockBet.amount) * 100 : 0,
           user: usersById[lockBet.user_id] ?? null,
         }
       : null,
     sharpest: roiRows.sort((left, right) => right.roi - left.roi)[0]
-      ? { ...roiRows.sort((left, right) => right.roi - left.roi)[0], label: 'Sharpest Bettor' }
+      ? { ...roiRows.sort((left, right) => right.roi - left.roi)[0], label: 'Top Performer' }
       : null,
   };
 }
@@ -774,7 +774,7 @@ export function useWeeklyAwards(leagueId: string | undefined, weekNumber: number
     enabled: Boolean(leagueId && weekNumber),
     queryFn: async (): Promise<WeeklyAwards> => {
       if (!leagueId || !weekNumber) {
-        return { degen: null, lock: null, sharpest: null };
+        return { coldStreak: null, lock: null, sharpest: null };
       }
 
       const [betsResult, membersResult] = await Promise.all([

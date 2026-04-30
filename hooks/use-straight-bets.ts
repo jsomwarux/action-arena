@@ -60,6 +60,17 @@ function assertSupabaseResult<T>(data: T | null, error: { message: string } | nu
   return data;
 }
 
+function normalizeSubmitPicksError(message: string) {
+  return message
+    .replace(/\$(\d+(?:\.\d+)?)/g, (_match, amount: string) => `${Math.round(Number(amount))} coins`)
+    .replace(/\bBets\b/g, 'Picks')
+    .replace(/\bbets\b/g, 'picks')
+    .replace(/\bBet\b/g, 'Pick')
+    .replace(/\bbet\b/g, 'pick')
+    .replace(/\bplacing picks\b/g, 'submitting picks')
+    .replace(/\bLock of the Week\b/g, 'Pick of the Week');
+}
+
 export function usePlacedBets(
   leagueId: string | undefined,
   userId: string | undefined,
@@ -147,7 +158,7 @@ export function useSubmitBetsMutation(
     },
     mutationFn: async (bets: MixedBetSubmission[]) => {
       if (!leagueId || !weekNumber) {
-        throw new Error('Choose a league before submitting bets.');
+        throw new Error('Choose a league before submitting picks.');
       }
 
       const { data, error } = await supabase.rpc('submit_bets', {
@@ -156,7 +167,11 @@ export function useSubmitBetsMutation(
         p_week_number: weekNumber,
       });
 
-      return assertSupabaseResult(data, error);
+      if (error) {
+        throw new Error(normalizeSubmitPicksError(error.message));
+      }
+
+      return assertSupabaseResult(data, null);
     },
     onSuccess: async (_data, bets) => {
       const counts = bets.reduce<Record<BetType, number>>(
@@ -166,8 +181,8 @@ export function useSubmitBetsMutation(
         },
         { parlay: 0, straight: 0, teaser: 0 },
       );
-      logAnalyticsEvent('bets_placed', {
-        bet_count: bets.length,
+      logAnalyticsEvent('picks_submitted', {
+        pick_count: bets.length,
         league_id: leagueId,
         parlay_count: counts.parlay,
         straight_count: counts.straight,
