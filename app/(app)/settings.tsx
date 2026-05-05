@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { Alert, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 
 import {
   Badge,
@@ -51,10 +51,10 @@ function LeagueManagementRow({
 }) {
   return (
     <View className="flex-row items-center gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.04] p-3">
-      <View className="h-10 w-10 items-center justify-center rounded-2xl border border-electric-green/25 bg-electric-green/10">
+      <View className="h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-electric-green/25 bg-electric-green/10">
         <Ionicons color={THEME_COLORS.electricGreen} name="shield" size={18} />
       </View>
-      <View className="flex-1">
+      <View className="min-w-0 flex-1">
         <Text className="text-base font-black text-white" numberOfLines={1}>
           {item.league.name}
         </Text>
@@ -65,11 +65,17 @@ function LeagueManagementRow({
           </Text>
         </View>
       </View>
-      <Button
+      <Pressable
+        accessibilityRole="button"
+        hitSlop={8}
         onPress={() => onLeave(item.league.id, item.league.name)}
-        title="Leave"
-        variant="destructive"
-      />
+        style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
+        <Text
+          className="text-[11px] font-black uppercase text-coral-red"
+          style={{ letterSpacing: 1.2 }}>
+          Leave
+        </Text>
+      </Pressable>
     </View>
   );
 }
@@ -273,7 +279,7 @@ export default function SettingsScreen() {
                 <View className="rounded-2xl border border-white/[0.07] bg-white/[0.04] p-3">
                   <Text className="text-sm font-bold text-white">About Action Arena</Text>
                   <Text className="mt-1 text-xs font-medium leading-5 text-white/50">
-                    Action Arena is a free-to-play fantasy sports prediction game. No real money is wagered or won.
+                    Action Arena is a free-to-play fantasy sports prediction game. No real money changes hands inside the app.
                   </Text>
                   <Button
                     onPress={() =>
@@ -292,10 +298,10 @@ export default function SettingsScreen() {
                 <View className="rounded-2xl border border-white/[0.07] bg-white/[0.04] p-3">
                   <Text className="text-sm font-bold text-white">Terms of Service</Text>
                   <Text className="mt-1 text-xs font-medium leading-5 text-white/50">
-                    Action Arena is for free-to-play fantasy sports predictions only. No real money
-                    is wagered or won. Coins, points, standings, rewards, and league results are
-                    virtual, have no monetary value, and cannot be redeemed for cash or
-                    cash-equivalent prizes in the app. League prizes, if any, are arranged by
+                    Action Arena is for free-to-play fantasy sports predictions only. No real
+                    money changes hands inside the app. Coins, points, standings, rewards, and
+                    league results are virtual, have no monetary value, and cannot be redeemed
+                    for cash or cash-equivalent prizes. League prizes, if any, are arranged by
                     commissioners outside of Action Arena.
                   </Text>
                 </View>

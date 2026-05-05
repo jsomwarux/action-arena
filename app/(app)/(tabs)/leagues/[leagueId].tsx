@@ -13,6 +13,7 @@ import {
   ScrollView,
   Text,
   TextInput as NativeTextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -28,8 +29,6 @@ import {
   Card,
   PressableScale,
   SkeletonLoader,
-  SlidingTabIndicator,
-  type SlidingTabOption,
 } from '@/components/ui';
 import { getCosmeticItem } from '@/constants/cosmetics';
 import { haptics } from '@/lib/haptics';
@@ -69,11 +68,16 @@ import type {
 type DetailTab = 'standings' | 'schedule' | 'members' | 'chat';
 type PlayoffStatus = 'clinched' | 'eliminated' | null;
 
-const TABS: { icon: React.ComponentProps<typeof Ionicons>['name']; key: DetailTab; label: string }[] = [
-  { icon: 'podium', key: 'standings', label: 'Standings' },
-  { icon: 'calendar', key: 'schedule', label: 'Schedule' },
-  { icon: 'people', key: 'members', label: 'Members' },
-  { icon: 'chatbubbles', key: 'chat', label: 'Chat' },
+const SCREEN_HORIZONTAL_PADDING = 40;
+const DETAIL_TAB_HEIGHT = 48;
+const DETAIL_TAB_HORIZONTAL_GAP = 10;
+const DETAIL_TAB_UNDERLINE_HEIGHT = 3;
+
+const TABS: { key: DetailTab; label: string }[] = [
+  { key: 'standings', label: 'Standings' },
+  { key: 'schedule', label: 'Schedule' },
+  { key: 'members', label: 'Members' },
+  { key: 'chat', label: 'Chat' },
 ];
 
 function getParamValue(param: string | string[] | undefined) {
@@ -832,8 +836,9 @@ function StandingsBoard({
       <View>
         <View className="flex-row items-center gap-3 px-5 pb-3 pt-5">
           <Text
-            className="w-9 text-[10px] font-black uppercase text-white/40"
-            style={{ letterSpacing: 1.5 }}>
+            className="w-12 text-[10px] font-black uppercase text-white/40"
+            numberOfLines={1}
+            style={{ letterSpacing: 1.2 }}>
             Rank
           </Text>
           <Text
@@ -1455,12 +1460,6 @@ function LeagueChat({
   );
 }
 
-const TAB_OPTIONS: SlidingTabOption<DetailTab>[] = TABS.map((tab) => ({
-  icon: tab.icon,
-  label: tab.label,
-  value: tab.key,
-}));
-
 function TabSwitcher({
   activeTab,
   onChange,
@@ -1468,7 +1467,111 @@ function TabSwitcher({
   activeTab: DetailTab;
   onChange: (tab: DetailTab) => void;
 }) {
-  return <SlidingTabIndicator onChange={onChange} options={TAB_OPTIONS} value={activeTab} />;
+  const { width } = useWindowDimensions();
+  const tabBarWidth = Math.max(0, width - SCREEN_HORIZONTAL_PADDING);
+  const tabWidth = tabBarWidth / TABS.length;
+  const labelWidth = Math.max(0, tabWidth - DETAIL_TAB_HORIZONTAL_GAP * 2);
+
+  return (
+    <View
+      style={{
+        alignSelf: 'center',
+        borderBottomColor: 'rgba(255,255,255,0.08)',
+        borderBottomWidth: 1,
+        width: tabBarWidth,
+      }}>
+      <View
+        style={{
+          flexDirection: 'row',
+          height: DETAIL_TAB_HEIGHT,
+          width: tabBarWidth,
+        }}>
+        {TABS.map((tab) => {
+          const isActive = activeTab === tab.key;
+          const isLastTab = tab.key === TABS[TABS.length - 1]?.key;
+          const underlineWidth = Math.min(
+            labelWidth,
+            Math.max(28, tab.label.length * 6.4),
+          );
+          const underlineLeft = (tabWidth - underlineWidth) / 2;
+
+          return (
+            <Pressable
+              accessibilityRole="tab"
+              accessibilityState={{ selected: isActive }}
+              hitSlop={8}
+              key={tab.key}
+              onPress={() => onChange(tab.key)}
+              style={({ pressed }) => ({
+                alignItems: 'center',
+                height: DETAIL_TAB_HEIGHT,
+                justifyContent: 'center',
+                opacity: pressed ? 0.68 : 1,
+                overflow: 'hidden',
+                paddingHorizontal: DETAIL_TAB_HORIZONTAL_GAP,
+                position: 'relative',
+                width: tabWidth,
+              })}>
+              <Text
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.68}
+                style={{
+                  color: isActive ? THEME_COLORS.electricGreen : 'rgba(255,255,255,0.55)',
+                  fontSize: 9,
+                  fontWeight: '900',
+                  letterSpacing: 0,
+                  maxWidth: labelWidth,
+                  textAlign: 'center',
+                  textTransform: 'uppercase',
+                  width: labelWidth,
+                }}>
+                {tab.label}
+              </Text>
+              <View
+                style={
+                  isActive
+                    ? {
+                        backgroundColor: THEME_COLORS.electricGreen,
+                        borderRadius: DETAIL_TAB_UNDERLINE_HEIGHT,
+                        bottom: 0,
+                        height: DETAIL_TAB_UNDERLINE_HEIGHT,
+                        left: underlineLeft,
+                        position: 'absolute',
+                        shadowColor: THEME_COLORS.electricGreen,
+                        shadowOffset: { width: 0, height: 0 },
+                        shadowOpacity: 0.55,
+                        shadowRadius: 8,
+                        width: underlineWidth,
+                      }
+                    : {
+                        backgroundColor: 'transparent',
+                        bottom: 0,
+                        height: DETAIL_TAB_UNDERLINE_HEIGHT,
+                        left: underlineLeft,
+                        position: 'absolute',
+                        width: underlineWidth,
+                      }
+                }
+              />
+              {!isLastTab ? (
+                <View
+                  pointerEvents="none"
+                  style={{
+                    backgroundColor: 'rgba(255,255,255,0.08)',
+                    height: 18,
+                    position: 'absolute',
+                    right: 0,
+                    width: 1,
+                  }}
+                />
+              ) : null}
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
 }
 
 function TabContent({

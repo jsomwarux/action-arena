@@ -131,31 +131,31 @@ const TOUR_STEPS: {
 }[] = [
   {
     anchor: 'top',
-    body: 'This bar tracks the full 100 coins weekly budget, what is allocated, what remains, and your progress toward the 5-pick minimum.',
+    body: 'Tracks your 100-coin weekly budget — what is allocated, what is left, and how close you are to the 5-pick minimum.',
     icon: 'wallet',
     title: 'Budget tracker',
   },
   {
     anchor: 'middle',
-    body: 'Tap a value button on a game card, set the coin amount, and the pick lands in your lineup immediately.',
+    body: 'Tap a value on any game card, set how many coins to play, and the pick lands in your lineup.',
     icon: 'finger-print',
-    title: 'Select a pick',
+    title: 'Make a pick',
   },
   {
     anchor: 'top',
-    body: 'Use the Straight, Parlay, and Teaser toggle to change how picks are built. Parlay is amber, teaser is cyan.',
+    body: 'Toggle between Straight, Parlay, and Teaser to change how picks are built. Parlay is amber, teaser is cyan.',
     icon: 'swap-horizontal',
     title: 'Switch pick modes',
   },
   {
     anchor: 'bottom',
-    body: 'Pull up the lineup from the bottom to review picks, rewards, remaining budget, and remove anything before locking in.',
+    body: 'Pull up the lineup from the bottom to review picks, rewards, and remaining budget — or remove anything before you lock in.',
     icon: 'receipt',
     title: 'Lineup',
   },
   {
     anchor: 'middle',
-    body: 'The submit button stays disabled until you have at least 5 picks, exactly one Pick of the Week, no pick over 35 coins, exactly 100 coins allocated, and no duplicate game sides.',
+    body: 'Submit unlocks once you have at least 5 picks, exactly one Pick of the Week, no pick over 35 coins, the full 100-coin budget allocated, and no duplicate game sides.',
     icon: 'checkmark-done',
     title: 'Validation rules',
   },
