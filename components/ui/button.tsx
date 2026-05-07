@@ -85,7 +85,10 @@ export function Button({
         />
       ) : (
         <Text
+          adjustsFontSizeToFit
           className={cn('text-base font-black uppercase', textClasses[variant])}
+          minimumFontScale={0.78}
+          numberOfLines={1}
           style={{ letterSpacing: 1.5 }}>
           {title}
         </Text>

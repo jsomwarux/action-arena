@@ -5,12 +5,13 @@ import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native'
 
 import { CosmeticAvatar } from '@/components/cosmetics';
 import { ProfileContent } from '@/components/profile/profile-content';
-import { Card, ScreenWrapper } from '@/components/ui';
+import { AnimatedNumber, Card, ScreenWrapper } from '@/components/ui';
 import { THEME_COLORS } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
 import { useUserCosmetics } from '@/hooks/use-cosmetics';
 import { useProfileData } from '@/hooks/use-profile-stats';
 import { logAnalyticsEvent } from '@/lib/analytics';
+import { haptics } from '@/lib/haptics';
 
 function StaticSkeleton({
   height,
@@ -88,18 +89,26 @@ export default function ProfileScreen() {
                 />
                 <View>
                   <Text
-                    className="text-[10px] font-black uppercase text-electric-green"
-                    style={{ letterSpacing: 2 }}>
+                    className="text-[11px] font-semibold uppercase text-electric-green"
+                    style={{ letterSpacing: 1.2 }}>
                     Locker
                   </Text>
-                  <Text className="mt-1 text-lg font-black text-white">
-                    {cosmeticsQuery.data?.coinBalance ?? 0} Arena Coins
-                  </Text>
+                  <View className="mt-0.5 flex-row items-baseline gap-1">
+                    <AnimatedNumber
+                      className="text-lg font-extrabold text-white"
+                      style={{ letterSpacing: -0.3 }}
+                      value={cosmeticsQuery.data?.coinBalance ?? 0}
+                    />
+                    <Text className="text-xs font-medium text-white/55">Arena Coins</Text>
+                  </View>
                 </View>
               </View>
               <Pressable
                 accessibilityRole="button"
-                onPress={() => router.push('/shop')}
+                onPress={() => {
+                  haptics.light();
+                  router.push('/shop');
+                }}
                 style={({ pressed }) => ({ opacity: pressed ? 0.78 : 1 })}>
                 <View className="h-12 w-12 items-center justify-center rounded-2xl border border-gold/45 bg-gold/15">
                   <Ionicons color={THEME_COLORS.gold} name="storefront" size={22} />
@@ -109,18 +118,21 @@ export default function ProfileScreen() {
             <View className="flex-row gap-3">
               {[
                 { icon: 'storefront' as const, label: 'Shop', route: '/shop' as const },
-                { icon: 'cash' as const, label: 'Coins', route: '/coin-store' as const },
+                { icon: 'ellipse' as const, label: 'Coins', route: '/coin-store' as const },
                 { icon: 'ribbon' as const, label: 'Pass', route: '/season-pass' as const },
                 { icon: 'analytics' as const, label: 'Stats', route: '/analytics' as const },
               ].map((action) => (
                 <Pressable
                   accessibilityRole="button"
                   key={action.route}
-                  onPress={() => router.push(action.route)}
+                  onPress={() => {
+                    haptics.light();
+                    router.push(action.route);
+                  }}
                   style={({ pressed }) => ({ flex: 1, opacity: pressed ? 0.78 : 1 })}>
                   <View className="items-center gap-1.5 rounded-2xl border border-white/10 bg-white/[0.04] px-2 py-3">
                     <Ionicons color={THEME_COLORS.electricGreen} name={action.icon} size={17} />
-                    <Text className="text-[10px] font-black uppercase text-white/70">
+                    <Text className="text-[11px] font-semibold text-white/75">
                       {action.label}
                     </Text>
                   </View>
@@ -132,21 +144,24 @@ export default function ProfileScreen() {
 
         <Pressable
           accessibilityRole="button"
-          onPress={() => router.push('/settings')}
+          onPress={() => {
+            haptics.light();
+            router.push('/settings');
+          }}
           style={({ pressed }) => ({ opacity: pressed ? 0.78 : 1 })}>
           <Card>
             <View className="flex-row items-center justify-between gap-3">
               <View className="flex-1">
                 <Text
-                  className="text-xs font-black uppercase text-electric-green"
-                  style={{ letterSpacing: 2 }}>
+                  className="text-[11px] font-semibold uppercase text-electric-green"
+                  style={{ letterSpacing: 1.2 }}>
                   Preferences
                 </Text>
-                <Text className="mt-1 text-lg font-black text-white">
+                <Text className="mt-0.5 text-base font-extrabold text-white" style={{ letterSpacing: -0.2 }}>
                   App Settings
                 </Text>
               </View>
-              <Ionicons color={THEME_COLORS.electricGreen} name="settings" size={24} />
+              <Ionicons color={THEME_COLORS.electricGreen} name="settings" size={22} />
             </View>
           </Card>
         </Pressable>

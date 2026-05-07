@@ -30,6 +30,7 @@ export default function TabLayout() {
           borderTopColor: 'rgba(255,255,255,0.06)',
           borderTopWidth: 1,
           elevation: 0,
+          zIndex: 50,
         },
       }}>
       <Tabs.Screen
@@ -49,7 +50,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="bet-board"
         options={{
-          title: 'Bet Board',
+          tabBarLabel: 'Picks',
+          title: 'Pick Board',
           tabBarIcon: ({ color }) => <TabIcon color={color} name="pulse-outline" />,
         }}
       />

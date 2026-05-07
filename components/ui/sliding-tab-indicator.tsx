@@ -26,11 +26,13 @@ type SlidingTabIndicatorProps<V extends string | number> = {
   value: V;
 };
 
-const PADDING = 4;
+const INDICATOR_WIDTH_RATIO = 0.7;
+const INDICATOR_HEIGHT = 3;
+const TAB_HEIGHT = 48;
 
-// Sliding indicator driven by RN core Animated.spring with the native driver
-// (translateX is supported natively). Layout-measured tab width keeps the
-// indicator perfectly aligned even when tabs are resized.
+// ESPN/Sleeper-style section tabs: each tab takes an equal share of the row
+// (flex: 1) so labels distribute evenly across the full width. A sliding
+// underline accent sits beneath the active tab and animates between positions.
 export function SlidingTabIndicator<V extends string | number>({
   accent = THEME_COLORS.electricGreen,
   onChange,
@@ -40,7 +42,9 @@ export function SlidingTabIndicator<V extends string | number>({
 }: SlidingTabIndicatorProps<V>) {
   const [containerWidth, setContainerWidth] = useState(0);
   const tabCount = options.length || 1;
-  const tabWidth = containerWidth > 0 ? (containerWidth - PADDING * 2) / tabCount : 0;
+  const tabWidth = containerWidth > 0 ? containerWidth / tabCount : 0;
+  const indicatorWidth = tabWidth * INDICATOR_WIDTH_RATIO;
+  const indicatorOffset = (tabWidth - indicatorWidth) / 2;
   const activeIndex = Math.max(
     0,
     options.findIndex((option) => option.value === value),
@@ -50,9 +54,9 @@ export function SlidingTabIndicator<V extends string | number>({
 
   useEffect(() => {
     Animated.spring(indicatorPosition, {
-      damping: 18,
+      damping: 20,
       mass: 1,
-      stiffness: 220,
+      stiffness: 240,
       toValue: activeIndex,
       useNativeDriver: true,
     }).start();
@@ -60,7 +64,7 @@ export function SlidingTabIndicator<V extends string | number>({
 
   const translateX = indicatorPosition.interpolate({
     inputRange: options.map((_, index) => index),
-    outputRange: options.map((_, index) => index * tabWidth),
+    outputRange: options.map((_, index) => index * tabWidth + indicatorOffset),
   });
 
   const handleLayout = (event: LayoutChangeEvent) => {
@@ -72,70 +76,67 @@ export function SlidingTabIndicator<V extends string | number>({
       onLayout={handleLayout}
       style={[
         {
-          backgroundColor: 'rgba(255,255,255,0.04)',
-          borderColor: 'rgba(255,255,255,0.08)',
-          borderRadius: 16,
-          borderWidth: 1,
-          padding: PADDING,
+          alignSelf: 'stretch',
+          borderBottomColor: 'rgba(255,255,255,0.08)',
+          borderBottomWidth: 1,
+          width: '100%',
         },
         style,
       ]}>
-      <View style={{ height: 44, position: 'relative' }}>
+      <View style={{ flexDirection: 'row', height: TAB_HEIGHT, position: 'relative' }}>
+        {options.map((option) => {
+          const isActive = option.value === value;
+          return (
+            <Pressable
+              accessibilityRole="tab"
+              accessibilityState={{ selected: isActive }}
+              hitSlop={8}
+              key={String(option.value)}
+              onPress={() => onChange(option.value)}
+              style={({ pressed }) => ({
+                alignItems: 'center',
+                flex: 1,
+                flexBasis: 0,
+                flexGrow: 1,
+                flexShrink: 1,
+                justifyContent: 'center',
+                opacity: pressed ? 0.6 : 1,
+                paddingHorizontal: 4,
+              })}>
+              <Text
+                allowFontScaling={false}
+                className={cn('font-black uppercase')}
+                numberOfLines={1}
+                style={{
+                  color: isActive ? accent : 'rgba(255,255,255,0.55)',
+                  fontSize: 12,
+                  letterSpacing: 0.4,
+                  textAlign: 'center',
+                }}>
+                {option.label}
+              </Text>
+            </Pressable>
+          );
+        })}
         {tabWidth > 0 ? (
           <Animated.View
+            pointerEvents="none"
             style={{
-              backgroundColor: `${accent}26`,
-              borderColor: `${accent}73`,
-              borderRadius: 12,
-              borderWidth: 1,
-              height: '100%',
+              backgroundColor: accent,
+              borderRadius: INDICATOR_HEIGHT,
+              bottom: 0,
+              height: INDICATOR_HEIGHT,
+              left: 0,
               position: 'absolute',
               shadowColor: accent,
               shadowOffset: { width: 0, height: 0 },
-              shadowOpacity: 0.45,
-              shadowRadius: 10,
+              shadowOpacity: 0.55,
+              shadowRadius: 8,
               transform: [{ translateX }],
-              width: tabWidth,
+              width: indicatorWidth,
             }}
           />
         ) : null}
-        <View style={{ flexDirection: 'row', height: '100%' }}>
-          {options.map((option) => {
-            const isActive = option.value === value;
-            const Ionicons = require('@expo/vector-icons/Ionicons').default;
-            return (
-              <Pressable
-                accessibilityRole="tab"
-                accessibilityState={{ selected: isActive }}
-                key={String(option.value)}
-                onPress={() => onChange(option.value)}
-                style={({ pressed }) => ({
-                  alignItems: 'center',
-                  flex: 1,
-                  flexDirection: 'row',
-                  gap: 6,
-                  justifyContent: 'center',
-                  opacity: pressed ? 0.78 : 1,
-                })}>
-                {option.icon ? (
-                  <Ionicons
-                    color={isActive ? accent : 'rgba(255,255,255,0.55)'}
-                    name={option.icon}
-                    size={13}
-                  />
-                ) : null}
-                <Text
-                  className={cn('text-[11px] font-black uppercase')}
-                  style={{
-                    color: isActive ? accent : 'rgba(255,255,255,0.65)',
-                    letterSpacing: 1.2,
-                  }}>
-                  {option.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
       </View>
     </View>
   );

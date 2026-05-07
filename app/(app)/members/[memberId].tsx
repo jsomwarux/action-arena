@@ -1,11 +1,10 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useEffect } from 'react';
 import { RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ProfileContent } from '@/components/profile/profile-content';
-import { Card, PressableScale, SkeletonLoader } from '@/components/ui';
+import { Card, SkeletonLoader } from '@/components/ui';
 import { THEME_COLORS } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
 import { buildMemberComparison, useProfileData } from '@/hooks/use-profile-stats';
@@ -28,7 +27,6 @@ function LoadingState() {
 }
 
 export default function MemberProfileScreen() {
-  const router = useRouter();
   const { memberId, leagueId } = useLocalSearchParams();
   const resolvedMemberId = getParamValue(memberId);
   const resolvedLeagueId = getParamValue(leagueId);
@@ -70,15 +68,6 @@ export default function MemberProfileScreen() {
           />
         }
         showsVerticalScrollIndicator={false}>
-        <PressableScale onPress={() => router.back()}>
-          <View className="flex-row items-center gap-2 self-start rounded-full border border-white/10 bg-white/[0.05] px-3 py-2">
-            <Ionicons color={THEME_COLORS.textPrimary} name="chevron-back" size={16} />
-            <Text className="text-xs font-black uppercase text-white" style={{ letterSpacing: 1.2 }}>
-              Back
-            </Text>
-          </View>
-        </PressableScale>
-
         {profileQuery.data ? (
           <ProfileContent
             comparison={comparison}

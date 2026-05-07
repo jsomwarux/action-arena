@@ -299,6 +299,12 @@ function legDescriptor(bet: BetWithLegs, index: number) {
   return `${leg.selection} ${leg.adjusted_line ?? leg.original_line ?? ''}`;
 }
 
+function marketCopy(market: string) {
+  if (market === 'moneyline') return 'Winner';
+  if (market === 'spread') return 'Spread';
+  return 'Over/Under';
+}
+
 function LockPill() {
   return (
     <View
@@ -311,7 +317,7 @@ function LockPill() {
       }}>
       <Ionicons color={THEME_COLORS.gold} name="star" size={11} />
       <Text className="text-[10px] font-black uppercase text-gold" style={{ letterSpacing: 1.2 }}>
-        Lock 1.5x
+        Pick of the Week 1.5x
       </Text>
     </View>
   );
@@ -457,7 +463,7 @@ function HeroStats({ summary }: { summary: ProfileSummary }) {
           </View>
           <Text className="mt-2 text-sm font-semibold text-white/65">
             {formatRecord(stats.wins, stats.losses, stats.ties)} record over{' '}
-            {stats.totalSettledBets} settled bet{stats.totalSettledBets === 1 ? '' : 's'}
+            {stats.totalSettledBets} settled pick{stats.totalSettledBets === 1 ? '' : 's'}
           </Text>
         </View>
 
@@ -469,7 +475,7 @@ function HeroStats({ summary }: { summary: ProfileSummary }) {
           />
           <StatTile
             accent={getProfitTone(stats.averageProfitPerBet)}
-            label="Avg / Bet"
+            label="Avg / Pick"
             value={formatProfit(stats.averageProfitPerBet)}
           />
           <StatTile
@@ -539,7 +545,7 @@ function BestBetCard({ bet }: { bet: BetWithLegs }) {
                 <Text
                   className="text-[10px] font-black uppercase text-gold"
                   style={{ letterSpacing: 2 }}>
-                  Best Bet
+                  Best Pick
                 </Text>
                 <Text
                   className="text-base font-black uppercase text-white"
@@ -572,13 +578,13 @@ function BestBetCard({ bet }: { bet: BetWithLegs }) {
               <Text
                 className="text-[10px] font-black uppercase text-white/45"
                 style={{ letterSpacing: 1.5 }}>
-                Stake · Odds
+                Played · Value
               </Text>
               <Text className="text-sm font-black text-white">
                 {formatCurrency(bet.amount)} · {formatAmericanOdds(bet.odds)}
               </Text>
               <Text className="text-[11px] font-semibold text-white/55">
-                Pays {formatCurrency(bet.potential_payout)}
+                Reward {formatCurrency(bet.potential_payout)}
               </Text>
             </View>
           </View>
@@ -616,7 +622,7 @@ function BestBetCard({ bet }: { bet: BetWithLegs }) {
                             {legDescriptor(bet, index)}
                           </Text>
                           <Text className="mt-0.5 text-[10px] font-semibold uppercase text-white/45">
-                            {leg.market.replace('_', ' ')} · {formatAmericanOdds(leg.leg_odds)}
+                            {marketCopy(leg.market)} · {formatAmericanOdds(leg.leg_odds)}
                           </Text>
                         </View>
                       </View>
@@ -646,7 +652,7 @@ function WorstBetCard({ bet }: { bet: BetWithLegs }) {
               <Text
                 className="text-[10px] font-black uppercase text-white/45"
                 style={{ letterSpacing: 1.6 }}>
-                Worst Bet
+                Toughest Pick
               </Text>
               <Text
                 className="text-sm font-black text-white"
@@ -665,7 +671,7 @@ function WorstBetCard({ bet }: { bet: BetWithLegs }) {
           </View>
         </View>
         <Text className="mt-2 text-[11px] font-semibold text-white/45">
-          Week {bet.week_number} · {formatCurrency(bet.amount)} stake · {formatAmericanOdds(bet.odds)}
+          Week {bet.week_number} · {formatCurrency(bet.amount)} played · {formatAmericanOdds(bet.odds)}
         </Text>
       </View>
     </View>
@@ -683,7 +689,7 @@ function BestWorst({ summary }: { summary: ProfileSummary }) {
               <Ionicons color="rgba(255,255,255,0.4)" name="medal-outline" size={26} />
             </View>
             <Text className="px-2 text-center text-base font-semibold leading-snug text-white/65">
-              Best & worst bets show up once you settle a few cards.
+              Best & toughest picks show up once you settle a few cards.
             </Text>
           </View>
         </Card>
@@ -703,7 +709,7 @@ function BestWorst({ summary }: { summary: ProfileSummary }) {
 }
 
 // ============================================================
-// Bet type breakdown (parlay amber, teaser cyan, straight green)
+// Pick type breakdown (parlay amber, teaser cyan, straight green)
 // ============================================================
 
 function BreakdownRow({ breakdown }: { breakdown: BetTypeBreakdown }) {
@@ -819,7 +825,7 @@ function Breakdown({
 }) {
   return (
     <View className="gap-3">
-      <SectionLabel title="Bet Type Breakdown" />
+      <SectionLabel title="Pick Type Breakdown" />
       <View className="gap-2">
         {breakdowns.map((breakdown) => (
           <BreakdownRow breakdown={breakdown} key={breakdown.type} />
@@ -904,7 +910,7 @@ function AchievementBadge({ achievement, index }: { achievement: AchievementDisp
           <Text
             className="text-[9px] font-black uppercase text-white/45"
             style={{ letterSpacing: 1.3 }}>
-            Locked
+            Not earned
           </Text>
         </View>
       )}
@@ -942,7 +948,7 @@ function Achievements({ achievements }: { achievements: AchievementDisplay[] }) 
 }
 
 // ============================================================
-// Bet history
+// Pick history
 // ============================================================
 
 function BetHistoryCard({ bet }: { bet: BetWithLegs }) {
@@ -1027,12 +1033,12 @@ function BetHistoryCard({ bet }: { bet: BetWithLegs }) {
           <Text
             className="text-[11px] font-black uppercase text-white/55"
             style={{ letterSpacing: 1.2 }}>
-            {formatCurrency(bet.amount)} stake
+            {formatCurrency(bet.amount)} played
           </Text>
           <Text
             className="text-[11px] font-black uppercase text-white/55"
             style={{ letterSpacing: 1.2 }}>
-            Pays {formatCurrency(bet.potential_payout)}
+            Reward {formatCurrency(bet.potential_payout)}
           </Text>
         </View>
 
@@ -1076,10 +1082,10 @@ function BetHistoryCard({ bet }: { bet: BetWithLegs }) {
           onPress={async () => {
             try {
               await shareBet.mutateAsync(bet);
-              Alert.alert('Shared to chat', 'This bet is now in league chat.');
+              Alert.alert('Shared to chat', 'This pick is now in league chat.');
             } catch (error) {
               Alert.alert(
-                'Could not share bet',
+                'Could not share pick',
                 error instanceof Error ? error.message : 'Try again.',
               );
             }
@@ -1149,11 +1155,11 @@ function BetHistory({
           <Text
             className="text-[10px] font-black uppercase text-electric-green"
             style={{ letterSpacing: 2.2 }}>
-            Bet History
+            Pick History
           </Text>
         </View>
         <Text className="text-[10px] font-semibold text-white/45">
-          {filtered.length} {filtered.length === 1 ? 'bet' : 'bets'}
+          {filtered.length} {filtered.length === 1 ? 'pick' : 'picks'}
         </Text>
       </View>
 
@@ -1192,7 +1198,7 @@ function BetHistory({
           <View className="items-center gap-2 py-3">
             <Ionicons color="rgba(255,255,255,0.45)" name="filter" size={22} />
             <Text className="text-sm font-semibold text-white/55">
-              No bets match these filters.
+              No picks match these filters.
             </Text>
           </View>
         </Card>
@@ -1246,7 +1252,7 @@ const COMPARE_ROWS: { format: (value: number) => string; higherIsBetter: boolean
     format: (value) => `${value}`,
     higherIsBetter: true,
     key: 'totalSettledBets',
-    label: 'Settled Bets',
+    label: 'Settled Picks',
   },
 ];
 

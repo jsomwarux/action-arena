@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { Alert, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 
 import {
   Badge,
@@ -12,6 +12,7 @@ import {
   TextInput,
   ToggleRow,
 } from '@/components/ui';
+import { ACTION_ARENA_DISCLOSURE } from '@/constants/disclosure';
 import { THEME_COLORS } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
 import { type LeagueSummary, useLeaveLeagueMutation, useMyLeagues } from '@/hooks/use-leagues';
@@ -50,10 +51,10 @@ function LeagueManagementRow({
 }) {
   return (
     <View className="flex-row items-center gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.04] p-3">
-      <View className="h-10 w-10 items-center justify-center rounded-2xl border border-electric-green/25 bg-electric-green/10">
+      <View className="h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-electric-green/25 bg-electric-green/10">
         <Ionicons color={THEME_COLORS.electricGreen} name="shield" size={18} />
       </View>
-      <View className="flex-1">
+      <View className="min-w-0 flex-1">
         <Text className="text-base font-black text-white" numberOfLines={1}>
           {item.league.name}
         </Text>
@@ -64,11 +65,17 @@ function LeagueManagementRow({
           </Text>
         </View>
       </View>
-      <Button
+      <Pressable
+        accessibilityRole="button"
+        hitSlop={8}
         onPress={() => onLeave(item.league.id, item.league.name)}
-        title="Leave"
-        variant="destructive"
-      />
+        style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
+        <Text
+          className="text-[11px] font-black uppercase text-coral-red"
+          style={{ letterSpacing: 1.2 }}>
+          Leave
+        </Text>
+      </Pressable>
     </View>
   );
 }
@@ -122,7 +129,7 @@ export default function SettingsScreen() {
   };
 
   const confirmLeaveLeague = (leagueId: string, leagueName: string) => {
-    Alert.alert('Leave league?', `You will leave ${leagueName}. Your historical bets remain visible.`, [
+    Alert.alert('Leave league?', `You will leave ${leagueName}. Your historical picks remain visible.`, [
       { style: 'cancel', text: 'Cancel' },
       {
         onPress: async () => {
@@ -179,7 +186,7 @@ export default function SettingsScreen() {
           <>
             <Card>
               <View className="gap-4">
-                <Text className="text-[10px] font-black uppercase text-electric-green" style={{ letterSpacing: 2 }}>
+                <Text className="text-[11px] font-semibold uppercase text-electric-green" style={{ letterSpacing: 1.2 }}>
                   Player Profile
                 </Text>
                 <TextInput label="Display name" onChangeText={setDisplayName} value={displayName} />
@@ -196,7 +203,7 @@ export default function SettingsScreen() {
 
             <Card>
               <View className="gap-3">
-                <Text className="text-[10px] font-black uppercase text-electric-green" style={{ letterSpacing: 2 }}>
+                <Text className="text-[11px] font-semibold uppercase text-electric-green" style={{ letterSpacing: 1.2 }}>
                   Notification Preferences
                 </Text>
                 {preferencesQuery.data
@@ -217,7 +224,7 @@ export default function SettingsScreen() {
 
             <Card>
               <View className="gap-3">
-                <Text className="text-[10px] font-black uppercase text-electric-green" style={{ letterSpacing: 2 }}>
+                <Text className="text-[11px] font-semibold uppercase text-electric-green" style={{ letterSpacing: 1.2 }}>
                   Manage Leagues
                 </Text>
                 {(leaguesQuery.data ?? []).length === 0 ? (
@@ -239,14 +246,20 @@ export default function SettingsScreen() {
             <Card tone="highlight">
               <View className="gap-3">
                 <View className="flex-row items-center gap-2">
-                  <Ionicons color={THEME_COLORS.gold} name="sparkles" size={16} />
-                  <Text className="text-[10px] font-black uppercase text-gold" style={{ letterSpacing: 2 }}>
+                  <Ionicons color={THEME_COLORS.gold} name="sparkles" size={14} />
+                  <Text
+                    className="text-[11px] font-semibold uppercase text-gold"
+                    style={{ letterSpacing: 1.2 }}>
                     Premium
                   </Text>
                 </View>
-                <Text className="text-xl font-black uppercase text-white">Action Arena Plus</Text>
-                <Text className="text-sm font-semibold text-white/55">
-                  Season Pass unlocks exclusive cosmetics, advanced analytics, early odds access, and future ad-free hooks.
+                <Text
+                  className="text-lg font-extrabold text-white"
+                  style={{ letterSpacing: -0.2 }}>
+                  Action Arena Plus
+                </Text>
+                <Text className="text-sm font-medium text-white/60">
+                  Season Pass unlocks exclusive cosmetics, advanced analytics, early Pick Board access, and future ad-free hooks.
                 </Text>
                 <Button
                   onPress={() => router.push('/season-pass')}
@@ -258,19 +271,47 @@ export default function SettingsScreen() {
 
             <Card>
               <View className="gap-3">
-                <Text className="text-[10px] font-black uppercase text-white/45" style={{ letterSpacing: 2 }}>
+                <Text
+                  className="text-[11px] font-semibold uppercase text-white/45"
+                  style={{ letterSpacing: 1.2 }}>
                   About
                 </Text>
-                {['About Action Arena', 'Terms of Service', 'Privacy Policy'].map((label) => (
-                  <View
-                    className="rounded-2xl border border-white/[0.07] bg-white/[0.04] p-3"
-                    key={label}>
-                    <Text className="text-sm font-black text-white">{label}</Text>
-                    <Text className="mt-1 text-xs font-semibold leading-5 text-white/45">
-                      Placeholder copy for development. Final legal and product text will live here before launch.
-                    </Text>
-                  </View>
-                ))}
+                <View className="rounded-2xl border border-white/[0.07] bg-white/[0.04] p-3">
+                  <Text className="text-sm font-bold text-white">About Action Arena</Text>
+                  <Text className="mt-1 text-xs font-medium leading-5 text-white/50">
+                    Action Arena is a free-to-play fantasy sports prediction game. No real money changes hands inside the app.
+                  </Text>
+                  <Button
+                    onPress={() =>
+                      router.push({ pathname: '/disclosure', params: { source: 'settings' } })
+                    }
+                    title="How It Works"
+                    variant="secondary"
+                  />
+                </View>
+                <View className="rounded-2xl border border-white/[0.07] bg-white/[0.04] p-3">
+                  <Text className="text-sm font-bold text-white">{ACTION_ARENA_DISCLOSURE.title}</Text>
+                  <Text className="mt-1 text-xs font-medium leading-5 text-white/50">
+                    {ACTION_ARENA_DISCLOSURE.body}
+                  </Text>
+                </View>
+                <View className="rounded-2xl border border-white/[0.07] bg-white/[0.04] p-3">
+                  <Text className="text-sm font-bold text-white">Terms of Service</Text>
+                  <Text className="mt-1 text-xs font-medium leading-5 text-white/50">
+                    Action Arena is for free-to-play fantasy sports predictions only. No real
+                    money changes hands inside the app. Coins, points, standings, rewards, and
+                    league results are virtual, have no monetary value, and cannot be redeemed
+                    for cash or cash-equivalent prizes. League prizes, if any, are arranged by
+                    commissioners outside of Action Arena.
+                  </Text>
+                </View>
+                <View className="rounded-2xl border border-white/[0.07] bg-white/[0.04] p-3">
+                  <Text className="text-sm font-bold text-white">Privacy Policy</Text>
+                  <Text className="mt-1 text-xs font-medium leading-5 text-white/50">
+                    We use account, league, pick, notification, and cosmetic data to operate the app
+                    experience during development.
+                  </Text>
+                </View>
               </View>
             </Card>
 

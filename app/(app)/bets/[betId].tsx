@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQuery } from '@tanstack/react-query';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { ScrollView, Text, View } from 'react-native';
 
 import { LockEffect } from '@/components/cosmetics';
@@ -30,12 +30,18 @@ function lineLabel(value: number | null) {
   return value > 0 ? `+${value}` : `${value}`;
 }
 
+function marketCopy(market: string) {
+  if (market === 'moneyline') return 'Winner';
+  if (market === 'spread') return 'Spread';
+  return 'Over/Under';
+}
+
 function useBetDetail(betId: string | undefined) {
   return useQuery({
     enabled: Boolean(betId),
     queryFn: async (): Promise<BetWithLegs> => {
       if (!betId) {
-        throw new Error('Bet is required.');
+        throw new Error('Pick is required.');
       }
 
       const { data, error } = await supabase
@@ -55,7 +61,6 @@ function useBetDetail(betId: string | undefined) {
 }
 
 export default function BetDetailScreen() {
-  const router = useRouter();
   const { user } = useAuth();
   const { betId } = useLocalSearchParams();
   const resolvedBetId = getParamValue(betId);
@@ -92,7 +97,7 @@ export default function BetDetailScreen() {
                           <Text
                             className="text-[10px] font-black uppercase text-gold"
                             style={{ letterSpacing: 1.2 }}>
-                            Lock 1.5x
+                            Pick of the Week 1.5x
                           </Text>
                         </View>
                       ) : null}
@@ -102,7 +107,7 @@ export default function BetDetailScreen() {
                       className="mt-3 text-3xl font-black uppercase text-white"
                       style={{ letterSpacing: -0.7, lineHeight: 34 }}>
                       {betQuery.data.bet_type === 'straight'
-                        ? betQuery.data.bet_legs[0]?.selection ?? 'Straight Bet'
+                        ? betQuery.data.bet_legs[0]?.selection ?? 'Straight Pick'
                         : `${betQuery.data.bet_legs.length}-Leg ${betQuery.data.bet_type}`}
                     </Text>
                   </View>
@@ -111,13 +116,13 @@ export default function BetDetailScreen() {
 
                 <View className="flex-row gap-3">
                   <View className="flex-1 rounded-2xl border border-white/[0.07] bg-white/[0.04] p-3">
-                    <Text className="text-[10px] font-black uppercase text-white/45">Stake</Text>
+                    <Text className="text-[10px] font-black uppercase text-white/45">Played</Text>
                     <Text className="mt-1 text-lg font-black text-white">
                       {formatCurrency(betQuery.data.amount)}
                     </Text>
                   </View>
                   <View className="flex-1 rounded-2xl border border-white/[0.07] bg-white/[0.04] p-3">
-                    <Text className="text-[10px] font-black uppercase text-white/45">Odds</Text>
+                    <Text className="text-[10px] font-black uppercase text-white/45">Value</Text>
                     <Text className="mt-1 text-lg font-black text-white">
                       {formatAmericanOdds(betQuery.data.odds)}
                     </Text>
@@ -159,7 +164,7 @@ export default function BetDetailScreen() {
                     </View>
                     <Text className="text-lg font-black text-white">{leg.selection}</Text>
                     <Text className="text-xs font-semibold uppercase text-white/45">
-                      {leg.market.replace('_', ' ')} · {formatAmericanOdds(leg.leg_odds)}
+                      {marketCopy(leg.market)} · {formatAmericanOdds(leg.leg_odds)}
                     </Text>
                     {betQuery.data.bet_type === 'teaser' ? (
                       <Text className="text-sm font-black text-cyan-accent">
@@ -178,9 +183,9 @@ export default function BetDetailScreen() {
             <View className="items-center gap-3 py-4">
               <Ionicons color={THEME_COLORS.coralRed} name="alert-circle" size={26} />
               <Text className="text-center text-base font-semibold text-white/55">
-                This bet could not be loaded.
+                This pick could not be loaded.
               </Text>
-              <Button onPress={() => router.back()} title="Go Back" variant="secondary" />
+              <Button onPress={() => betQuery.refetch()} title="Retry" variant="secondary" />
             </View>
           </Card>
         ) : null}

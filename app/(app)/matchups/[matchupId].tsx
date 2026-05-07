@@ -1,16 +1,16 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { LockEffect, WinCelebration } from '@/components/cosmetics';
+import { CosmeticAvatar, LockEffect, WinCelebration } from '@/components/cosmetics';
 import {
   AnimatedNumber,
   Badge,
   Card,
   LivePulse,
-  PressableScale,
+  NflTeamLogo,
   SkeletonLoader,
   StaggeredItem,
 } from '@/components/ui';
@@ -55,15 +55,6 @@ const resultLabel: Record<BetResult, string> = {
 
 function getParamValue(param: string | string[] | undefined) {
   return Array.isArray(param) ? param[0] : param;
-}
-
-function getInitials(name: string) {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((segment) => segment[0]?.toUpperCase() ?? '')
-    .join('');
 }
 
 function resultTone(result: BetResult, inProgress = false) {
@@ -146,6 +137,12 @@ function selectionLabel(leg: BetLegRow, betType: BetType) {
   return `${leg.selection} ${leg.adjusted_line ?? leg.original_line ?? ''}`;
 }
 
+function marketCopy(market: string) {
+  if (market === 'moneyline') return 'Winner';
+  if (market === 'spread') return 'Spread';
+  return 'Over/Under';
+}
+
 function ResultPill({ bet }: { bet: BetWithLegs }) {
   const inProgress = isInProgress(bet);
   const tone = resultTone(bet.result, inProgress);
@@ -179,7 +176,7 @@ function LockPill() {
       }}>
       <Ionicons color={THEME_COLORS.gold} name="star" size={11} />
       <Text className="text-[10px] font-black uppercase text-gold" style={{ letterSpacing: 1.2 }}>
-        Lock 1.5x
+        Pick of the Week 1.5x
       </Text>
     </View>
   );
@@ -202,7 +199,7 @@ function EmptyBets({ side }: { side: 'You' | 'Opponent' | 'Player' }) {
       <View className="items-center gap-2">
         <Ionicons color="rgba(255,255,255,0.35)" name="receipt-outline" size={22} />
         <Text className="text-center text-sm font-semibold text-white/45">
-          {side === 'You' ? 'You haven’t locked any bets yet.' : 'No bets placed for this matchup.'}
+          {side === 'You' ? 'You haven’t submitted any picks yet.' : 'No picks placed for this matchup.'}
         </Text>
       </View>
     </View>
@@ -263,12 +260,27 @@ function BetCard({
               className="text-base font-black text-white"
               style={{ letterSpacing: -0.3 }}
               numberOfLines={2}>
-              {isMultiLeg
-                ? `${bet.bet_legs.length}-leg ${bet.bet_type}`
-                : firstLeg
-                  ? selectionLabel(firstLeg, bet.bet_type)
-                  : 'Selection unavailable'}
+              {isMultiLeg ? `${bet.bet_legs.length}-leg ${bet.bet_type}` : null}
             </Text>
+            {!isMultiLeg && firstLeg ? (
+              <View className="flex-row items-center gap-2">
+                {firstLeg.market !== 'over_under' ? (
+                  <NflTeamLogo size={28} teamName={firstLeg.selection} />
+                ) : null}
+                <Text
+                  className="flex-1 text-base font-black text-white"
+                  numberOfLines={2}
+                  style={{ letterSpacing: -0.3 }}>
+                  {selectionLabel(firstLeg, bet.bet_type)}
+                </Text>
+              </View>
+            ) : !isMultiLeg ? (
+              <Text
+                className="text-base font-black text-white"
+                style={{ letterSpacing: -0.3 }}>
+                Selection unavailable
+              </Text>
+            ) : null}
           </View>
           <ResultPill bet={bet} />
         </View>
@@ -278,7 +290,7 @@ function BetCard({
             <Text
               className="text-[10px] font-black uppercase text-white/40"
               style={{ letterSpacing: 1.4 }}>
-              Stake
+              Played
             </Text>
             <Text className="mt-1 text-sm font-black text-white">
               {formatCurrency(bet.amount)}
@@ -288,7 +300,7 @@ function BetCard({
             <Text
               className="text-[10px] font-black uppercase text-white/40"
               style={{ letterSpacing: 1.4 }}>
-              Pays
+              Reward
             </Text>
             <Text className="mt-1 text-sm font-black text-white" style={{ color: accent.hex }}>
               {formatCurrency(bet.potential_payout)}
@@ -324,18 +336,22 @@ function BetCard({
                   key={leg.id}
                   className="flex-row items-center justify-between gap-3 rounded-xl border border-white/[0.06] bg-white/[0.04] px-3 py-3">
                   <View className="flex-1 flex-row items-center gap-3">
-                    <View
-                      className="h-6 w-6 items-center justify-center rounded-full border"
-                      style={{
-                        backgroundColor: `${accent.hex}1a`,
-                        borderColor: `${accent.hex}66`,
-                      }}>
-                      <Text
-                        className="text-[10px] font-black"
-                        style={{ color: accent.hex, letterSpacing: -0.2 }}>
-                        {index + 1}
-                      </Text>
-                    </View>
+                    {leg.market !== 'over_under' ? (
+                      <NflTeamLogo size={24} teamName={leg.selection} />
+                    ) : (
+                      <View
+                        className="h-6 w-6 items-center justify-center rounded-full border"
+                        style={{
+                          backgroundColor: `${accent.hex}1a`,
+                          borderColor: `${accent.hex}66`,
+                        }}>
+                        <Text
+                          className="text-[10px] font-black"
+                          style={{ color: accent.hex, letterSpacing: -0.2 }}>
+                          {index + 1}
+                        </Text>
+                      </View>
+                    )}
                     <View className="flex-1">
                       <Text
                         className="text-sm font-black text-white"
@@ -344,7 +360,7 @@ function BetCard({
                         {selectionLabel(leg, bet.bet_type)}
                       </Text>
                       <Text className="mt-1 text-[11px] font-semibold uppercase text-white/40">
-                        {leg.market.replace('_', ' ')} · {formatAmericanOdds(leg.leg_odds)}
+                        {marketCopy(leg.market)} · {formatAmericanOdds(leg.leg_odds)}
                       </Text>
                     </View>
                   </View>
@@ -370,6 +386,7 @@ function BetCard({
 }
 
 function PlayerSide({
+  cosmetics,
   isLeading,
   isUser,
   profit,
@@ -377,6 +394,7 @@ function PlayerSide({
   side,
   user,
 }: {
+  cosmetics?: EquippedCosmeticsByCategory;
   isLeading: boolean;
   isUser: boolean;
   profit: number;
@@ -390,11 +408,6 @@ function PlayerSide({
     : isLeading
       ? 'border-gold/55 bg-gold/15'
       : 'border-white/15 bg-white/[0.05]';
-  const initialsColor = isUser
-    ? 'text-electric-green'
-    : isLeading
-      ? 'text-gold'
-      : 'text-white';
 
   return (
     <View
@@ -412,11 +425,7 @@ function PlayerSide({
               }
             : undefined
         }>
-        <Text
-          className={cn('text-2xl font-black uppercase', initialsColor)}
-          style={{ letterSpacing: 0.5 }}>
-          {getInitials(name) || 'BY'}
-        </Text>
+        <CosmeticAvatar cosmetics={cosmetics} name={name} size="lg" />
       </View>
 
       <View className="items-center gap-1">
@@ -445,8 +454,9 @@ function PlayerSide({
         <Text className="text-[11px] font-semibold text-white/45">{record}</Text>
         <AnimatedNumber
           className={cn('text-3xl font-black', getProfitTone(profit))}
-          decimals={Math.abs(profit) % 1 === 0 ? 0 : 2}
-          prefix={profit < 0 ? '-$' : '+$'}
+          decimals={0}
+          prefix={profit < 0 ? '-' : '+'}
+          suffix=" coins"
           style={{ letterSpacing: -0.6 }}
           value={Math.abs(profit)}
         />
@@ -537,9 +547,11 @@ function ProfitTug({
 }
 
 function FightCardHeader({
+  cosmeticsByUserId,
   detail,
   userId,
 }: {
+  cosmeticsByUserId: Record<string, EquippedCosmeticsByCategory | undefined>;
   detail: MatchupDetail;
   userId: string | undefined;
 }) {
@@ -558,7 +570,7 @@ function FightCardHeader({
               <Text
                 className="text-[10px] font-black uppercase text-electric-green"
                 style={{ letterSpacing: 2.5 }}>
-                Week {detail.matchup.week_number} · Main Event
+                Week {detail.matchup.week_number} · Matchup
               </Text>
             </View>
             <Text
@@ -579,6 +591,7 @@ function FightCardHeader({
 
         <View className="flex-row items-center">
           <PlayerSide
+            cosmetics={cosmeticsByUserId[detail.matchup.home_user_id]}
             isLeading={homeLeading}
             isUser={detail.matchup.home_user_id === userId}
             profit={homeProfit}
@@ -609,6 +622,11 @@ function FightCardHeader({
             </View>
           </View>
           <PlayerSide
+            cosmetics={
+              detail.matchup.away_user_id
+                ? cosmeticsByUserId[detail.matchup.away_user_id]
+                : undefined
+            }
             isLeading={awayLeading}
             isUser={detail.matchup.away_user_id === userId}
             profit={awayProfit}
@@ -694,7 +712,7 @@ function LockShowdownSide({
               numberOfLines={2}
               style={{ letterSpacing: -0.2 }}>
               {bet.bet_type === 'straight'
-                ? bet.bet_legs[0]?.selection ?? 'Straight bet'
+                ? bet.bet_legs[0]?.selection ?? 'Straight pick'
                 : `${bet.bet_legs.length}-leg ${bet.bet_type}`}
             </Text>
             <Text className="text-[11px] font-semibold text-white/55">
@@ -741,7 +759,7 @@ function LockShowdownSide({
         <View className="items-center justify-center rounded-2xl border border-dashed border-gold/25 bg-white/[0.02] px-3 py-5">
           <Ionicons color="rgba(255,215,0,0.55)" name="star-outline" size={22} />
           <Text className="mt-2 text-center text-xs font-semibold text-white/45">
-            No Lock filed
+            No Pick of the Week filed
           </Text>
         </View>
       )}
@@ -779,12 +797,12 @@ function LockShowdown({
             <Text
               className="text-[10px] font-black uppercase text-gold"
               style={{ letterSpacing: 2.4 }}>
-              Lock vs Lock · Headline Fight
+              Pick of the Week Showdown · Headline Fight
             </Text>
             <Ionicons color={THEME_COLORS.gold} name="star" size={13} />
           </View>
           <Text className="text-[11px] font-medium text-white/55">
-            Each Lock pays or costs {LOCK_OF_THE_WEEK_MULTIPLIER}x. The biggest swing of the week.
+            Each Pick of the Week rewards or costs {LOCK_OF_THE_WEEK_MULTIPLIER}x. The biggest swing of the week.
           </Text>
         </View>
 
@@ -794,7 +812,7 @@ function LockShowdown({
             cosmetics={homeCosmetics}
             isUser={homeIsUser}
             name={homeName}
-            sideLabel="Home Lock"
+            sideLabel="Home Pick of the Week"
           />
           <View className="items-center justify-center">
             <View
@@ -817,7 +835,7 @@ function LockShowdown({
             cosmetics={awayCosmetics}
             isUser={awayIsUser}
             name={awayName}
-            sideLabel="Away Lock"
+            sideLabel="Away Pick of the Week"
           />
         </View>
       </View>
@@ -883,7 +901,7 @@ function BetColumnSection({
             <Text
               className="text-[10px] font-black uppercase text-white/65"
               style={{ letterSpacing: 1.2 }}>
-              {bets.length} {bets.length === 1 ? 'bet' : 'bets'}
+              {bets.length} {bets.length === 1 ? 'pick' : 'picks'}
             </Text>
           </View>
         </View>
@@ -922,7 +940,6 @@ function LoadingState() {
 }
 
 export default function MatchupDetailScreen() {
-  const router = useRouter();
   const { matchupId } = useLocalSearchParams();
   const resolvedMatchupId = getParamValue(matchupId);
   const { user } = useAuth();
@@ -1043,17 +1060,7 @@ export default function MatchupDetailScreen() {
           />
         }
         showsVerticalScrollIndicator={false}>
-        <View className="flex-row items-center justify-between">
-          <PressableScale onPress={() => router.back()}>
-            <View className="flex-row items-center gap-2 self-start rounded-full border border-white/10 bg-white/[0.05] px-3 py-2">
-              <Ionicons color={THEME_COLORS.textPrimary} name="chevron-back" size={16} />
-              <Text
-                className="text-xs font-black uppercase text-white"
-                style={{ letterSpacing: 1.2 }}>
-                Back
-              </Text>
-            </View>
-          </PressableScale>
+        <View className="flex-row items-center justify-end">
           <View className="flex-row items-center gap-2">
             {userWonMatchup ? (
               <View
@@ -1083,7 +1090,11 @@ export default function MatchupDetailScreen() {
           </View>
         </View>
 
-        <FightCardHeader detail={detail} userId={userId} />
+        <FightCardHeader
+          cosmeticsByUserId={cosmeticsByUserId}
+          detail={detail}
+          userId={userId}
+        />
         <ProfitTug
           awayName={awayName}
           awayProfit={awayProfit}
@@ -1112,8 +1123,8 @@ export default function MatchupDetailScreen() {
             isUser={homeIsUser}
             side="home"
             subtitle={`${homeNonLockBets.length === 0 ? 'No' : homeNonLockBets.length} undercard ${
-              homeNonLockBets.length === 1 ? 'bet' : 'bets'
-            } besides the Lock`}
+              homeNonLockBets.length === 1 ? 'pick' : 'picks'
+            } besides the Pick of the Week`}
             title={homeName}
           />
           <BetColumnSection
@@ -1129,8 +1140,8 @@ export default function MatchupDetailScreen() {
             subtitle={
               detail.matchup.away_user_id
                 ? `${awayNonLockBets.length === 0 ? 'No' : awayNonLockBets.length} undercard ${
-                    awayNonLockBets.length === 1 ? 'bet' : 'bets'
-                  } besides the Lock`
+                    awayNonLockBets.length === 1 ? 'pick' : 'picks'
+                  } besides the Pick of the Week`
                 : 'Opponent has a bye this week.'
             }
             title={awayName}

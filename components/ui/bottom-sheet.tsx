@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, type PropsWithChildren } from 'react';
+import { useEffect, useMemo, useState, type PropsWithChildren, type ReactNode } from 'react';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -18,7 +18,7 @@ type BottomSheetProps = PropsWithChildren<{
   collapsedHeight?: number;
   fullScreenInset?: number;
   halfRatio?: number;
-  header?: React.ReactNode;
+  header?: ReactNode;
   onSnapChange: (index: SnapIndex) => void;
   snap: SnapIndex;
   visible: boolean;
@@ -29,7 +29,7 @@ const SPRING = { damping: 22, stiffness: 220 };
 export function BottomSheet({
   children,
   collapsedHeight = 96,
-  fullScreenInset = 36,
+  fullScreenInset = 8,
   halfRatio = 0.55,
   header,
   onSnapChange,
@@ -38,21 +38,23 @@ export function BottomSheet({
 }: BottomSheetProps) {
   const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const sheetHeight = Math.max(windowHeight - fullScreenInset - insets.top, 320);
+  const [containerHeight, setContainerHeight] = useState(windowHeight);
+  const fullTopInset = insets.top + fullScreenInset;
+  const sheetHeight = Math.max(containerHeight - fullTopInset, 320);
   const halfHeight = Math.round(sheetHeight * halfRatio);
 
   const snapTranslations = useMemo(
     () => ({
-      0: sheetHeight - collapsedHeight - insets.bottom,
-      1: sheetHeight - halfHeight - insets.bottom,
+      0: sheetHeight - collapsedHeight,
+      1: sheetHeight - halfHeight,
       2: 0,
     }),
-    [sheetHeight, collapsedHeight, halfHeight, insets.bottom],
+    [sheetHeight, collapsedHeight, halfHeight],
   );
 
   const translateY = useSharedValue(sheetHeight + 80);
   const overlayProgress = useSharedValue(0);
-  const baseTranslate = useRef(snapTranslations[0]);
+  const dragStartY = useSharedValue(snapTranslations[0]);
 
   useEffect(() => {
     if (!visible) {
@@ -68,11 +70,14 @@ export function BottomSheet({
     .activeOffsetY([-12, 12])
     .onStart(() => {
       'worklet';
-      baseTranslate.current = translateY.value;
+      dragStartY.value = translateY.value;
     })
     .onUpdate((event) => {
       'worklet';
-      const next = Math.max(snapTranslations[2] - 40, baseTranslate.current + event.translationY);
+      const next = Math.min(
+        snapTranslations[0] + 28,
+        Math.max(snapTranslations[2] - 28, dragStartY.value + event.translationY),
+      );
       translateY.value = next;
       const progress = interpolate(
         next,
@@ -117,20 +122,25 @@ export function BottomSheet({
   };
 
   return (
-    <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
+    <View
+      onLayout={(event) => {
+        setContainerHeight(event.nativeEvent.layout.height);
+      }}
+      pointerEvents="box-none"
+      style={[StyleSheet.absoluteFill, { overflow: 'hidden' }]}>
       {visible ? (
         <Animated.View
-          onTouchStart={() => onSnapChange(0)}
+          pointerEvents={snap === 0 ? 'none' : 'auto'}
           style={[
             StyleSheet.absoluteFill,
             { backgroundColor: '#000' },
             overlayStyle,
-            { pointerEvents: snap === 0 ? 'none' : 'auto' },
-          ]}
-        />
+          ]}>
+          <Pressable onPress={() => onSnapChange(0)} style={StyleSheet.absoluteFill} />
+        </Animated.View>
       ) : null}
       <Animated.View
-        pointerEvents="box-none"
+        pointerEvents={visible ? 'auto' : 'none'}
         style={[
           {
             backgroundColor: '#0F172A',
@@ -138,10 +148,10 @@ export function BottomSheet({
             borderTopLeftRadius: 28,
             borderTopRightRadius: 28,
             borderTopWidth: 1,
-            bottom: -insets.bottom,
             height: sheetHeight + insets.bottom + 40,
             left: 0,
-            paddingBottom: insets.bottom,
+            overflow: 'hidden',
+            paddingBottom: Math.max(insets.bottom, 12),
             paddingTop: 10,
             position: 'absolute',
             right: 0,
@@ -149,6 +159,7 @@ export function BottomSheet({
             shadowOffset: { width: 0, height: -8 },
             shadowOpacity: 0.45,
             shadowRadius: 24,
+            top: fullTopInset,
           },
           sheetStyle,
         ]}>

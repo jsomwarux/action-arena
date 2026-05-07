@@ -6,6 +6,8 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
+    "settle:mock": "node scripts/settle-mock-results.mjs",
+    "test:settlement": "supabase db query --linked -f scripts/test-settlement-scenarios.sql",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

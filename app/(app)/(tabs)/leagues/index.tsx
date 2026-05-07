@@ -28,7 +28,10 @@ function LeagueCard({ index, item }: { index: number; item: LeagueSummary }) {
       <PressableScale
         accessibilityRole="button"
         onPress={() =>
-          router.push({ pathname: '/leagues/[leagueId]', params: { leagueId: league.id } })
+          router.push({
+            pathname: '/(app)/(tabs)/leagues/[leagueId]',
+            params: { leagueId: league.id },
+          })
         }>
         <Card>
           <View className="gap-4">

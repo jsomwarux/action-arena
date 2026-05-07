@@ -1,5 +1,8 @@
 import type { BetMarket } from '@/types/database';
 
+import { getNflTeamShortName } from './nfl-teams';
+import { getMockNflOddsApiGames } from './mock-nfl-odds';
+
 export type OddsApiMarketKey = 'h2h' | 'spreads' | 'totals';
 export type OddsRegion = 'us';
 export type OddsFormat = 'american';
@@ -9,6 +12,7 @@ export type OddsApiOutcome = {
   name: string;
   point?: number;
   price: number;
+  short_name?: string;
 };
 
 export type OddsApiMarket = {
@@ -41,6 +45,7 @@ export type OddsSelection = {
   market: BetMarket;
   odds: number;
   selection: string;
+  shortName: string;
 };
 
 export type OddsGame = {
@@ -54,6 +59,7 @@ export type OddsGame = {
 const ODDS_API_BASE_URL = 'https://api.the-odds-api.com/v4';
 const NFL_SPORT_KEY = 'americanfootball_nfl';
 const ODDS_API_KEY = process.env.EXPO_PUBLIC_ODDS_API_KEY;
+export const isUsingMockOdds = process.env.EXPO_PUBLIC_USE_MOCK_DATA === 'true';
 
 const marketKeyToBetMarket: Record<OddsApiMarketKey, BetMarket> = {
   h2h: 'moneyline',
@@ -70,18 +76,14 @@ function emptyMarkets(): Record<BetMarket, OddsSelection[]> {
 }
 
 function selectBookmaker(bookmakers: OddsApiBookmaker[]) {
-  return (
-    bookmakers.find((bookmaker) => bookmaker.key === 'draftkings') ??
-    bookmakers.find((bookmaker) => bookmaker.key === 'fanduel') ??
-    bookmakers[0] ??
-    null
-  );
+  return bookmakers[0] ?? null;
 }
 
 function normalizeOutcome(outcome: OddsApiOutcome, market: BetMarket): OddsSelection {
   const isTotal = market === 'over_under';
   const line = typeof outcome.point === 'number' ? outcome.point : null;
   const label = isTotal && line !== null ? `${outcome.name} ${line}` : outcome.name;
+  const shortName = isTotal ? outcome.name : (outcome.short_name ?? getNflTeamShortName(outcome.name));
 
   return {
     description: outcome.description,
@@ -90,10 +92,11 @@ function normalizeOutcome(outcome: OddsApiOutcome, market: BetMarket): OddsSelec
     market,
     odds: outcome.price,
     selection: isTotal ? outcome.name : outcome.name,
+    shortName,
   };
 }
 
-function normalizeGame(game: OddsApiGame): OddsGame {
+export function normalizeOddsApiGame(game: OddsApiGame): OddsGame {
   const markets = emptyMarkets();
   const bookmaker = selectBookmaker(game.bookmakers);
 
@@ -112,8 +115,18 @@ function normalizeGame(game: OddsApiGame): OddsGame {
 }
 
 export async function fetchUpcomingNflOdds() {
+  if (isUsingMockOdds) {
+    return getMockNflOddsApiGames()
+      .map(normalizeOddsApiGame)
+      .filter((game) => new Date(game.commenceTime).getTime() > Date.now())
+      .sort(
+        (left, right) =>
+          new Date(left.commenceTime).getTime() - new Date(right.commenceTime).getTime(),
+      );
+  }
+
   if (!ODDS_API_KEY) {
-    throw new Error('Set EXPO_PUBLIC_ODDS_API_KEY to load real NFL odds.');
+    throw new Error('Set EXPO_PUBLIC_ODDS_API_KEY to load real NFL lines.');
   }
 
   const url = new URL(`${ODDS_API_BASE_URL}/sports/${NFL_SPORT_KEY}/odds`);
@@ -126,12 +139,12 @@ export async function fetchUpcomingNflOdds() {
   const response = await fetch(url.toString());
 
   if (!response.ok) {
-    throw new Error(`Odds API request failed with status ${response.status}.`);
+    throw new Error(`Lines request failed with status ${response.status}.`);
   }
 
   const data = (await response.json()) as OddsApiGame[];
   return data
-    .map(normalizeGame)
+    .map(normalizeOddsApiGame)
     .filter((game) => new Date(game.commenceTime).getTime() > Date.now())
     .sort(
       (left, right) =>

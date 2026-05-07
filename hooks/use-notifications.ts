@@ -29,17 +29,17 @@ export const NOTIFICATION_PREFERENCE_LABELS: {
   {
     description: "When fresh weekly lines are ready, you'll get nudged back to the board.",
     key: 'odds_available',
-    title: "New week's odds",
+    title: "New week's lines",
   },
   {
     description: 'A reminder before kickoff if your weekly card is still missing.',
     key: 'bet_reminders',
-    title: 'Bet reminders',
+    title: 'Pick reminders',
   },
   {
-    description: 'Final result alerts when individual bets settle.',
+    description: 'Final result alerts when individual picks settle.',
     key: 'bet_results',
-    title: 'Bet results',
+    title: 'Pick results',
   },
   {
     description: 'Leg-by-leg updates for parlays and teasers while games finish.',
@@ -57,14 +57,14 @@ export const NOTIFICATION_PREFERENCE_LABELS: {
     title: 'Matchup results',
   },
   {
-    description: 'Sharpest Bettor, Lock of the Week, and other league hardware.',
+    description: 'Top Performer, Pick of the Week, and other league hardware.',
     key: 'weekly_awards',
     title: 'Weekly awards',
   },
   {
-    description: 'Urgency when your opponent has already locked their weekly bets.',
+    description: 'Urgency when your opponent has already submitted their weekly picks.',
     key: 'opponent_bets_locked',
-    title: 'Opponent locked bets',
+    title: 'Opponent submitted picks',
   },
 ];
 

@@ -102,7 +102,7 @@ function Header() {
             <Text
               className="text-lg font-black text-arena-bg"
               style={{ letterSpacing: -0.2 }}>
-              Open Bet Board
+              Open Pick Board
             </Text>
           </View>
           <Ionicons color={THEME_COLORS.background} name="arrow-forward" size={22} />
@@ -204,7 +204,7 @@ function ActionNeeded({ cards }: { cards: HomeLeagueCard[] }) {
                       </Text>
                       <View className="flex-row items-center gap-2">
                         <Text className="text-sm font-semibold text-white/70">
-                          {needed} more {needed === 1 ? 'bet' : 'bets'} until budget is locked
+                          {needed} more {needed === 1 ? 'pick' : 'picks'} until lineup is ready
                         </Text>
                       </View>
                     </View>
@@ -219,7 +219,7 @@ function ActionNeeded({ cards }: { cards: HomeLeagueCard[] }) {
                       <Text
                         className="text-[10px] font-black uppercase text-amber-accent"
                         style={{ letterSpacing: 1.4 }}>
-                        Place Bets
+                        Submit Picks
                       </Text>
                     </View>
                   </View>
@@ -298,8 +298,9 @@ function ThisWeekCard({ card }: { card: HomeLeagueCard }) {
             </Text>
             <AnimatedNumber
               className={cn('mt-1 text-2xl font-black', getProfitTone(card.weeklyProfit))}
-              decimals={Math.abs(card.weeklyProfit) % 1 === 0 ? 0 : 2}
-              prefix={card.weeklyProfit < 0 ? '-$' : '+$'}
+              decimals={0}
+              prefix={card.weeklyProfit < 0 ? '-' : '+'}
+              suffix=" coins"
               style={{ letterSpacing: -0.5 }}
               value={Math.abs(card.weeklyProfit)}
             />
@@ -413,7 +414,7 @@ function ThisWeekCard({ card }: { card: HomeLeagueCard }) {
                 needed > 0 ? 'text-amber-accent' : 'text-electric-green',
               )}
               style={{ letterSpacing: 1.4 }}>
-              {card.betsPlaced}/{MINIMUM_BETS_PER_WEEK} bets locked
+              {card.betsPlaced}/{MINIMUM_BETS_PER_WEEK} picks submitted
             </Text>
           </View>
           <PressableScale onPress={() => router.push('/bet-board')}>
@@ -594,7 +595,7 @@ function RecentResultCard({ card }: { card: HomeLeagueCard }) {
             ) : null}
             {!biggestWin && !biggestLoss ? (
               <Text className="text-sm font-semibold text-white/45">
-                No settled bets from last week yet.
+                No settled picks from last week yet.
               </Text>
             ) : null}
           </View>
@@ -623,7 +624,7 @@ function RecentResultCard({ card }: { card: HomeLeagueCard }) {
   );
 }
 
-type AwardKind = 'sharpest' | 'degen' | 'lock';
+type AwardKind = 'sharpest' | 'coldStreak' | 'lock';
 
 const AWARD_THEME: Record<
   AwardKind,
@@ -638,15 +639,15 @@ const AWARD_THEME: Record<
     title: string;
   }
 > = {
-  degen: {
+  coldStreak: {
     accent: THEME_COLORS.coralRed,
     barClass: 'bg-coral-red/55',
     bgClass: 'bg-coral-red/[0.07]',
     borderClass: 'border-coral-red/35',
     icon: 'flame',
-    subtitle: 'Lit the budget on fire — entertainment value through the roof.',
+    subtitle: 'A tough week with plenty of room for a comeback.',
     textClass: 'text-coral-red',
-    title: 'Degen of the Week',
+    title: 'Cold Streak',
   },
   lock: {
     accent: THEME_COLORS.electricGreen,
@@ -656,7 +657,7 @@ const AWARD_THEME: Record<
     icon: 'lock-closed',
     subtitle: 'Biggest single profit of the week.',
     textClass: 'text-electric-green',
-    title: 'Lock of the Week',
+    title: 'Pick of the Week',
   },
   sharpest: {
     accent: THEME_COLORS.gold,
@@ -666,7 +667,7 @@ const AWARD_THEME: Record<
     icon: 'trophy',
     subtitle: 'Best ROI across the league.',
     textClass: 'text-gold',
-    title: 'Sharpest Bettor',
+    title: 'Top Performer',
   },
 };
 
@@ -677,10 +678,10 @@ function awardBetSummary(award: WeeklyAward) {
   const firstLeg = bet.bet_legs[0];
   const label =
     bet.bet_type === 'straight'
-      ? firstLeg?.selection ?? 'Straight bet'
+      ? firstLeg?.selection ?? 'Straight pick'
       : `${bet.bet_legs.length}-leg ${bet.bet_type}`;
 
-  return { betType: bet.bet_type, label, odds: bet.odds, stake: bet.amount };
+  return { betType: bet.bet_type, label, odds: bet.odds, played: bet.amount };
 }
 
 function AwardTrophy({ award, kind }: { award: WeeklyAward; kind: AwardKind }) {
@@ -747,8 +748,9 @@ function AwardTrophy({ award, kind }: { award: WeeklyAward; kind: AwardKind }) {
               </Text>
               <AnimatedNumber
                 className={cn('text-base font-black', getProfitTone(award.profit))}
-                decimals={Math.abs(award.profit) % 1 === 0 ? 0 : 2}
-                prefix={award.profit < 0 ? '-$' : '+$'}
+                decimals={0}
+                prefix={award.profit < 0 ? '-' : '+'}
+                suffix=" coins"
                 style={{ letterSpacing: -0.3 }}
                 value={Math.abs(award.profit)}
               />
@@ -776,7 +778,7 @@ function AwardTrophy({ award, kind }: { award: WeeklyAward; kind: AwardKind }) {
             </Text>
             <View className="mt-1 flex-row items-center justify-between">
               <Text className="text-[11px] font-semibold text-white/55">
-                Stake {formatCurrency(summary.stake)}
+                Played {formatCurrency(summary.played)}
               </Text>
               <Text className="text-[11px] font-black text-electric-green">
                 Profit {formatProfit(award.profit)}
@@ -800,7 +802,7 @@ function AwardTrophy({ award, kind }: { award: WeeklyAward; kind: AwardKind }) {
 
 function WeeklyAwardsSection({ cards }: { cards: HomeLeagueCard[] }) {
   const cardsWithAwards = cards.filter(
-    (card) => card.weeklyAwards.sharpest || card.weeklyAwards.degen || card.weeklyAwards.lock,
+    (card) => card.weeklyAwards.sharpest || card.weeklyAwards.coldStreak || card.weeklyAwards.lock,
   );
 
   if (cardsWithAwards.length === 0) {
@@ -837,8 +839,8 @@ function WeeklyAwardsSection({ cards }: { cards: HomeLeagueCard[] }) {
               {card.weeklyAwards.lock ? (
                 <AwardTrophy award={card.weeklyAwards.lock} kind="lock" />
               ) : null}
-              {card.weeklyAwards.degen ? (
-                <AwardTrophy award={card.weeklyAwards.degen} kind="degen" />
+              {card.weeklyAwards.coldStreak ? (
+                <AwardTrophy award={card.weeklyAwards.coldStreak} kind="coldStreak" />
               ) : null}
             </View>
           </View>

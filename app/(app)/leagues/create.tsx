@@ -27,6 +27,11 @@ const VISIBILITY_ICONS: Record<LeagueVisibility, IoniconName> = {
   private: 'lock-closed',
 };
 
+const MAX_LEAGUE_NAME_LENGTH = 50;
+const LEAGUE_NAME_TOO_LONG_MESSAGE = 'League name must be 50 characters or fewer.';
+const CREATE_LEAGUE_ERROR_MESSAGE =
+  'We could not create that league. Please check the details and try again.';
+
 function SectionHeader({ subtitle, title }: { subtitle?: string; title: string }) {
   return (
     <View className="gap-1">
@@ -62,11 +67,10 @@ function ToggleOption({
       accessibilityRole="button"
       accessibilityState={{ selected: isSelected, disabled }}
       disabled={disabled}
-      onPress={onPress}
-      style={{ flex: 1 }}>
+      onPress={onPress}>
       <View
         className={cn(
-          'flex-1 gap-3 rounded-2xl border p-4',
+          'w-full gap-3 rounded-2xl border p-4',
           isSelected
             ? 'border-electric-green bg-electric-green/10'
             : 'border-white/10 bg-white/[0.04]',
@@ -130,26 +134,46 @@ export default function CreateLeagueScreen() {
   const [maxMembers, setMaxMembers] = useState(10);
   const [sport, setSport] = useState<LeagueSport>('nfl');
   const [nameError, setNameError] = useState<string | undefined>();
+  const trimmedName = name.trim();
+  const isNameTooLong = trimmedName.length > MAX_LEAGUE_NAME_LENGTH;
+
+  const handleNameChange = (nextName: string) => {
+    setName(nextName);
+
+    if (nextName.trim().length > MAX_LEAGUE_NAME_LENGTH) {
+      setNameError(LEAGUE_NAME_TOO_LONG_MESSAGE);
+      return;
+    }
+
+    if (nameError) {
+      setNameError(undefined);
+    }
+  };
 
   const handleSubmit = async () => {
     setNameError(undefined);
 
-    if (name.trim().length < 2) {
+    if (trimmedName.length < 2) {
       setNameError('League name needs at least 2 characters.');
+      return;
+    }
+
+    if (trimmedName.length > MAX_LEAGUE_NAME_LENGTH) {
+      setNameError(LEAGUE_NAME_TOO_LONG_MESSAGE);
       return;
     }
 
     try {
       const leagueId = await createLeague.mutateAsync({
         maxMembers,
-        name,
+        name: trimmedName,
         sport,
         type,
         visibility,
       });
-      router.replace({ pathname: '/leagues/[leagueId]', params: { leagueId } });
-    } catch (error) {
-      Alert.alert('Could not create league', error instanceof Error ? error.message : 'Try again.');
+      router.replace({ pathname: '/(app)/(tabs)/leagues/[leagueId]', params: { leagueId } });
+    } catch {
+      Alert.alert('Could not create league', CREATE_LEAGUE_ERROR_MESSAGE);
     }
   };
 
@@ -181,7 +205,7 @@ export default function CreateLeagueScreen() {
               <TextInput
                 error={nameError}
                 label="League name"
-                onChangeText={setName}
+                onChangeText={handleNameChange}
                 placeholder="Sunday Syndicate"
                 value={name}
               />
@@ -191,7 +215,7 @@ export default function CreateLeagueScreen() {
                   subtitle="Pick how members compete each week."
                   title="League Format"
                 />
-                <View className="flex-row gap-3">
+                <View className="gap-3">
                   {LEAGUE_TYPE_OPTIONS.map((option) => (
                     <ToggleOption
                       description={option.description}
@@ -210,7 +234,7 @@ export default function CreateLeagueScreen() {
                   subtitle="Public rooms appear in browse. Private requires the invite code."
                   title="Visibility"
                 />
-                <View className="flex-row gap-3">
+                <View className="gap-3">
                   {LEAGUE_VISIBILITY_OPTIONS.map((option) => (
                     <ToggleOption
                       description={option.description}
@@ -304,6 +328,7 @@ export default function CreateLeagueScreen() {
               </View>
 
               <Button
+                disabled={isNameTooLong}
                 loading={createLeague.isPending}
                 title="Create League"
                 onPress={handleSubmit}

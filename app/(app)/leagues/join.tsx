@@ -53,7 +53,7 @@ function PublicLeagueCard({
               <Text
                 className="text-[10px] font-black uppercase text-white/45"
                 style={{ letterSpacing: 1.5 }}>
-                Slots
+                Members
               </Text>
               <Text className="mt-1 text-base font-black text-white">
                 {item.memberCount}
@@ -147,7 +147,7 @@ export default function JoinLeagueScreen() {
   const handleJoin = async (input: { inviteCode?: string; leagueId?: string }) => {
     try {
       const leagueId = await joinLeague.mutateAsync(input);
-      router.replace({ pathname: '/leagues/[leagueId]', params: { leagueId } });
+      router.replace({ pathname: '/(app)/(tabs)/leagues/[leagueId]', params: { leagueId } });
     } catch (error) {
       Alert.alert('Could not join league', error instanceof Error ? error.message : 'Try again.');
     }
