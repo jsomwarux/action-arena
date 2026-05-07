@@ -25,7 +25,7 @@ const PASS_FEATURES: {
   title: string;
 }[] = [
   {
-    body: 'Claim your Season 1 identity with a founder logo, animated frame, exclusive Lock effect, and a legacy trophy skin.',
+    body: 'Claim your Season 1 identity with a founder logo, animated frame, exclusive Pick of the Week effect, and a legacy trophy skin.',
     highlight: '4 exclusive cosmetics',
     icon: 'sparkles',
     title: 'Season 1 Exclusive Drops',

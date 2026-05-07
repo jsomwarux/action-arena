@@ -45,6 +45,7 @@ type OddsApiScoreGame = {
 
 type RequestBody = {
   daysFrom?: unknown;
+  scores?: unknown;
   sportKey?: unknown;
 };
 
@@ -99,7 +100,7 @@ function parseSportKey(value: unknown) {
   return typeof value === 'string' && value.trim() ? value.trim() : NFL_SPORT_KEY;
 }
 
-async function readBody(request: Request) {
+async function readBody(request: Request): Promise<unknown> {
   if (request.method === 'GET') {
     return {};
   }
@@ -110,7 +111,15 @@ async function readBody(request: Request) {
     return {};
   }
 
-  return JSON.parse(text) as RequestBody;
+  return JSON.parse(text) as unknown;
+}
+
+function toRequestBody(value: unknown): RequestBody {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return {};
+  }
+
+  return value as RequestBody;
 }
 
 function assertScoresPayload(payload: unknown): OddsApiScoreGame[] {
@@ -194,18 +203,22 @@ Deno.serve(async (request) => {
       });
     }
 
-    const body = await readBody(request);
+    const rawBody = await readBody(request);
+    const body = toRequestBody(rawBody);
     const searchParams = new URL(request.url).searchParams;
     const daysFrom = parseDaysFrom(searchParams.get('daysFrom') ?? body.daysFrom);
     const sportKey = parseSportKey(searchParams.get('sportKey') ?? body.sportKey);
+    const suppliedScoresPayload = Array.isArray(rawBody) ? rawBody : body.scores;
 
     console.info('Starting pick settlement run', { daysFrom, sportKey });
 
-    const scores = await fetchCompletedScores({
-      daysFrom,
-      oddsApiKey: getOddsApiKey(),
-      sportKey,
-    });
+    const scores = Array.isArray(suppliedScoresPayload)
+      ? assertScoresPayload(suppliedScoresPayload).filter((game) => game.completed && game.scores)
+      : await fetchCompletedScores({
+          daysFrom,
+          oddsApiKey: getOddsApiKey(),
+          sportKey,
+        });
 
     console.info('Fetched completed score rows', { count: scores.length, sportKey });
 

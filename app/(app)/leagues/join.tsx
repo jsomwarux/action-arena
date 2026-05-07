@@ -147,7 +147,7 @@ export default function JoinLeagueScreen() {
   const handleJoin = async (input: { inviteCode?: string; leagueId?: string }) => {
     try {
       const leagueId = await joinLeague.mutateAsync(input);
-      router.replace({ pathname: '/leagues/[leagueId]', params: { leagueId } });
+      router.replace({ pathname: '/(app)/(tabs)/leagues/[leagueId]', params: { leagueId } });
     } catch (error) {
       Alert.alert('Could not join league', error instanceof Error ? error.message : 'Try again.');
     }

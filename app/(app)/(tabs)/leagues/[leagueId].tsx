@@ -26,7 +26,9 @@ import {
 } from '@/components/cosmetics';
 import {
   Badge,
+  Button,
   Card,
+  NflTeamLogo,
   PressableScale,
   SkeletonLoader,
 } from '@/components/ui';
@@ -43,7 +45,11 @@ import {
   useSendLeagueChatMessage,
   useSendLeagueChatSticker,
 } from '@/hooks/use-league-chat';
-import { type LeagueDetail, useLeagueDetail } from '@/hooks/use-leagues';
+import {
+  type LeagueDetail,
+  useGenerateScheduleMutation,
+  useLeagueDetail,
+} from '@/hooks/use-leagues';
 import { type WeeklyAward, type WeeklyAwards, useWeeklyAwards } from '@/hooks/use-profile-stats';
 import { cn } from '@/lib/cn';
 import {
@@ -66,12 +72,14 @@ import type {
 } from '@/types/database';
 
 type DetailTab = 'standings' | 'schedule' | 'members' | 'chat';
+type PlayoffPlaceholderWeek = 15 | 16 | 17;
 type PlayoffStatus = 'clinched' | 'eliminated' | null;
 
 const SCREEN_HORIZONTAL_PADDING = 40;
 const DETAIL_TAB_HEIGHT = 48;
 const DETAIL_TAB_HORIZONTAL_GAP = 10;
 const DETAIL_TAB_UNDERLINE_HEIGHT = 3;
+const PLAYOFF_PLACEHOLDER_WEEKS: PlayoffPlaceholderWeek[] = [15, 16, 17];
 
 const TABS: { key: DetailTab; label: string }[] = [
   { key: 'standings', label: 'Standings' },
@@ -297,52 +305,6 @@ function PlayerAvatar({
   );
 }
 
-function MatchupRow({
-  cosmeticsByUserId,
-  detail,
-  matchup,
-}: {
-  cosmeticsByUserId: Record<string, EquippedCosmeticsByCategory>;
-  detail: LeagueDetail;
-  matchup: WeeklyMatchupRow;
-}) {
-  const isHomeWinner = matchup.winner_id && matchup.winner_id === matchup.home_user_id;
-  const isAwayWinner =
-    matchup.away_user_id && matchup.winner_id && matchup.winner_id === matchup.away_user_id;
-
-  return (
-    <View className="gap-3">
-      <View className="flex-row items-center justify-between gap-3">
-        <View className="flex-1 flex-row items-center gap-2">
-          {isHomeWinner ? (
-            <Ionicons color={THEME_COLORS.electricGreen} name="trophy" size={14} />
-          ) : null}
-          <Text className="flex-1 text-base font-black text-white" numberOfLines={1}>
-            {getDisplayName(detail, matchup.home_user_id)}
-          </Text>
-        </View>
-        <Text className={cn('text-base font-black', getProfitTone(matchup.home_profit ?? 0))}>
-          {matchup.home_profit === null ? '–' : formatProfit(matchup.home_profit)}
-        </Text>
-      </View>
-      <View className="h-px bg-white/[0.08]" />
-      <View className="flex-row items-center justify-between gap-3">
-        <View className="flex-1 flex-row items-center gap-2">
-          {isAwayWinner ? (
-            <Ionicons color={THEME_COLORS.electricGreen} name="trophy" size={14} />
-          ) : null}
-          <Text className="flex-1 text-base font-black text-white" numberOfLines={1}>
-            {getAwayDisplayName(detail, matchup)}
-          </Text>
-        </View>
-        <Text className={cn('text-base font-black', getProfitTone(matchup.away_profit ?? 0))}>
-          {matchup.away_profit === null ? '–' : formatProfit(matchup.away_profit)}
-        </Text>
-      </View>
-    </View>
-  );
-}
-
 function FightCard({
   cosmeticsByUserId,
   detail,
@@ -374,7 +336,7 @@ function FightCard({
             <Text
               className="mt-1 text-2xl font-black uppercase text-white"
               style={{ letterSpacing: -0.4 }}>
-              Main Event
+              Your Matchup
             </Text>
           </View>
           <Badge label={`Week ${detail.league.current_week}`} tone="green" />
@@ -819,6 +781,7 @@ function StandingsBoard({
   detail: LeagueDetail;
   userId: string;
 }) {
+  const router = useRouter();
   const isH2H = detail.league.type === 'h2h';
 
   if (detail.standings.length === 0) {
@@ -859,69 +822,83 @@ function StandingsBoard({
           const lastRow = index === detail.standings.length - 1;
           const playoffStatus = playoffStatusForStanding(detail, standing);
           return (
-            <View
+            <PressableScale
               key={standing.id}
-              className={cn(
-                'flex-row items-center gap-3 px-5 py-4',
-                isCurrentUser ? 'bg-electric-green/[0.06]' : null,
-                !lastRow && 'border-b border-white/[0.05]',
-              )}
-              style={
-                isCurrentUser
-                  ? {
-                      borderLeftColor: THEME_COLORS.electricGreen,
-                      borderLeftWidth: 3,
-                    }
-                  : undefined
-              }>
+              accessibilityRole="button"
+              onPress={() => {
+                haptics.selection();
+                router.push({
+                  pathname: '/members/[memberId]',
+                  params: { leagueId: detail.league.id, memberId: standing.user_id },
+                });
+              }}
+              pressedScale={0.99}>
               <View
                 className={cn(
-                  'h-9 w-9 items-center justify-center rounded-full border',
-                  accent.bg,
-                  accent.ring,
-                )}>
-                {standing.rank === 1 ? (
-                  <TrophySkinIcon cosmetics={cosmeticsByUserId[standing.user_id]} size={15} />
-                ) : (
-                  <Text className={cn('text-sm font-black', accent.text)}>{standing.rank}</Text>
+                  'flex-row items-center gap-3 px-5 py-4',
+                  isCurrentUser ? 'bg-electric-green/[0.06]' : null,
+                  !lastRow && 'border-b border-white/[0.05]',
                 )}
-              </View>
-              <View className="flex-1">
-                <View className="flex-row items-center gap-2">
-                  <CosmeticAvatar
-                    cosmetics={cosmeticsByUserId[standing.user_id]}
-                    name={getDisplayName(detail, standing.user_id)}
-                    size="sm"
-                  />
-                  <Text className="text-base font-black text-white" numberOfLines={1}>
-                    {getDisplayName(detail, standing.user_id)}
-                  </Text>
-                  {isCurrentUser ? (
-                    <View className="rounded-full border border-electric-green/40 bg-electric-green/15 px-2 py-[2px]">
-                      <Text
-                        className="text-[9px] font-black uppercase text-electric-green"
-                        style={{ letterSpacing: 1 }}>
-                        You
-                      </Text>
-                    </View>
-                  ) : null}
-                  <PlayoffStatusIcon status={playoffStatus} />
+                style={
+                  isCurrentUser
+                    ? {
+                        borderLeftColor: THEME_COLORS.electricGreen,
+                        borderLeftWidth: 3,
+                      }
+                    : undefined
+                }>
+                <View
+                  className={cn(
+                    'h-9 w-9 items-center justify-center rounded-full border',
+                    accent.bg,
+                    accent.ring,
+                  )}>
+                  {standing.rank === 1 ? (
+                    <TrophySkinIcon cosmetics={cosmeticsByUserId[standing.user_id]} size={15} />
+                  ) : (
+                    <Text className={cn('text-sm font-black', accent.text)}>{standing.rank}</Text>
+                  )}
                 </View>
-                <Text className="mt-1 text-[11px] font-semibold text-white/45">
-                  Weekly {formatProfit(standing.weekly_profit)}
-                </Text>
+                <View className="flex-1">
+                  <View className="flex-row items-center gap-2">
+                    <CosmeticAvatar
+                      cosmetics={cosmeticsByUserId[standing.user_id]}
+                      name={getDisplayName(detail, standing.user_id)}
+                      size="sm"
+                    />
+                    <Text className="text-base font-black text-white" numberOfLines={1}>
+                      {getDisplayName(detail, standing.user_id)}
+                    </Text>
+                    {isCurrentUser ? (
+                      <View className="rounded-full border border-electric-green/40 bg-electric-green/15 px-2 py-[2px]">
+                        <Text
+                          className="text-[9px] font-black uppercase text-electric-green"
+                          style={{ letterSpacing: 1 }}>
+                          You
+                        </Text>
+                      </View>
+                    ) : null}
+                    <PlayoffStatusIcon status={playoffStatus} />
+                  </View>
+                  <Text className="mt-1 text-[11px] font-semibold text-white/45">
+                    Weekly {formatProfit(standing.weekly_profit)}
+                  </Text>
+                </View>
+                <View className="flex-row items-center gap-2">
+                  <Text
+                    className={cn(
+                      'text-base font-black',
+                      isH2H ? 'text-white' : getProfitTone(standing.total_profit),
+                    )}
+                    style={{ letterSpacing: -0.3 }}>
+                    {isH2H
+                      ? formatRecord(standing.wins, standing.losses, standing.ties)
+                      : formatProfit(standing.total_profit)}
+                  </Text>
+                  <Ionicons color="rgba(255,255,255,0.35)" name="chevron-forward" size={16} />
+                </View>
               </View>
-              <Text
-                className={cn(
-                  'text-base font-black',
-                  isH2H ? 'text-white' : getProfitTone(standing.total_profit),
-                )}
-                style={{ letterSpacing: -0.3 }}>
-                {isH2H
-                  ? formatRecord(standing.wins, standing.losses, standing.ties)
-                  : formatProfit(standing.total_profit)}
-              </Text>
-            </View>
+            </PressableScale>
           );
         })}
       </View>
@@ -929,67 +906,542 @@ function StandingsBoard({
   );
 }
 
-function ScheduleList({
+function ScheduleEmptyState({
+  canStartSeason,
+  detail,
+  onStartSeason,
+  startSeasonError,
+  startingSeason,
+  userId,
+}: {
+  canStartSeason: boolean;
+  detail: LeagueDetail;
+  onStartSeason: () => void;
+  startSeasonError?: string;
+  startingSeason: boolean;
+  userId: string;
+}) {
+  const isCommissioner = detail.league.commissioner_id === userId;
+  const memberCount = detail.members.length;
+  const maxMembers = detail.league.max_members;
+  const hasEnoughPlayers = memberCount >= 2;
+  const isFull = memberCount >= maxMembers;
+
+  if (canStartSeason) {
+    return (
+      <View className="gap-4">
+        <View
+          className="overflow-hidden rounded-3xl border border-electric-green/30 bg-electric-green/[0.06]"
+          style={{
+            shadowColor: THEME_COLORS.electricGreen,
+            shadowOffset: { width: 0, height: 12 },
+            shadowOpacity: 0.35,
+            shadowRadius: 24,
+          }}>
+          <View className="items-center gap-4 px-6 py-8">
+            <View
+              className="h-16 w-16 items-center justify-center rounded-full border border-electric-green/50 bg-electric-green/15"
+              style={{
+                shadowColor: THEME_COLORS.electricGreen,
+                shadowOffset: { width: 0, height: 0 },
+                shadowOpacity: 0.6,
+                shadowRadius: 16,
+              }}>
+              <Ionicons color={THEME_COLORS.electricGreen} name="flag" size={28} />
+            </View>
+            <View className="items-center gap-2">
+              <Text
+                className="text-[10px] font-black uppercase text-electric-green"
+                style={{ letterSpacing: 2.5 }}>
+                Commissioner
+              </Text>
+              <Text
+                className="text-center text-2xl font-black uppercase text-white"
+                style={{ letterSpacing: -0.4 }}>
+                Ready to Kick Off?
+              </Text>
+              <Text className="px-2 text-center text-sm font-semibold leading-5 text-white/65">
+                Drop the green flag with {memberCount} player{memberCount === 1 ? '' : 's'}, or wait until the
+                roster fills to {maxMembers} for an automatic start.
+              </Text>
+            </View>
+            <View className="w-full pt-2">
+              <Button
+                loading={startingSeason}
+                title={startingSeason ? 'Building Schedule…' : 'Start Season'}
+                onPress={onStartSeason}
+              />
+            </View>
+            {startSeasonError ? (
+              <View className="flex-row items-center gap-2 rounded-2xl border border-coral-red/40 bg-coral-red/10 px-3 py-2">
+                <Ionicons color={THEME_COLORS.coralRed} name="alert-circle" size={14} />
+                <Text className="flex-1 text-xs font-semibold text-coral-red">
+                  {startSeasonError}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        </View>
+        <View className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
+          <View className="flex-row items-center justify-between">
+            <Text
+              className="text-[10px] font-black uppercase text-white/55"
+              style={{ letterSpacing: 1.8 }}>
+              Roster
+            </Text>
+            <Text className="text-xs font-black text-white">
+              {memberCount} / {maxMembers} joined
+            </Text>
+          </View>
+          <View className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
+            <View
+              className="h-full rounded-full bg-electric-green"
+              style={{ width: `${Math.min(100, (memberCount / maxMembers) * 100)}%` }}
+            />
+          </View>
+        </View>
+      </View>
+    );
+  }
+
+  let title = 'Season Starts Soon';
+  let body = 'Hang tight — the schedule will drop here as soon as it’s set.';
+  let iconName: React.ComponentProps<typeof Ionicons>['name'] = 'hourglass';
+
+  if (startingSeason) {
+    title = 'Building the Schedule…';
+    body = 'Generating matchups for every week of the season.';
+    iconName = 'cog';
+  } else if (!hasEnoughPlayers) {
+    title = 'Waiting on Players';
+    body = isCommissioner
+      ? 'You need at least 2 players to start. Share the invite code to bring more friends in.'
+      : 'The league needs at least one more player before the season can begin.';
+    iconName = 'people';
+  } else if (isCommissioner) {
+    title = 'Ready When You Are';
+    body = 'Reload to refresh — your Start Season button will appear once the league is set.';
+    iconName = 'flag';
+  } else if (isFull) {
+    title = 'Schedule Inbound';
+    body = 'The roster is full. Building the season schedule now.';
+    iconName = 'time';
+  } else {
+    title = 'Waiting on the Commissioner';
+    body =
+      'More players are joining, or the commissioner is getting ready to start the season. Sit tight.';
+    iconName = 'hourglass';
+  }
+
+  return (
+    <Card>
+      <View className="items-center gap-4 py-4">
+        <View className="h-14 w-14 items-center justify-center rounded-full border border-white/15 bg-white/[0.04]">
+          <Ionicons color={THEME_COLORS.textPrimary} name={iconName} size={24} />
+        </View>
+        <View className="items-center gap-2">
+          <Text
+            className="text-center text-xl font-black uppercase text-white"
+            style={{ letterSpacing: -0.3 }}>
+            {title}
+          </Text>
+          <Text className="px-2 text-center text-sm font-semibold leading-5 text-white/60">
+            {body}
+          </Text>
+        </View>
+        <View className="mt-1 flex-row items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1.5">
+          <Ionicons color="rgba(255,255,255,0.55)" name="people" size={11} />
+          <Text
+            className="text-[10px] font-black uppercase text-white/65"
+            style={{ letterSpacing: 1.5 }}>
+            {memberCount} / {maxMembers} players
+          </Text>
+        </View>
+        {startSeasonError ? (
+          <View className="mt-1 flex-row items-center gap-2 rounded-2xl border border-coral-red/40 bg-coral-red/10 px-3 py-2">
+            <Ionicons color={THEME_COLORS.coralRed} name="alert-circle" size={14} />
+            <Text className="flex-1 text-xs font-semibold text-coral-red">
+              {startSeasonError}
+            </Text>
+          </View>
+        ) : null}
+      </View>
+    </Card>
+  );
+}
+
+function ScheduleMatchupCard({
   cosmeticsByUserId,
   detail,
+  isCurrentWeek,
+  matchup,
   userId,
 }: {
   cosmeticsByUserId: Record<string, EquippedCosmeticsByCategory>;
   detail: LeagueDetail;
+  isCurrentWeek: boolean;
+  matchup: WeeklyMatchupRow;
   userId: string;
 }) {
   const router = useRouter();
+  const involvesUser = matchup.home_user_id === userId || matchup.away_user_id === userId;
+  const homeName = getDisplayName(detail, matchup.home_user_id);
+  const awayName = getAwayDisplayName(detail, matchup);
+  const homeIsUser = matchup.home_user_id === userId;
+  const awayIsUser = matchup.away_user_id === userId;
+  const homeIsWinner = !!matchup.winner_id && matchup.winner_id === matchup.home_user_id;
+  const awayIsWinner = !!matchup.winner_id && matchup.winner_id === matchup.away_user_id;
+  const isPlayed = matchup.home_profit !== null || matchup.away_profit !== null;
+  const isBye = !matchup.away_user_id;
+
+  return (
+    <PressableScale
+      onPress={() =>
+        router.push({
+          pathname: '/matchups/[matchupId]',
+          params: { matchupId: matchup.id },
+        })
+      }>
+      <Card tone={involvesUser ? 'highlight' : 'default'}>
+        <View className="gap-3">
+          {(involvesUser || isCurrentWeek) && !isBye ? (
+            <View className="flex-row items-center justify-between">
+              {involvesUser ? (
+                <View className="flex-row items-center gap-1.5 rounded-full border border-electric-green/40 bg-electric-green/15 px-2 py-0.5">
+                  <Ionicons color={THEME_COLORS.electricGreen} name="flash" size={10} />
+                  <Text
+                    className="text-[9px] font-black uppercase text-electric-green"
+                    style={{ letterSpacing: 1.4 }}>
+                    Your Matchup
+                  </Text>
+                </View>
+              ) : (
+                <View />
+              )}
+              {isCurrentWeek ? (
+                <View className="flex-row items-center gap-1.5 rounded-full border border-gold/40 bg-gold/15 px-2 py-0.5">
+                  <View className="h-1.5 w-1.5 rounded-full bg-gold" />
+                  <Text
+                    className="text-[9px] font-black uppercase text-gold"
+                    style={{ letterSpacing: 1.4 }}>
+                    Live
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
+
+          <View className="flex-row items-center gap-3">
+            <View className="flex-1 flex-row items-center gap-2.5">
+              <CosmeticAvatar
+                cosmetics={cosmeticsByUserId[matchup.home_user_id]}
+                name={homeName}
+                size="sm"
+              />
+              <View className="flex-1">
+                <Text
+                  className={cn(
+                    'text-base font-black',
+                    homeIsUser ? 'text-electric-green' : 'text-white',
+                  )}
+                  numberOfLines={1}
+                  style={{ letterSpacing: -0.3 }}>
+                  {homeName}
+                </Text>
+                {isPlayed ? (
+                  <Text className={cn('text-xs font-black', getProfitTone(matchup.home_profit ?? 0))}>
+                    {matchup.home_profit === null ? '–' : formatProfit(matchup.home_profit)}
+                  </Text>
+                ) : (
+                  <Text className="text-[10px] font-semibold uppercase text-white/40" style={{ letterSpacing: 1.2 }}>
+                    Home
+                  </Text>
+                )}
+              </View>
+              {homeIsWinner ? (
+                <Ionicons color={THEME_COLORS.electricGreen} name="trophy" size={14} />
+              ) : null}
+            </View>
+
+            <View className="h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/[0.05]">
+              <Text
+                className="text-[10px] font-black uppercase text-white/65"
+                style={{ letterSpacing: 1 }}>
+                VS
+              </Text>
+            </View>
+
+            <View className="flex-1 flex-row items-center justify-end gap-2.5">
+              {awayIsWinner ? (
+                <Ionicons color={THEME_COLORS.electricGreen} name="trophy" size={14} />
+              ) : null}
+              <View className="flex-1 items-end">
+                <Text
+                  className={cn(
+                    'text-base font-black',
+                    isBye
+                      ? 'text-white/45'
+                      : awayIsUser
+                        ? 'text-electric-green'
+                        : 'text-white',
+                  )}
+                  numberOfLines={1}
+                  style={{ letterSpacing: -0.3 }}>
+                  {awayName}
+                </Text>
+                {isBye ? (
+                  <Text className="text-[10px] font-semibold uppercase text-white/40" style={{ letterSpacing: 1.2 }}>
+                    Rest week
+                  </Text>
+                ) : isPlayed ? (
+                  <Text className={cn('text-xs font-black', getProfitTone(matchup.away_profit ?? 0))}>
+                    {matchup.away_profit === null ? '–' : formatProfit(matchup.away_profit)}
+                  </Text>
+                ) : (
+                  <Text className="text-[10px] font-semibold uppercase text-white/40" style={{ letterSpacing: 1.2 }}>
+                    Away
+                  </Text>
+                )}
+              </View>
+              {!isBye ? (
+                <CosmeticAvatar
+                  cosmetics={
+                    matchup.away_user_id ? cosmeticsByUserId[matchup.away_user_id] : undefined
+                  }
+                  name={awayName}
+                  size="sm"
+                />
+              ) : (
+                <View className="h-9 w-9 items-center justify-center rounded-2xl border border-dashed border-white/15 bg-white/[0.02]">
+                  <Ionicons color="rgba(255,255,255,0.35)" name="moon" size={14} />
+                </View>
+              )}
+            </View>
+          </View>
+        </View>
+      </Card>
+    </PressableScale>
+  );
+}
+
+function getScheduleWeekMeta(weekNumber: number) {
+  const isPlayoff = weekNumber > 14;
+  const isChampionship = weekNumber === 17;
+  const sectionLabel = isChampionship
+    ? 'Championship'
+    : isPlayoff
+      ? `Playoff Round ${weekNumber - 14}`
+      : 'Regular Season';
+
+  const accentColor = isChampionship
+    ? THEME_COLORS.gold
+    : isPlayoff
+      ? THEME_COLORS.cyanAccent
+      : THEME_COLORS.electricGreen;
+
+  return {
+    accentColor,
+    isChampionship,
+    isPlayoff,
+    sectionLabel,
+  };
+}
+
+function ScheduleWeekHeader({
+  isCurrentWeek,
+  weekNumber,
+}: {
+  isCurrentWeek: boolean;
+  weekNumber: number;
+}) {
+  const { accentColor, isChampionship, isPlayoff, sectionLabel } =
+    getScheduleWeekMeta(weekNumber);
+
+  return (
+    <View
+      className="overflow-hidden rounded-2xl border"
+      style={{
+        backgroundColor: isCurrentWeek ? `${accentColor}14` : 'rgba(255,255,255,0.03)',
+        borderColor: isCurrentWeek ? `${accentColor}66` : 'rgba(255,255,255,0.08)',
+        shadowColor: isCurrentWeek ? accentColor : 'transparent',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: isCurrentWeek ? 0.4 : 0,
+        shadowRadius: isCurrentWeek ? 14 : 0,
+      }}>
+      <View
+        className="flex-row items-center justify-between px-4 py-3"
+        style={{
+          borderLeftColor: accentColor,
+          borderLeftWidth: 3,
+        }}>
+        <View className="flex-row items-center gap-3">
+          <View
+            className="h-8 w-8 items-center justify-center rounded-xl"
+            style={{
+              backgroundColor: `${accentColor}26`,
+              borderColor: `${accentColor}66`,
+              borderWidth: 1,
+            }}>
+            <Text
+              className="text-[11px] font-black"
+              style={{ color: accentColor, letterSpacing: -0.2 }}>
+              {weekNumber}
+            </Text>
+          </View>
+          <View>
+            <Text
+              className="text-[9px] font-black uppercase"
+              style={{ color: accentColor, letterSpacing: 2 }}>
+              {sectionLabel}
+            </Text>
+            <Text
+              className="text-base font-black uppercase text-white"
+              style={{ letterSpacing: -0.3 }}>
+              Week {weekNumber}
+            </Text>
+          </View>
+        </View>
+        {isCurrentWeek ? (
+          <View
+            className="flex-row items-center gap-1.5 rounded-full px-2.5 py-1"
+            style={{
+              backgroundColor: `${accentColor}26`,
+              borderColor: `${accentColor}66`,
+              borderWidth: 1,
+            }}>
+            <View
+              className="h-1.5 w-1.5 rounded-full"
+              style={{ backgroundColor: accentColor }}
+            />
+            <Text
+              className="text-[9px] font-black uppercase"
+              style={{ color: accentColor, letterSpacing: 1.4 }}>
+              This Week
+            </Text>
+          </View>
+        ) : isChampionship ? (
+          <Badge label="Title Game" tone="gold" />
+        ) : isPlayoff ? (
+          <Badge label="Playoffs" tone="cyan" />
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+function PlayoffPlaceholderCard({ weekNumber }: { weekNumber: PlayoffPlaceholderWeek }) {
+  const description =
+    weekNumber === 17
+      ? 'TBD - Based on Week 16 results'
+      : 'TBD - Based on regular season standings';
+
+  return (
+    <Card>
+      <View className="items-center gap-3 py-3">
+        <View className="h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-white/[0.05]">
+          <Ionicons color="rgba(255,255,255,0.65)" name="git-branch" size={18} />
+        </View>
+        <View className="items-center gap-1">
+          <Text
+            className="text-lg font-black uppercase text-white"
+            style={{ letterSpacing: -0.3 }}>
+            Matchup TBD
+          </Text>
+          <Text className="text-center text-sm font-semibold text-white/55">
+            {description}
+          </Text>
+        </View>
+      </View>
+    </Card>
+  );
+}
+
+function ScheduleList({
+  canStartSeason,
+  cosmeticsByUserId,
+  detail,
+  onStartSeason,
+  startSeasonError,
+  startingSeason,
+  userId,
+}: {
+  canStartSeason: boolean;
+  cosmeticsByUserId: Record<string, EquippedCosmeticsByCategory>;
+  detail: LeagueDetail;
+  onStartSeason: () => void;
+  startSeasonError?: string;
+  startingSeason: boolean;
+  userId: string;
+}) {
+  const matchupsByWeek = useMemo(() => {
+    const grouped = detail.matchups.reduce<Record<number, WeeklyMatchupRow[]>>(
+      (accumulator, matchup) => {
+        accumulator[matchup.week_number] = accumulator[matchup.week_number] ?? [];
+        accumulator[matchup.week_number].push(matchup);
+        return accumulator;
+      },
+      {},
+    );
+
+    return Object.entries(grouped)
+      .map(([weekNumber, matchups]) => ({
+        matchups,
+        weekNumber: Number(weekNumber),
+      }))
+      .sort((left, right) => left.weekNumber - right.weekNumber);
+  }, [detail.matchups]);
 
   if (detail.matchups.length === 0) {
     return (
-      <Card>
-        <Text className="text-base font-semibold text-white/55">
-          No matchups have been generated yet.
-        </Text>
-      </Card>
+      <ScheduleEmptyState
+        canStartSeason={canStartSeason}
+        detail={detail}
+        onStartSeason={onStartSeason}
+        startSeasonError={startSeasonError}
+        startingSeason={startingSeason}
+        userId={userId}
+      />
     );
   }
 
+  const currentWeek = detail.league.current_week;
+  const placeholderWeeks = PLAYOFF_PLACEHOLDER_WEEKS.filter(
+    (weekNumber) => !matchupsByWeek.some((week) => week.weekNumber === weekNumber),
+  );
+
   return (
-    <View className="gap-3">
-      {detail.matchups.map((matchup) => {
-        const involvesUser =
-          matchup.home_user_id === userId || matchup.away_user_id === userId;
+    <View className="gap-5">
+      {matchupsByWeek.map(({ matchups, weekNumber }) => {
+        const isCurrentWeek = weekNumber === currentWeek;
+
         return (
-          <PressableScale
-            key={matchup.id}
-            onPress={() =>
-              router.push({
-                pathname: '/matchups/[matchupId]',
-                params: { matchupId: matchup.id },
-              })
-            }>
-            <Card tone={involvesUser ? 'highlight' : 'default'}>
-              <View className="gap-3">
-                <View className="flex-row items-center justify-between">
-                  <Text
-                    className="text-[10px] font-black uppercase text-white/55"
-                    style={{ letterSpacing: 2 }}>
-                    Week {matchup.week_number}
-                  </Text>
-                  {matchup.is_championship ? (
-                    <Badge label="Championship" tone="gold" />
-                  ) : matchup.is_playoff ? (
-                    <Badge label="Playoff" tone="cyan" />
-                  ) : involvesUser ? (
-                    <Badge label="Your Game" tone="green" />
-                  ) : null}
-                </View>
-                <MatchupRow
+          <View className="gap-3" key={weekNumber}>
+            <ScheduleWeekHeader isCurrentWeek={isCurrentWeek} weekNumber={weekNumber} />
+
+            <View className="gap-2.5">
+              {matchups.map((matchup) => (
+                <ScheduleMatchupCard
                   cosmeticsByUserId={cosmeticsByUserId}
                   detail={detail}
+                  isCurrentWeek={isCurrentWeek}
+                  key={matchup.id}
                   matchup={matchup}
+                  userId={userId}
                 />
-              </View>
-            </Card>
-          </PressableScale>
+              ))}
+            </View>
+          </View>
         );
       })}
+      {placeholderWeeks.map((weekNumber) => (
+        <View className="gap-3" key={`playoff-placeholder-${weekNumber}`}>
+          <ScheduleWeekHeader
+            isCurrentWeek={weekNumber === currentWeek}
+            weekNumber={weekNumber}
+          />
+          <PlayoffPlaceholderCard weekNumber={weekNumber} />
+        </View>
+      ))}
     </View>
   );
 }
@@ -1095,7 +1547,7 @@ function SharedBetCard({
               <View className="flex-row items-center gap-1 rounded-full border border-gold/55 bg-gold/15 px-2 py-0.5">
                 <Ionicons color={THEME_COLORS.gold} name="star" size={10} />
                 <Text className="text-[9px] font-black uppercase text-gold" style={{ letterSpacing: 1 }}>
-                  Lock 1.5x
+                  Pick of the Week 1.5x
                 </Text>
               </View>
             ) : null}
@@ -1113,11 +1565,16 @@ function SharedBetCard({
         <View className="mt-3 gap-1.5">
           {metadata.legs.map((leg, index) => (
             <View key={`${leg.selection}-${index}`} className="flex-row items-center justify-between gap-2">
-              <Text className="flex-1 text-xs font-semibold text-white/75" numberOfLines={1}>
-                {metadata.betType === 'teaser' && leg.originalLine !== null && leg.adjustedLine !== null
-                  ? `${leg.selection} ${leg.originalLine} → ${leg.adjustedLine}`
-                  : leg.selection}
-              </Text>
+              <View className="flex-1 flex-row items-center gap-2">
+                {leg.market !== 'over_under' ? (
+                  <NflTeamLogo size={20} teamName={leg.selection} />
+                ) : null}
+                <Text className="flex-1 text-xs font-semibold text-white/75" numberOfLines={1}>
+                  {metadata.betType === 'teaser' && leg.originalLine !== null && leg.adjustedLine !== null
+                    ? `${leg.selection} ${leg.originalLine} → ${leg.adjustedLine}`
+                    : leg.selection}
+                </Text>
+              </View>
               <Text className="text-[10px] font-black uppercase text-white/45">
                 {formatAmericanOdds(leg.odds)}
               </Text>
@@ -1575,13 +2032,21 @@ function TabSwitcher({
 }
 
 function TabContent({
+  canStartSeason,
   cosmeticsByUserId,
   detail,
+  onStartSeason,
+  startSeasonError,
+  startingSeason,
   tab,
   userId,
 }: {
+  canStartSeason: boolean;
   cosmeticsByUserId: Record<string, EquippedCosmeticsByCategory>;
   detail: LeagueDetail;
+  onStartSeason: () => void;
+  startSeasonError?: string;
+  startingSeason: boolean;
   tab: DetailTab;
   userId: string;
 }) {
@@ -1591,7 +2056,15 @@ function TabContent({
         <StandingsBoard cosmeticsByUserId={cosmeticsByUserId} detail={detail} userId={userId} />
       ) : null}
       {tab === 'schedule' ? (
-        <ScheduleList cosmeticsByUserId={cosmeticsByUserId} detail={detail} userId={userId} />
+        <ScheduleList
+          canStartSeason={canStartSeason}
+          cosmeticsByUserId={cosmeticsByUserId}
+          detail={detail}
+          onStartSeason={onStartSeason}
+          startSeasonError={startSeasonError}
+          startingSeason={startingSeason}
+          userId={userId}
+        />
       ) : null}
       {tab === 'members' ? (
         <MembersList cosmeticsByUserId={cosmeticsByUserId} detail={detail} />
@@ -1660,9 +2133,11 @@ export default function LeagueDetailScreen() {
   const resolvedInitialTab = getParamValue(initialTab);
   const { user } = useAuth();
   const detailQuery = useLeagueDetail(resolvedLeagueId, user?.id);
+  const generateSchedule = useGenerateScheduleMutation(user?.id);
   const awardsQuery = useWeeklyAwards(resolvedLeagueId, detailQuery.data?.league.current_week);
   const detailRefetchRef = useRef(detailQuery.refetch);
   const awardsRefetchRef = useRef(awardsQuery.refetch);
+  const fullLeagueFallbackAttempts = useRef<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState<DetailTab>('standings');
   const cosmeticUserIds = useMemo(
     () =>
@@ -1699,6 +2174,28 @@ export default function LeagueDetailScreen() {
     }, [resolvedLeagueId, user?.id]),
   );
 
+  useEffect(() => {
+    const detail = detailQuery.data;
+
+    if (!detail || activeTab !== 'schedule') {
+      return;
+    }
+
+    const shouldGenerateFullLeagueSchedule =
+      detail.league.type === 'h2h' &&
+      detail.members.length >= detail.league.max_members &&
+      detail.matchups.length === 0 &&
+      !generateSchedule.isPending &&
+      !fullLeagueFallbackAttempts.current.has(detail.league.id);
+
+    if (!shouldGenerateFullLeagueSchedule) {
+      return;
+    }
+
+    fullLeagueFallbackAttempts.current.add(detail.league.id);
+    generateSchedule.mutate(detail.league.id);
+  }, [activeTab, detailQuery.data, generateSchedule]);
+
   if (detailQuery.isLoading) {
     return <DetailSkeleton />;
   }
@@ -1727,6 +2224,16 @@ export default function LeagueDetailScreen() {
   const userId = user.id;
   const currentUserMatchup = detail.currentUserMatchup;
   const cosmeticsByUserId = cosmeticsQuery.data ?? {};
+  const isLeagueFull = detail.members.length >= detail.league.max_members;
+  const canStartSeason =
+    detail.league.type === 'h2h' &&
+    detail.league.commissioner_id === userId &&
+    detail.members.length >= 2 &&
+    detail.league.status === 'drafting' &&
+    detail.matchups.length === 0;
+  const handleStartSeason = () => {
+    generateSchedule.mutate(detail.league.id);
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-arena-bg">
@@ -1742,7 +2249,7 @@ export default function LeagueDetailScreen() {
         }
         showsVerticalScrollIndicator={false}>
         <HeroHeader detail={detail} />
-        <InviteCodeCard detail={detail} />
+        {!isLeagueFull ? <InviteCodeCard detail={detail} /> : null}
 
         <SeasonAwardsCard cosmeticsByUserId={cosmeticsByUserId} detail={detail} />
         {awardsQuery.data ? <WeeklyAwardsCard awards={awardsQuery.data} /> : null}
@@ -1766,8 +2273,12 @@ export default function LeagueDetailScreen() {
 
         <TabSwitcher activeTab={activeTab} onChange={setActiveTab} />
         <TabContent
+          canStartSeason={canStartSeason}
           cosmeticsByUserId={cosmeticsByUserId}
           detail={detail}
+          onStartSeason={handleStartSeason}
+          startSeasonError={generateSchedule.error?.message}
+          startingSeason={generateSchedule.isPending}
           tab={activeTab}
           userId={userId}
         />

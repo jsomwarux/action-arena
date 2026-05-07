@@ -317,6 +317,42 @@ export function useJoinLeagueMutation(userId: string | undefined) {
   });
 }
 
+export function useGenerateScheduleMutation(userId: string | undefined) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (leagueId: string) => {
+      if (!userId) {
+        throw new Error('You must be signed in to generate a schedule.');
+      }
+
+      const { data, error } = await supabase.rpc('activate_league_and_generate_schedule', {
+        p_league_id: leagueId,
+      });
+
+      return assertSupabaseResult(data, error);
+    },
+    onSuccess: async (_, leagueId) => {
+      logAnalyticsEvent('league_schedule_generated', {
+        league_id: leagueId,
+        user_id: userId,
+      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: leagueKeys.detail(leagueId) }),
+        queryClient.invalidateQueries({ queryKey: leagueKeys.mine(userId) }),
+        queryClient.invalidateQueries({ queryKey: ['home-dashboard', userId] }),
+      ]);
+    },
+    onError: (error, leagueId) => {
+      console.error('[league_schedule_generation_failed]', {
+        error: error instanceof Error ? error.message : String(error),
+        league_id: leagueId,
+        user_id: userId,
+      });
+    },
+  });
+}
+
 export function useLeaveLeagueMutation(userId: string | undefined) {
   const queryClient = useQueryClient();
 

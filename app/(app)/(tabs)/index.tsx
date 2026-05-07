@@ -204,7 +204,7 @@ function ActionNeeded({ cards }: { cards: HomeLeagueCard[] }) {
                       </Text>
                       <View className="flex-row items-center gap-2">
                         <Text className="text-sm font-semibold text-white/70">
-                          {needed} more {needed === 1 ? 'pick' : 'picks'} until lineup is locked
+                          {needed} more {needed === 1 ? 'pick' : 'picks'} until lineup is ready
                         </Text>
                       </View>
                     </View>

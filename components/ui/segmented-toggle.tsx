@@ -2,7 +2,6 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Pressable, Text, View } from 'react-native';
 
 import { THEME_COLORS } from '@/constants/theme';
-import { cn } from '@/lib/cn';
 
 export type SegmentedAccent = 'green' | 'amber' | 'cyan' | 'gold' | 'red' | 'white';
 
@@ -25,12 +24,16 @@ const ACCENT_HEX: Record<SegmentedAccent, string> = {
   white: THEME_COLORS.textPrimary,
 };
 
-function withAlpha(hex: string, alpha: number) {
-  const value = Math.round(alpha * 255)
-    .toString(16)
-    .padStart(2, '0');
-  return `${hex}${value}`;
-}
+// Bright accents (cyan/green/gold/amber) read best with the near-black arena
+// background as the on-pill text color. Coral red needs white for contrast.
+const ON_ACCENT_TEXT: Record<SegmentedAccent, string> = {
+  amber: '#000000',
+  cyan: '#000000',
+  gold: '#000000',
+  green: '#000000',
+  red: '#FFFFFF',
+  white: '#000000',
+};
 
 type SegmentedToggleProps<V extends string | number> = {
   accent?: SegmentedAccent;
@@ -47,67 +50,87 @@ export function SegmentedToggle<V extends string | number>({
   options,
   value,
 }: SegmentedToggleProps<V>) {
+  const verticalPadding = compact ? 8 : 10;
+  const textSize = compact ? 10 : 11;
+
   return (
     <View
       className="rounded-2xl border border-white/[0.08] bg-white/[0.04]"
-      style={{ padding: 4 }}>
-      <View className={cn('flex-row', compact ? 'h-9' : 'h-12')}>
+      style={{
+        alignSelf: 'stretch',
+        flexDirection: 'row',
+        padding: 4,
+        width: '100%',
+      }}>
+      <View
+        style={{
+          alignItems: 'stretch',
+          flexDirection: 'row',
+          minHeight: compact ? 36 : 48,
+          width: '100%',
+        }}>
         {options.map((option) => {
           const isActive = option.value === value;
           const optionAccent = option.accent ?? accent;
           const colorHex = ACCENT_HEX[optionAccent];
-          const activeBg = withAlpha(colorHex, 0.18);
-          const activeBorder = withAlpha(colorHex, 0.5);
+          const onAccentText = ON_ACCENT_TEXT[optionAccent];
+          const idleText = 'rgba(255,255,255,0.6)';
 
           return (
-            <Pressable
-              accessibilityRole="tab"
-              accessibilityState={{ disabled: option.disabled, selected: isActive }}
-              disabled={option.disabled}
+            <View
               key={String(option.value)}
-              onPress={() => onChange(option.value)}
-              style={({ pressed }) => ({
-                alignItems: 'center',
+              style={{
                 flex: 1,
-                flexDirection: 'row',
-                gap: 6,
-                justifyContent: 'center',
-                opacity: option.disabled ? 0.35 : pressed ? 0.78 : 1,
-              })}>
-              <View
-                style={{
-                  alignItems: 'center',
-                  backgroundColor: isActive ? activeBg : 'transparent',
-                  borderColor: isActive ? activeBorder : 'transparent',
-                  borderRadius: 12,
-                  borderWidth: 1,
-                  flex: 1,
-                  flexDirection: 'row',
-                  gap: 6,
-                  height: '100%',
-                  justifyContent: 'center',
-                  shadowColor: isActive ? colorHex : 'transparent',
-                  shadowOffset: { width: 0, height: 0 },
-                  shadowOpacity: isActive ? 0.4 : 0,
-                  shadowRadius: isActive ? 10 : 0,
-                }}>
-                {option.icon ? (
-                  <Ionicons
-                    color={isActive ? colorHex : 'rgba(255,255,255,0.55)'}
-                    name={option.icon}
-                    size={compact ? 12 : 14}
-                  />
-                ) : null}
-                <Text
-                  className={cn('font-black uppercase', compact ? 'text-[10px]' : 'text-[11px]')}
+                flexBasis: 0,
+                minWidth: 0,
+              }}>
+              <Pressable
+                accessibilityRole="tab"
+                accessibilityState={{ disabled: option.disabled, selected: isActive }}
+                disabled={option.disabled}
+                onPress={() => onChange(option.value)}
+                style={({ pressed }) => ({
+                  alignSelf: 'stretch',
+                  minWidth: 0,
+                  opacity: option.disabled ? 0.35 : pressed ? 0.85 : 1,
+                })}>
+                <View
                   style={{
-                    color: isActive ? colorHex : 'rgba(255,255,255,0.6)',
-                    letterSpacing: 1.2,
+                    alignItems: 'center',
+                    backgroundColor: isActive ? colorHex : 'transparent',
+                    borderRadius: 12,
+                    flexDirection: 'row',
+                    gap: compact ? 4 : 6,
+                    justifyContent: 'center',
+                    minHeight: compact ? 36 : 48,
+                    minWidth: 0,
+                    paddingHorizontal: compact ? 4 : 8,
+                    paddingVertical: verticalPadding,
+                    width: '100%',
                   }}>
-                  {option.label}
-                </Text>
-              </View>
-            </Pressable>
+                  {option.icon ? (
+                    <Ionicons
+                      color={isActive ? onAccentText : idleText}
+                      name={option.icon}
+                      size={compact ? 12 : 14}
+                    />
+                  ) : null}
+                  <Text
+                    numberOfLines={1}
+                    style={{
+                      color: isActive ? onAccentText : idleText,
+                      fontSize: textSize,
+                      fontWeight: isActive ? '900' : '400',
+                      includeFontPadding: false,
+                      letterSpacing: compact ? 0.9 : 1.2,
+                      lineHeight: compact ? 13 : 15,
+                      textTransform: 'uppercase',
+                    }}>
+                    {option.label}
+                  </Text>
+                </View>
+              </Pressable>
+            </View>
           );
         })}
       </View>

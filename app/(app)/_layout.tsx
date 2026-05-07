@@ -1,6 +1,7 @@
 import { Redirect, Stack, usePathname } from 'expo-router';
 import { ActivityIndicator, View } from 'react-native';
 
+import { BackButton } from '@/components/ui/back-button';
 import { THEME_COLORS } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
 import { hasSeenActionArenaDisclosure } from '@/hooks/use-disclosure';
@@ -30,9 +31,11 @@ export default function AppLayout() {
       screenOptions={{
         contentStyle: { backgroundColor: THEME_COLORS.background },
         headerBackButtonDisplayMode: 'minimal',
+        headerBackVisible: false,
+        headerLeft: () => <BackButton />,
         headerShadowVisible: false,
         headerStyle: { backgroundColor: THEME_COLORS.background },
-        headerTintColor: THEME_COLORS.textPrimary,
+        headerTintColor: THEME_COLORS.electricGreen,
         headerTitleStyle: {
           fontWeight: '900',
         },

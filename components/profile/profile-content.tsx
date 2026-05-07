@@ -317,7 +317,7 @@ function LockPill() {
       }}>
       <Ionicons color={THEME_COLORS.gold} name="star" size={11} />
       <Text className="text-[10px] font-black uppercase text-gold" style={{ letterSpacing: 1.2 }}>
-        Lock 1.5x
+        Pick of the Week 1.5x
       </Text>
     </View>
   );
@@ -910,7 +910,7 @@ function AchievementBadge({ achievement, index }: { achievement: AchievementDisp
           <Text
             className="text-[9px] font-black uppercase text-white/45"
             style={{ letterSpacing: 1.3 }}>
-            Locked
+            Not earned
           </Text>
         </View>
       )}

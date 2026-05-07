@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQuery } from '@tanstack/react-query';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { ScrollView, Text, View } from 'react-native';
 
 import { LockEffect } from '@/components/cosmetics';
@@ -61,7 +61,6 @@ function useBetDetail(betId: string | undefined) {
 }
 
 export default function BetDetailScreen() {
-  const router = useRouter();
   const { user } = useAuth();
   const { betId } = useLocalSearchParams();
   const resolvedBetId = getParamValue(betId);
@@ -98,7 +97,7 @@ export default function BetDetailScreen() {
                           <Text
                             className="text-[10px] font-black uppercase text-gold"
                             style={{ letterSpacing: 1.2 }}>
-                            Lock 1.5x
+                            Pick of the Week 1.5x
                           </Text>
                         </View>
                       ) : null}
@@ -186,7 +185,7 @@ export default function BetDetailScreen() {
               <Text className="text-center text-base font-semibold text-white/55">
                 This pick could not be loaded.
               </Text>
-              <Button onPress={() => router.back()} title="Go Back" variant="secondary" />
+              <Button onPress={() => betQuery.refetch()} title="Retry" variant="secondary" />
             </View>
           </Card>
         ) : null}

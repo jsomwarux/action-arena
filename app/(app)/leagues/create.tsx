@@ -171,7 +171,7 @@ export default function CreateLeagueScreen() {
         type,
         visibility,
       });
-      router.replace({ pathname: '/leagues/[leagueId]', params: { leagueId } });
+      router.replace({ pathname: '/(app)/(tabs)/leagues/[leagueId]', params: { leagueId } });
     } catch {
       Alert.alert('Could not create league', CREATE_LEAGUE_ERROR_MESSAGE);
     }
