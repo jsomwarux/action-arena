@@ -37,6 +37,18 @@ export type MixedBetSubmission = {
   legs: BetSubmissionLeg[];
 };
 
+export type BetEditSubmissionLeg = BetSubmissionLeg & {
+  id: string;
+};
+
+export type BetEditSubmission = {
+  bet_id: string;
+  odds: number;
+  potential_payout: number;
+  teaser_points: TeaserPoints | null;
+  legs: BetEditSubmissionLeg[];
+};
+
 export type PlacedBet = BetRow & {
   bet_legs: BetLegRow[];
 };
@@ -209,4 +221,133 @@ export function useSubmitStraightBetsMutation(
   weekNumber: number | undefined,
 ) {
   return useSubmitBetsMutation(leagueId, userId, weekNumber);
+}
+
+function optimisticEditedBet(previous: PlacedBet[], edit: BetEditSubmission): PlacedBet[] {
+  return previous.map((bet) => {
+    if (bet.id !== edit.bet_id) {
+      return bet;
+    }
+
+    return {
+      ...bet,
+      odds: edit.odds,
+      potential_payout: edit.potential_payout,
+      teaser_points: edit.teaser_points,
+      bet_legs: bet.bet_legs.map((leg) => {
+        const editedLeg = edit.legs.find((item) => item.id === leg.id);
+        if (!editedLeg) {
+          return leg;
+        }
+
+        return {
+          ...leg,
+          adjusted_line: editedLeg.adjusted_line,
+          game_id: editedLeg.game_id,
+          game_start_time: editedLeg.game_start_time,
+          leg_odds: editedLeg.leg_odds,
+          locked: false,
+          market: editedLeg.market,
+          original_line: editedLeg.original_line,
+          result: 'pending',
+          selection: editedLeg.selection,
+        };
+      }),
+    };
+  });
+}
+
+function optimisticPickOfWeek(previous: PlacedBet[], betId: string): PlacedBet[] {
+  return previous.map((bet) => ({
+    ...bet,
+    is_lock: bet.id === betId,
+  }));
+}
+
+export function useUpdatePlacedBetMutation(
+  leagueId: string | undefined,
+  userId: string | undefined,
+  weekNumber: number | undefined,
+) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    onMutate: async (edit: BetEditSubmission) => {
+      const queryKey = straightBetKeys.placed(leagueId, userId, weekNumber);
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<PlacedBet[]>(queryKey) ?? [];
+
+      queryClient.setQueryData<PlacedBet[]>(queryKey, optimisticEditedBet(previous, edit));
+
+      return { previous };
+    },
+    mutationFn: async (edit: BetEditSubmission) => {
+      const { data, error } = await supabase.rpc('update_submitted_bet', {
+        p_bet_id: edit.bet_id,
+        p_legs: edit.legs as unknown as Json,
+        p_odds: edit.odds,
+        p_potential_payout: edit.potential_payout,
+        p_teaser_points: edit.teaser_points,
+      });
+
+      if (error) {
+        throw new Error(normalizeSubmitPicksError(error.message));
+      }
+
+      return assertSupabaseResult(data, null);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: straightBetKeys.placed(leagueId, userId, weekNumber),
+      });
+    },
+    onError: (_error, _variables, context) => {
+      queryClient.setQueryData(
+        straightBetKeys.placed(leagueId, userId, weekNumber),
+        context?.previous ?? [],
+      );
+    },
+  });
+}
+
+export function useSetPickOfWeekMutation(
+  leagueId: string | undefined,
+  userId: string | undefined,
+  weekNumber: number | undefined,
+) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    onMutate: async (betId: string) => {
+      const queryKey = straightBetKeys.placed(leagueId, userId, weekNumber);
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<PlacedBet[]>(queryKey) ?? [];
+
+      queryClient.setQueryData<PlacedBet[]>(queryKey, optimisticPickOfWeek(previous, betId));
+
+      return { previous };
+    },
+    mutationFn: async (betId: string) => {
+      const { data, error } = await supabase.rpc('set_pick_of_week', {
+        p_bet_id: betId,
+      });
+
+      if (error) {
+        throw new Error(normalizeSubmitPicksError(error.message));
+      }
+
+      return assertSupabaseResult(data, null);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: straightBetKeys.placed(leagueId, userId, weekNumber),
+      });
+    },
+    onError: (_error, _variables, context) => {
+      queryClient.setQueryData(
+        straightBetKeys.placed(leagueId, userId, weekNumber),
+        context?.previous ?? [],
+      );
+    },
+  });
 }

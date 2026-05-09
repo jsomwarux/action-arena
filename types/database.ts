@@ -438,6 +438,32 @@ export type OddsReleaseWindowRow = {
   week_number: number;
 };
 
+export type LeagueWeekSlateGameRow = {
+  away_team: string | null;
+  commence_time: string;
+  created_at: string;
+  game_id: string;
+  home_team: string | null;
+  id: string;
+  league_id: string;
+  updated_at: string;
+  week_number: number;
+};
+
+export type LeagueWeekSlateGameInsert = {
+  away_team?: string | null;
+  commence_time: string;
+  created_at?: string;
+  game_id: string;
+  home_team?: string | null;
+  id?: string;
+  league_id: string;
+  updated_at?: string;
+  week_number: number;
+};
+
+export type LeagueWeekSlateGameUpdate = Partial<LeagueWeekSlateGameInsert>;
+
 export type SeasonAward = {
   award_key: SeasonAwardKey;
   award_label: string;
@@ -556,11 +582,25 @@ export type Database = {
         };
         Returns: boolean;
       };
+      can_view_bet_details: {
+        Args: {
+          p_bet_user_id: string;
+          p_league_id: string;
+          p_week_number: number;
+        };
+        Returns: boolean;
+      };
       equip_cosmetic: {
         Args: {
           p_item_id: string;
         };
         Returns: string;
+      };
+      get_matchup_detail: {
+        Args: {
+          p_matchup_id: string;
+        };
+        Returns: Json;
       };
       has_season_pass: {
         Args: {
@@ -580,6 +620,20 @@ export type Database = {
           p_invite_code: string;
         };
         Returns: string;
+      };
+      league_week_picks_revealed: {
+        Args: {
+          p_league_id: string;
+          p_week_number: number;
+        };
+        Returns: boolean;
+      };
+      league_week_reveal_time: {
+        Args: {
+          p_league_id: string;
+          p_week_number: number;
+        };
+        Returns: string | null;
       };
       enqueue_weekly_award_notification: {
         Args: {
@@ -604,6 +658,12 @@ export type Database = {
         Args: {
           p_code: string;
           p_season_year?: number;
+        };
+        Returns: string;
+      };
+      set_pick_of_week: {
+        Args: {
+          p_bet_id: string;
         };
         Returns: string;
       };
@@ -635,6 +695,24 @@ export type Database = {
           p_week_number: number;
         };
         Returns: string[];
+      };
+      sync_league_week_slate: {
+        Args: {
+          p_games: Json;
+          p_league_id: string;
+          p_week_number: number;
+        };
+        Returns: string | null;
+      };
+      update_submitted_bet: {
+        Args: {
+          p_bet_id: string;
+          p_legs: Json;
+          p_odds: number;
+          p_potential_payout: number;
+          p_teaser_points: number | null;
+        };
+        Returns: string;
       };
     };
     Tables: {
@@ -727,6 +805,20 @@ export type Database = {
         ];
         Row: LeagueChatMessageRow;
         Update: LeagueChatMessageUpdate;
+      };
+      league_week_slate_games: {
+        Insert: LeagueWeekSlateGameInsert;
+        Relationships: [
+          {
+            columns: ['league_id'];
+            foreignKeyName: 'league_week_slate_games_league_id_fkey';
+            isOneToOne: false;
+            referencedColumns: ['id'];
+            referencedRelation: 'leagues';
+          },
+        ];
+        Row: LeagueWeekSlateGameRow;
+        Update: LeagueWeekSlateGameUpdate;
       };
       seasons: {
         Insert: SeasonInsert;

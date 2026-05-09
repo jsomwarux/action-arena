@@ -22,6 +22,7 @@ import { useLocalFlag } from '@/hooks/use-local-flags';
 import {
   type BetWithLegs,
   type MatchupDetail,
+  type MatchupPickVisibility,
   useMatchupDetail,
 } from '@/hooks/use-matchups';
 import { useSeasonPass } from '@/hooks/use-season-pass';
@@ -118,29 +119,51 @@ function isInProgress(bet: BetWithLegs) {
 }
 
 function selectionLabel(leg: BetLegRow, betType: BetType) {
+  // leg.selection already embeds the spread/total line for non-moneyline markets
+  // (e.g. "Dallas Cowboys +2.5", "Under 44.5"), so we only append the line
+  // transformation for teasers — never re-append the base line.
   if (leg.market === 'moneyline') {
     return leg.selection;
   }
-  if (leg.market === 'spread') {
-    if (betType === 'teaser' && leg.original_line !== null && leg.adjusted_line !== null) {
-      return `${leg.selection} ${leg.original_line > 0 ? '+' : ''}${leg.original_line} → ${
-        leg.adjusted_line > 0 ? '+' : ''
-      }${leg.adjusted_line}`;
-    }
-    return `${leg.selection} ${leg.adjusted_line && leg.adjusted_line > 0 ? '+' : ''}${
-      leg.adjusted_line ?? leg.original_line ?? ''
-    }`;
+  if (betType === 'teaser' && leg.adjusted_line !== null) {
+    const adjusted =
+      leg.market === 'spread' && leg.adjusted_line > 0
+        ? `+${leg.adjusted_line}`
+        : `${leg.adjusted_line}`;
+    return `${leg.selection} → ${adjusted}`;
   }
-  if (betType === 'teaser' && leg.original_line !== null && leg.adjusted_line !== null) {
-    return `${leg.selection} ${leg.original_line} → ${leg.adjusted_line}`;
-  }
-  return `${leg.selection} ${leg.adjusted_line ?? leg.original_line ?? ''}`;
+  return leg.selection;
 }
 
 function marketCopy(market: string) {
   if (market === 'moneyline') return 'Winner';
   if (market === 'spread') return 'Spread';
   return 'Over/Under';
+}
+
+function formatRevealTime(revealAt: string | null) {
+  if (!revealAt) {
+    return 'Reveals at first game kickoff';
+  }
+
+  const revealDate = new Date(revealAt);
+  if (Number.isNaN(revealDate.getTime())) {
+    return 'Reveals at first game kickoff';
+  }
+
+  const day = revealDate.toLocaleDateString(undefined, { weekday: 'long' });
+  const time = revealDate.toLocaleTimeString(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+  return `Reveals ${day} at ${time}`;
+}
+
+function revealMessage(revealAt: string | null) {
+  return {
+    body: 'Cards reveal at first game kickoff',
+    time: formatRevealTime(revealAt),
+  };
 }
 
 function ResultPill({ bet }: { bet: BetWithLegs }) {
@@ -206,6 +229,36 @@ function EmptyBets({ side }: { side: 'You' | 'Opponent' | 'Player' }) {
   );
 }
 
+function HiddenPicksPlaceholder({
+  revealAt,
+  submitted,
+}: {
+  revealAt: string | null;
+  submitted: boolean;
+}) {
+  const message = revealMessage(revealAt);
+
+  return (
+    <View className="flex-row items-center gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.035] px-3 py-3">
+      <View className="h-9 w-9 items-center justify-center rounded-xl border border-white/15 bg-white/[0.06]">
+        <Ionicons
+          color="rgba(255,255,255,0.62)"
+          name={submitted ? 'lock-closed' : 'hourglass'}
+          size={16}
+        />
+      </View>
+      <View className="flex-1">
+        <Text className="text-xs font-semibold text-white/55">{message.body}</Text>
+        <Text
+          className="mt-0.5 text-[10px] font-black uppercase text-electric-green"
+          style={{ letterSpacing: 1.2 }}>
+          {message.time}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
 function BetCard({
   bet,
   cosmetics,
@@ -245,11 +298,15 @@ function BetCard({
           : undefined
       }>
       <View className="gap-3">
+        {isLock ? (
+          <View className="self-start">
+            <LockPill />
+          </View>
+        ) : null}
         <View className="flex-row items-start justify-between gap-3">
           <View className="flex-1 gap-2">
             <View className="flex-row items-center gap-2">
               <Badge betType={bet.bet_type} />
-              {isLock ? <LockPill /> : null}
               <Text
                 className="text-[10px] font-black uppercase text-white/45"
                 style={{ letterSpacing: 1.4 }}>
@@ -656,108 +713,46 @@ function LockShowdownSide({
   isUser,
   name,
   sideLabel,
+  visibility,
 }: {
   bet: BetWithLegs | null;
   cosmetics?: EquippedCosmeticsByCategory;
   isUser: boolean;
   name: string;
   sideLabel: string;
+  visibility: MatchupPickVisibility;
 }) {
-  const lockProfit = bet?.profit ?? null;
-  const settled = bet?.result === 'win' || bet?.result === 'loss';
-  const inProgress = bet ? isInProgress(bet) : false;
-  const result = bet?.result ?? 'pending';
+  const hidden = !isUser && !visibility.isVisible;
 
   return (
-    <View className="flex-1 gap-3">
-      <View className="items-center gap-1">
+    <View className="gap-2">
+      <View className="flex-row items-center justify-between gap-3">
         <Text
           className="text-[10px] font-black uppercase text-gold/85"
           style={{ letterSpacing: 1.5 }}>
           {sideLabel}
         </Text>
         <Text
-          className="text-base font-black text-white"
+          className="flex-1 text-right text-base font-black text-white"
           numberOfLines={1}
           style={{ letterSpacing: -0.2 }}>
           {name}
         </Text>
       </View>
-      {bet ? (
-        <LockEffect cosmetics={cosmetics}>
-          <View
-            className={cn(
-              'overflow-hidden rounded-2xl border bg-gold/[0.10]',
-              isUser ? 'border-gold' : 'border-gold/55',
-            )}
-            style={{
-              borderWidth: 2,
-              shadowColor: THEME_COLORS.gold,
-              shadowOffset: { width: 0, height: 6 },
-              shadowOpacity: isUser ? 0.5 : 0.35,
-              shadowRadius: isUser ? 16 : 12,
-            }}>
-          <View className="gap-2 p-3">
-            <View className="flex-row flex-wrap items-center gap-1.5">
-              <Badge betType={bet.bet_type} />
-              <View className="flex-row items-center gap-1 rounded-full border border-gold/55 bg-gold/15 px-1.5 py-0.5">
-                <Ionicons color={THEME_COLORS.gold} name="star" size={9} />
-                <Text className="text-[9px] font-black uppercase text-gold" style={{ letterSpacing: 1 }}>
-                  1.5x
-                </Text>
-              </View>
-            </View>
-            <Text
-              className="text-sm font-black text-white"
-              numberOfLines={2}
-              style={{ letterSpacing: -0.2 }}>
-              {bet.bet_type === 'straight'
-                ? bet.bet_legs[0]?.selection ?? 'Straight pick'
-                : `${bet.bet_legs.length}-leg ${bet.bet_type}`}
-            </Text>
-            <Text className="text-[11px] font-semibold text-white/55">
-              {formatAmericanOdds(bet.odds)} · {formatCurrency(bet.amount)}
-            </Text>
-            <View className="mt-1 flex-row items-center justify-between border-t border-gold/25 pt-2">
-              <Text
-                className={cn(
-                  'text-[10px] font-black uppercase',
-                  inProgress
-                    ? 'text-gold'
-                    : result === 'win'
-                      ? 'text-electric-green'
-                      : result === 'loss'
-                        ? 'text-coral-red'
-                        : 'text-white/55',
-                )}
-                style={{ letterSpacing: 1.2 }}>
-                {inProgress
-                  ? 'Live'
-                  : result === 'win'
-                    ? 'Win · 1.5x'
-                    : result === 'loss'
-                      ? 'Loss · 1.5x'
-                      : result === 'push'
-                        ? 'Push'
-                        : 'Pending'}
-              </Text>
-              <Text
-                className={cn(
-                  'text-base font-black',
-                  settled && lockProfit !== null
-                    ? getProfitTone(lockProfit)
-                    : 'text-white/65',
-                )}
-                style={{ letterSpacing: -0.3 }}>
-                {settled && lockProfit !== null ? formatProfit(lockProfit) : '–'}
-              </Text>
-            </View>
-          </View>
-          </View>
-        </LockEffect>
+      {hidden ? (
+        <HiddenPicksPlaceholder revealAt={visibility.revealAt} submitted={visibility.isSubmitted} />
+      ) : bet ? (
+        <BetCard bet={bet} cosmetics={cosmetics} isUser={isUser} />
+      ) : !visibility.isSubmitted && visibility.isVisible ? (
+        <View className="items-center justify-center rounded-2xl border border-dashed border-gold/25 bg-white/[0.02] px-3 py-8">
+          <Ionicons color="rgba(255,215,0,0.55)" name="remove-circle-outline" size={26} />
+          <Text className="mt-2 text-center text-xs font-semibold text-white/45">
+            Did not submit
+          </Text>
+        </View>
       ) : (
-        <View className="items-center justify-center rounded-2xl border border-dashed border-gold/25 bg-white/[0.02] px-3 py-5">
-          <Ionicons color="rgba(255,215,0,0.55)" name="star-outline" size={22} />
+        <View className="items-center justify-center rounded-2xl border border-dashed border-gold/25 bg-white/[0.02] px-3 py-8">
+          <Ionicons color="rgba(255,215,0,0.55)" name="star-outline" size={26} />
           <Text className="mt-2 text-center text-xs font-semibold text-white/45">
             No Pick of the Week filed
           </Text>
@@ -770,53 +765,71 @@ function LockShowdownSide({
 function LockShowdown({
   awayBet,
   awayCosmetics,
+  awayVisibility,
   awayName,
   homeBet,
   homeCosmetics,
   homeIsUser,
   homeName,
   awayIsUser,
+  homeVisibility,
 }: {
   awayBet: BetWithLegs | null;
   awayCosmetics?: EquippedCosmeticsByCategory;
+  awayVisibility: MatchupPickVisibility;
   awayName: string;
   awayIsUser: boolean;
   homeBet: BetWithLegs | null;
   homeCosmetics?: EquippedCosmeticsByCategory;
   homeIsUser: boolean;
   homeName: string;
+  homeVisibility: MatchupPickVisibility;
 }) {
-  if (!homeBet && !awayBet) return null;
+  const showHomeHidden = !homeIsUser && !homeVisibility.isVisible && homeVisibility.isSubmitted;
+  const showAwayHidden = !awayIsUser && !awayVisibility.isVisible && awayVisibility.isSubmitted;
+  const showHomeDidNotSubmit = homeVisibility.isVisible && !homeVisibility.isSubmitted;
+  const showAwayDidNotSubmit = awayVisibility.isVisible && !awayVisibility.isSubmitted;
+
+  if (!homeBet && !awayBet && !showHomeHidden && !showAwayHidden && !showHomeDidNotSubmit && !showAwayDidNotSubmit) {
+    return null;
+  }
 
   return (
     <Card>
-      <View className="gap-4">
-        <View className="items-center gap-1">
-          <View className="flex-row items-center gap-1.5">
-            <Ionicons color={THEME_COLORS.gold} name="star" size={13} />
+      <View className="gap-5">
+        <View className="items-center gap-2">
+          <View className="flex-row items-center gap-2">
+            <Ionicons color={THEME_COLORS.gold} name="star" size={12} />
             <Text
               className="text-[10px] font-black uppercase text-gold"
-              style={{ letterSpacing: 2.4 }}>
-              Pick of the Week Showdown · Headline Fight
+              style={{ letterSpacing: 2 }}>
+              Headline Fight
             </Text>
-            <Ionicons color={THEME_COLORS.gold} name="star" size={13} />
+            <Ionicons color={THEME_COLORS.gold} name="star" size={12} />
           </View>
-          <Text className="text-[11px] font-medium text-white/55">
+          <Text
+            className="text-center text-lg font-black text-white"
+            style={{ letterSpacing: -0.3 }}>
+            Pick of the Week Showdown
+          </Text>
+          <Text className="text-center text-[11px] font-medium text-white/55">
             Each Pick of the Week rewards or costs {LOCK_OF_THE_WEEK_MULTIPLIER}x. The biggest swing of the week.
           </Text>
         </View>
 
-        <View className="flex-row items-stretch gap-3">
+        <View className="gap-4">
           <LockShowdownSide
             bet={homeBet}
             cosmetics={homeCosmetics}
             isUser={homeIsUser}
             name={homeName}
-            sideLabel="Home Pick of the Week"
+            sideLabel="Home"
+            visibility={homeVisibility}
           />
-          <View className="items-center justify-center">
+          <View className="flex-row items-center gap-3">
+            <View className="h-[1px] flex-1 bg-gold/30" />
             <View
-              className="h-10 w-10 items-center justify-center rounded-full border border-gold/55 bg-gold/15"
+              className="h-9 w-9 items-center justify-center rounded-full border border-gold/55 bg-gold/15"
               style={{
                 shadowColor: THEME_COLORS.gold,
                 shadowOffset: { width: 0, height: 0 },
@@ -829,13 +842,15 @@ function LockShowdown({
                 VS
               </Text>
             </View>
+            <View className="h-[1px] flex-1 bg-gold/30" />
           </View>
           <LockShowdownSide
             bet={awayBet}
             cosmetics={awayCosmetics}
             isUser={awayIsUser}
             name={awayName}
-            sideLabel="Away Pick of the Week"
+            sideLabel="Away"
+            visibility={awayVisibility}
           />
         </View>
       </View>
@@ -851,6 +866,7 @@ function BetColumnSection({
   side,
   subtitle,
   title,
+  visibility,
 }: {
   bets: BetWithLegs[];
   cosmetics?: EquippedCosmeticsByCategory;
@@ -859,12 +875,21 @@ function BetColumnSection({
   side: Side;
   subtitle?: string;
   title: string;
+  visibility: MatchupPickVisibility;
 }) {
   const accentColor = isUser
     ? THEME_COLORS.electricGreen
     : side === 'home'
       ? THEME_COLORS.cyanAccent
       : THEME_COLORS.coralRed;
+  const hidden = !isUser && !visibility.isVisible;
+  const statusLabel = hidden
+    ? visibility.isSubmitted
+      ? 'Submitted'
+      : 'Not submitted'
+    : `${bets.length} ${bets.length === 1 ? 'pick' : 'picks'}`;
+  const hiddenMessage = hidden ? revealMessage(visibility.revealAt) : null;
+  const resolvedSubtitle = hidden ? null : subtitle;
 
   return (
     <View className="gap-3">
@@ -901,17 +926,37 @@ function BetColumnSection({
             <Text
               className="text-[10px] font-black uppercase text-white/65"
               style={{ letterSpacing: 1.2 }}>
-              {bets.length} {bets.length === 1 ? 'pick' : 'picks'}
+              {statusLabel}
             </Text>
           </View>
         </View>
       </View>
 
-      {subtitle ? (
-        <Text className="text-xs font-semibold text-white/45">{subtitle}</Text>
+      {resolvedSubtitle ? (
+        <Text className="text-xs font-semibold text-white/45">{resolvedSubtitle}</Text>
       ) : null}
 
-      {bets.length === 0 ? (
+      {hiddenMessage ? (
+        <View className="gap-0.5">
+          <Text className="text-xs font-semibold text-white/55">{hiddenMessage.body}</Text>
+          <Text
+            className="text-[10px] font-black uppercase text-electric-green"
+            style={{ letterSpacing: 1.2 }}>
+            {hiddenMessage.time}
+          </Text>
+        </View>
+      ) : null}
+
+      {hidden ? null : !visibility.isSubmitted && visibility.isVisible && !isUser ? (
+        <View className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] px-4 py-6">
+          <View className="items-center gap-2">
+            <Ionicons color="rgba(255,255,255,0.35)" name="remove-circle-outline" size={22} />
+            <Text className="text-center text-sm font-semibold text-white/45">
+              Did not submit
+            </Text>
+          </View>
+        </View>
+      ) : bets.length === 0 ? (
         <EmptyBets side={emptyVariant} />
       ) : (
         <View className="gap-3">
@@ -970,6 +1015,23 @@ export default function MatchupDetailScreen() {
       week_number: detail.matchup.week_number,
     });
   }, [detail, userId]);
+
+  useEffect(() => {
+    if (!detail?.revealAt) {
+      return undefined;
+    }
+
+    const delay = new Date(detail.revealAt).getTime() - Date.now();
+    if (!Number.isFinite(delay) || delay <= 0) {
+      return undefined;
+    }
+
+    const timeout = setTimeout(() => {
+      void matchupQuery.refetch();
+    }, Math.min(delay + 1000, 2_147_483_647));
+
+    return () => clearTimeout(timeout);
+  }, [detail?.revealAt, matchupQuery.refetch]);
 
   useEffect(() => {
     if (!detail || adHookTriggered.current || seasonPassQuery.isLoading) {
@@ -1110,10 +1172,12 @@ export default function MatchupDetailScreen() {
           }
           awayIsUser={awayIsUser}
           awayName={awayName}
+          awayVisibility={detail.awayPickVisibility}
           homeBet={homeLockBet}
           homeCosmetics={cosmeticsByUserId[detail.matchup.home_user_id]}
           homeIsUser={homeIsUser}
           homeName={homeName}
+          homeVisibility={detail.homePickVisibility}
         />
         <View className="gap-5">
           <BetColumnSection
@@ -1126,6 +1190,7 @@ export default function MatchupDetailScreen() {
               homeNonLockBets.length === 1 ? 'pick' : 'picks'
             } besides the Pick of the Week`}
             title={homeName}
+            visibility={detail.homePickVisibility}
           />
           <BetColumnSection
             bets={awayNonLockBets}
@@ -1145,6 +1210,7 @@ export default function MatchupDetailScreen() {
                 : 'Opponent has a bye this week.'
             }
             title={awayName}
+            visibility={detail.awayPickVisibility}
           />
         </View>
       </ScrollView>

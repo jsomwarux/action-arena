@@ -18,9 +18,8 @@ declare
   submitted_lock_count integer;
   leg_count integer;
   bet_type_text text;
-  contradictory_selection_count integer;
-  duplicate_selection_count integer;
-  existing_selection_count integer;
+  contradictory_selection_message text;
+  existing_selection_message text;
 begin
   if auth.uid() is null then
     raise exception 'Authentication required';
@@ -62,29 +61,21 @@ begin
     raise exception 'No single bet can exceed $35';
   end if;
 
-  select count(*)
-  into duplicate_selection_count
-  from (
-    select
-      leg ->> 'game_id' as game_id,
-      leg ->> 'market' as market,
-      leg ->> 'selection' as selection
-    from jsonb_array_elements(p_bets) bet
-    cross join jsonb_array_elements(bet.value -> 'legs') leg
-    group by leg ->> 'game_id', leg ->> 'market', leg ->> 'selection'
-    having count(*) > 1
-  ) duplicate_selections;
-
-  if duplicate_selection_count > 0 then
-    raise exception 'Duplicate selections are not allowed';
-  end if;
-
   with submitted_legs as (
     select
       row_number() over () as leg_index,
       leg ->> 'game_id' as game_id,
       leg ->> 'market' as market,
       leg ->> 'selection' as selection,
+      coalesce(nullif(leg ->> 'adjusted_line', '')::numeric, nullif(leg ->> 'original_line', '')::numeric) as effective_line,
+      concat(
+        leg ->> 'selection',
+        ' ',
+        case
+          when (leg ->> 'leg_odds')::integer > 0 then concat('+', leg ->> 'leg_odds')
+          else leg ->> 'leg_odds'
+        end
+      ) as pick_label,
       case
         when leg ->> 'market' = 'spread' then
           regexp_replace(leg ->> 'selection', '[[:space:]][+-][0-9]+([.][0-9]+)?$', '')
@@ -95,18 +86,47 @@ begin
     from jsonb_array_elements(p_bets) bet
     cross join jsonb_array_elements(bet.value -> 'legs') leg
   )
-  select count(*)
-  into contradictory_selection_count
+  select format(
+    '%s conflicts with %s because %s',
+    left_leg.pick_label,
+    right_leg.pick_label,
+    case
+      when left_leg.market = 'moneyline' then 'both teams cannot win the same game'
+      when left_leg.market = 'spread' then 'they are opposite sides of the same spread'
+      else 'they are opposite sides of the same total'
+    end
+  )
+  into contradictory_selection_message
   from submitted_legs left_leg
   join submitted_legs right_leg
     on right_leg.leg_index > left_leg.leg_index
    and right_leg.game_id = left_leg.game_id
    and right_leg.market = left_leg.market
    and right_leg.selection <> left_leg.selection
-   and right_leg.side <> left_leg.side;
+   and right_leg.side <> left_leg.side
+   and (
+      left_leg.market = 'moneyline'
+      or (
+        left_leg.market = 'spread'
+        and (
+          left_leg.effective_line is null
+          or right_leg.effective_line is null
+          or abs(abs(left_leg.effective_line) - abs(right_leg.effective_line)) < 0.001
+        )
+      )
+      or (
+        left_leg.market = 'over_under'
+        and (
+          left_leg.effective_line is null
+          or right_leg.effective_line is null
+          or abs(left_leg.effective_line - right_leg.effective_line) < 0.001
+        )
+      )
+   )
+  limit 1;
 
-  if contradictory_selection_count > 0 then
-    raise exception 'Contradicting same-game selections are not allowed';
+  if contradictory_selection_message is not null then
+    raise exception '%', contradictory_selection_message;
   end if;
 
   with submitted_legs as (
@@ -114,6 +134,15 @@ begin
       leg ->> 'game_id' as game_id,
       leg ->> 'market' as market,
       leg ->> 'selection' as selection,
+      coalesce(nullif(leg ->> 'adjusted_line', '')::numeric, nullif(leg ->> 'original_line', '')::numeric) as effective_line,
+      concat(
+        leg ->> 'selection',
+        ' ',
+        case
+          when (leg ->> 'leg_odds')::integer > 0 then concat('+', leg ->> 'leg_odds')
+          else leg ->> 'leg_odds'
+        end
+      ) as pick_label,
       case
         when leg ->> 'market' = 'spread' then
           regexp_replace(leg ->> 'selection', '[[:space:]][+-][0-9]+([.][0-9]+)?$', '')
@@ -129,6 +158,15 @@ begin
       bl.game_id,
       bl.market::text as market,
       bl.selection,
+      coalesce(bl.adjusted_line, bl.original_line) as effective_line,
+      concat(
+        bl.selection,
+        ' ',
+        case
+          when bl.leg_odds > 0 then concat('+', bl.leg_odds::text)
+          else bl.leg_odds::text
+        end
+      ) as pick_label,
       case
         when bl.market = 'spread' then
           regexp_replace(bl.selection, '[[:space:]][+-][0-9]+([.][0-9]+)?$', '')
@@ -142,19 +180,46 @@ begin
       and b.league_id = p_league_id
       and b.week_number = p_week_number
   )
-  select count(*)
-  into existing_selection_count
+  select format(
+    '%s conflicts with existing pick %s because %s',
+    submitted.pick_label,
+    existing.pick_label,
+    case
+      when submitted.market = 'moneyline' then 'both teams cannot win the same game'
+      when submitted.market = 'spread' then 'they are opposite sides of the same spread'
+      else 'they are opposite sides of the same total'
+    end
+  )
+  into existing_selection_message
   from submitted_legs submitted
   join existing_legs existing
     on existing.game_id = submitted.game_id
    and existing.market = submitted.market
+   and existing.selection <> submitted.selection
+   and existing.side <> submitted.side
    and (
-      existing.selection = submitted.selection
-      or existing.side <> submitted.side
-   );
+      submitted.market = 'moneyline'
+      or (
+        submitted.market = 'spread'
+        and (
+          submitted.effective_line is null
+          or existing.effective_line is null
+          or abs(abs(submitted.effective_line) - abs(existing.effective_line)) < 0.001
+        )
+      )
+      or (
+        submitted.market = 'over_under'
+        and (
+          submitted.effective_line is null
+          or existing.effective_line is null
+          or abs(submitted.effective_line - existing.effective_line) < 0.001
+        )
+      )
+   )
+  limit 1;
 
-  if existing_selection_count > 0 then
-    raise exception 'You already have a duplicate or conflicting selection on one of these games';
+  if existing_selection_message is not null then
+    raise exception '%', existing_selection_message;
   end if;
 
   for bet_item in select value from jsonb_array_elements(p_bets) loop

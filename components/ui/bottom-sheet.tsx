@@ -26,6 +26,16 @@ type BottomSheetProps = PropsWithChildren<{
 
 const SPRING = { damping: 22, stiffness: 220 };
 
+// The sheet container is rendered taller than its visible region so the
+// bottom-rounded corner / spring overshoot doesn't reveal the underlay; the
+// extra height below the visible bottom is clipped by the parent's
+// overflow:hidden. paddingBottom must account for this overshoot AND add a
+// visible buffer so anchored content (e.g. submit buttons) keeps clear
+// breathing room above the sheet's visible bottom — which, when the sheet is
+// hosted inside a tab navigator screen, sits flush against the tab bar.
+const SHEET_HEIGHT_OVERSHOOT = 40;
+const SHEET_CONTENT_BOTTOM_BUFFER = 28;
+
 export function BottomSheet({
   children,
   collapsedHeight = 96,
@@ -148,10 +158,10 @@ export function BottomSheet({
             borderTopLeftRadius: 28,
             borderTopRightRadius: 28,
             borderTopWidth: 1,
-            height: sheetHeight + insets.bottom + 40,
+            height: sheetHeight + insets.bottom + SHEET_HEIGHT_OVERSHOOT,
             left: 0,
             overflow: 'hidden',
-            paddingBottom: Math.max(insets.bottom, 12),
+            paddingBottom: insets.bottom + SHEET_HEIGHT_OVERSHOOT + SHEET_CONTENT_BOTTOM_BUFFER,
             paddingTop: 10,
             position: 'absolute',
             right: 0,

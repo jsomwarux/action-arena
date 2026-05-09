@@ -22,6 +22,8 @@ import {
   BottomSheet,
   Button,
   Card,
+  LivePulse,
+  ModalShell,
   NflTeamLogo,
   PressableScale,
   ScreenWrapper,
@@ -47,14 +49,18 @@ import { useUserCosmetics } from '@/hooks/use-cosmetics';
 import { useShareBetToChat } from '@/hooks/use-league-chat';
 import { LOCAL_FLAG_KEYS, useLocalFlag } from '@/hooks/use-local-flags';
 import { useMyLeagues } from '@/hooks/use-leagues';
-import { useUpcomingNflOdds } from '@/hooks/use-odds';
+import { useLeagueWeekRevealTime, useSyncLeagueWeekSlate, useUpcomingNflOdds } from '@/hooks/use-odds';
 import { useBetBoardAccess } from '@/hooks/use-season-pass';
 import {
+  type BetEditSubmission,
+  type BetEditSubmissionLeg,
   type BetSubmissionLeg,
   type MixedBetSubmission,
   type PlacedBet,
   usePlacedBets,
+  useSetPickOfWeekMutation,
   useSubmitBetsMutation,
+  useUpdatePlacedBetMutation,
 } from '@/hooks/use-straight-bets';
 import { cn } from '@/lib/cn';
 import {
@@ -68,6 +74,13 @@ import {
 } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import type { OddsGame, OddsSelection } from '@/lib/odds-api';
+import {
+  areDirectlyContradictingPicks,
+  findContradictingPick,
+  findPickContradiction,
+  getPickConflictSide,
+  formatPickConflictReason,
+} from '@/lib/pick-conflicts';
 import type {
   BetMarket,
   BetType,
@@ -103,9 +116,36 @@ type EditingSlipBet = {
   bet: SlipBet;
 };
 
+type EditingPlacedLeg = SlipLeg & {
+  betLegId: string;
+  locked: boolean;
+};
+
 type ValidationState = {
   errors: string[];
   warnings: string[];
+};
+
+type ConflictSource =
+  | {
+      kind: 'builder';
+      mode: Extract<BetMode, 'parlay' | 'teaser'>;
+    }
+  | {
+      bet: SlipBet;
+      kind: 'slip';
+    };
+
+type SelectionConflict = {
+  actionLabel: string;
+  existingLeg: SlipLeg;
+  game: OddsGame;
+  id: string;
+  message: string;
+  nextLeg: SlipLeg;
+  selection: OddsSelection;
+  source: ConflictSource;
+  targetMode: BetMode;
 };
 
 const MARKET_OPTIONS: SegmentedOption<BetMarket>[] = [
@@ -164,7 +204,7 @@ const TOUR_STEPS: {
   },
   {
     anchor: 'middle',
-    body: 'Submit unlocks once you have at least 5 picks, exactly one Pick of the Week, no pick over 35 coins, the full 100-coin budget allocated, and no duplicate game sides.',
+    body: 'Submit unlocks once you have at least 5 picks, exactly one Pick of the Week, no pick over 35 coins, the full 100-coin budget allocated, and no directly conflicting picks.',
     icon: 'checkmark-done',
     title: 'Validation rules',
   },
@@ -247,6 +287,77 @@ function makeSlipLeg(game: OddsGame, selection: OddsSelection, adjustedLine = se
   };
 }
 
+function getLegSelectionKey(leg: Pick<SlipLeg, 'game_id' | 'market' | 'original_line' | 'selection'>) {
+  return `${leg.game_id}:${leg.market}:${leg.selection}:${leg.original_line ?? 'na'}`;
+}
+
+function isPlacedLegLocked(leg: Pick<PlacedBet['bet_legs'][number], 'game_start_time' | 'locked'>) {
+  return leg.locked || new Date(leg.game_start_time).getTime() <= Date.now();
+}
+
+function isPlacedBetLocked(bet: PlacedBet) {
+  return bet.bet_legs.some((leg) => isPlacedLegLocked(leg));
+}
+
+function findOddsGame(oddsGames: OddsGame[], gameId: string) {
+  return oddsGames.find((game) => game.id === gameId);
+}
+
+function makeEditablePlacedLeg(
+  leg: PlacedBet['bet_legs'][number],
+  oddsGame: OddsGame | undefined,
+): EditingPlacedLeg {
+  return {
+    adjusted_line: leg.adjusted_line,
+    awayTeam: oddsGame?.awayTeam ?? 'Selected',
+    betLegId: leg.id,
+    game_id: leg.game_id,
+    game_start_time: leg.game_start_time,
+    homeTeam: oddsGame?.homeTeam ?? 'Game',
+    id: leg.id,
+    label: leg.selection,
+    leg_odds: leg.leg_odds,
+    locked: isPlacedLegLocked(leg),
+    market: leg.market,
+    original_line: leg.original_line,
+    selection: leg.selection,
+    selectionKey: getLegSelectionKey(leg),
+  };
+}
+
+function makeEditablePlacedLegs(bet: PlacedBet, oddsGames: OddsGame[]) {
+  return bet.bet_legs.map((leg) => makeEditablePlacedLeg(leg, findOddsGame(oddsGames, leg.game_id)));
+}
+
+function makeEditedPlacedLeg(
+  currentLeg: EditingPlacedLeg,
+  game: OddsGame,
+  selection: OddsSelection,
+  adjustedLine = selection.line,
+): EditingPlacedLeg {
+  const nextLeg = makeSlipLeg(game, selection, adjustedLine);
+
+  return {
+    ...nextLeg,
+    betLegId: currentLeg.betLegId,
+    id: currentLeg.id,
+    locked: currentLeg.locked,
+  };
+}
+
+function editableLegToSubmissionLeg(leg: EditingPlacedLeg): BetEditSubmissionLeg {
+  return {
+    adjusted_line: leg.adjusted_line,
+    game_id: leg.game_id,
+    game_start_time: leg.game_start_time,
+    id: leg.betLegId,
+    leg_odds: leg.leg_odds,
+    market: leg.market,
+    original_line: leg.original_line,
+    selection: leg.selection,
+  };
+}
+
 function makeStraightBet(game: OddsGame, selection: OddsSelection, amount: number): SlipBet {
   const leg = makeSlipLeg(game, selection);
   const reward = calculatePotentialPayout(amount, selection.odds);
@@ -305,6 +416,36 @@ function updateSlipBetAmount(bet: SlipBet, amount: number): SlipBet {
     ...bet,
     amount: roundedAmount,
     potential_payout: calculatePotentialPayout(roundedAmount, bet.odds),
+  };
+}
+
+function getEditedPlacedBetMetrics(bet: PlacedBet, legs: EditingPlacedLeg[]) {
+  if (bet.bet_type === 'parlay') {
+    const { cappedReward, rawReward } = calculateParlayReward(bet.amount, legs);
+    return {
+      odds: getParlayOdds(legs),
+      potential_payout: cappedReward,
+      rawPotentialReward: rawReward,
+      teaser_points: null,
+    };
+  }
+
+  if (bet.bet_type === 'teaser') {
+    const odds = bet.teaser_points ? getTeaserOdds(legs.length, bet.teaser_points) : null;
+    return {
+      odds: odds ?? bet.odds,
+      potential_payout: odds ? calculatePotentialPayout(bet.amount, odds) : bet.potential_payout,
+      rawPotentialReward: undefined,
+      teaser_points: bet.teaser_points,
+    };
+  }
+
+  const odds = legs[0]?.leg_odds ?? bet.odds;
+  return {
+    odds,
+    potential_payout: calculatePotentialPayout(bet.amount, odds),
+    rawPotentialReward: undefined,
+    teaser_points: null,
   };
 }
 
@@ -400,44 +541,172 @@ function formatMatchupLabel(leg: SlipLeg) {
   return `${leg.awayTeam} @ ${leg.homeTeam}`;
 }
 
-function getLegConflictSide(leg: SlipLeg) {
-  if (leg.market === 'spread') {
-    return getSelectedTeamLogoName(leg);
-  }
-
-  if (leg.market === 'over_under') {
-    return leg.selection.toLowerCase().startsWith('over') ? 'Over' : 'Under';
-  }
-
-  return leg.selection;
-}
-
-function isExactSameSelection(left: SlipLeg, right: SlipLeg) {
-  return left.selectionKey === right.selectionKey;
-}
-
-function areContradictingSameGameLegs(left: SlipLeg, right: SlipLeg) {
-  if (left.game_id !== right.game_id || left.market !== right.market) {
-    return false;
-  }
-
-  if (isExactSameSelection(left, right)) {
-    return false;
-  }
-
-  if (left.market === 'moneyline' || left.market === 'spread' || left.market === 'over_under') {
-    return getLegConflictSide(left) !== getLegConflictSide(right);
-  }
-
-  return false;
-}
-
-function findContradictingLeg(legs: SlipLeg[], nextLeg: SlipLeg) {
-  return legs.find((leg) => areContradictingSameGameLegs(leg, nextLeg));
-}
-
 function formatLegConflictLabel(leg: SlipLeg) {
   return `${leg.label} ${formatAmericanOdds(leg.leg_odds)}`;
+}
+
+function formatConflictShortLabel(leg: SlipLeg) {
+  return getPickConflictSide(leg);
+}
+
+function capitalizeSentence(value: string) {
+  return value.length > 0 ? `${value.charAt(0).toUpperCase()}${value.slice(1)}` : value;
+}
+
+function getSlipBetLocationLabel(bet: SlipBet) {
+  if (bet.bet_type === 'straight') {
+    return 'your straight pick';
+  }
+
+  return `your ${bet.legs.length}-leg ${bet.bet_type}`;
+}
+
+function getBuilderLocationLabel(mode: Extract<BetMode, 'parlay' | 'teaser'>) {
+  return `this ${mode}`;
+}
+
+function getTargetSwapLabel(mode: BetMode) {
+  return mode === 'straight' ? 'as a straight pick' : `in this ${mode}`;
+}
+
+function getConflictSourceLocation(source: ConflictSource) {
+  return source.kind === 'builder'
+    ? getBuilderLocationLabel(source.mode)
+    : getSlipBetLocationLabel(source.bet);
+}
+
+function getConflictSourcePhrase(source: ConflictSource) {
+  return source.kind === 'builder'
+    ? `already in ${getBuilderLocationLabel(source.mode)}`
+    : `already in ${getSlipBetLocationLabel(source.bet)}`;
+}
+
+function getConflictActionLabel(
+  nextLeg: SlipLeg,
+  existingLeg: SlipLeg,
+  source: ConflictSource,
+  targetMode: BetMode,
+) {
+  const nextLabel = formatConflictShortLabel(nextLeg);
+  const existingLabel = formatConflictShortLabel(existingLeg);
+
+  if (source.kind === 'builder' && source.mode === targetMode) {
+    return `Replace ${existingLabel} with ${nextLabel}`;
+  }
+
+  return `Replace ${existingLabel} in ${getConflictSourceLocation(
+    source,
+  )} with ${nextLabel} ${getTargetSwapLabel(targetMode)}`;
+}
+
+function makeSelectionConflict({
+  existingLeg,
+  game,
+  nextLeg,
+  selection,
+  source,
+  targetMode,
+}: {
+  existingLeg: SlipLeg;
+  game: OddsGame;
+  nextLeg: SlipLeg;
+  selection: OddsSelection;
+  source: ConflictSource;
+  targetMode: BetMode;
+}): SelectionConflict {
+  const nextLabel = formatConflictShortLabel(nextLeg);
+  const existingLabel = formatConflictShortLabel(existingLeg);
+  const reason = capitalizeSentence(formatPickConflictReason(nextLeg, existingLeg));
+
+  return {
+    actionLabel: getConflictActionLabel(nextLeg, existingLeg, source, targetMode),
+    existingLeg,
+    game,
+    id: `${targetMode}:${nextLeg.selectionKey}:${existingLeg.selectionKey}`,
+    message: `${nextLabel} conflicts with ${existingLabel} ${getConflictSourcePhrase(
+      source,
+    )}. ${reason}.`,
+    nextLeg,
+    selection,
+    source,
+    targetMode,
+  };
+}
+
+function getUpdatedSlipBetAfterLegRemoval(bet: SlipBet, removedLegId: string): SlipBet | null {
+  const legs = bet.legs.filter((leg) => leg.id !== removedLegId);
+
+  if (bet.bet_type === 'straight' || legs.length === 0) {
+    return null;
+  }
+
+  if (bet.bet_type === 'parlay') {
+    if (legs.length < 2) {
+      return null;
+    }
+
+    const { cappedReward, rawReward } = calculateParlayReward(bet.amount, legs);
+    return {
+      ...bet,
+      id: `parlay:${legs.map((leg) => leg.id).join('|')}`,
+      label: `${legs.length}-leg Parlay`,
+      legs,
+      odds: getParlayOdds(legs),
+      potential_payout: cappedReward,
+      rawPotentialReward: rawReward,
+    };
+  }
+
+  if (legs.length < 2 || !bet.teaser_points) {
+    return null;
+  }
+
+  const odds = getTeaserOdds(legs.length, bet.teaser_points);
+  if (!odds) {
+    return null;
+  }
+
+  return {
+    ...bet,
+    id: `teaser:${bet.teaser_points}:${legs.map((leg) => leg.id).join('|')}`,
+    label: `${legs.length}-leg ${bet.teaser_points}pt Teaser`,
+    legs,
+    odds,
+    potential_payout: calculatePotentialPayout(bet.amount, odds),
+    rawPotentialReward: undefined,
+  };
+}
+
+function formatAddConflictMessage(nextLeg: SlipLeg, existingLeg: SlipLeg) {
+  return `Cannot add ${formatLegConflictLabel(nextLeg)}. It directly conflicts with ${formatLegConflictLabel(
+    existingLeg,
+  )} on ${formatMatchupLabel(nextLeg)} because ${formatPickConflictReason(
+    nextLeg,
+    existingLeg,
+  )}.`;
+}
+
+function getSlipLegs(slipBets: SlipBet[]) {
+  return slipBets.flatMap((bet) => bet.legs);
+}
+
+function getPlacedBetConflictLegs(placedBets: PlacedBet[], editingBetId: string, oddsGames: OddsGame[]) {
+  return placedBets
+    .filter((bet) => bet.id !== editingBetId)
+    .flatMap((bet) => makeEditablePlacedLegs(bet, oddsGames));
+}
+
+function useLockClock(enabled: boolean) {
+  const [, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!enabled) {
+      return undefined;
+    }
+
+    const interval = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(interval);
+  }, [enabled]);
 }
 
 function getDisplayedPotentialPayout(bet: Pick<SlipBet, 'is_lock' | 'potential_payout'>) {
@@ -465,20 +734,6 @@ function getBetTypeLabel(type: BetType) {
   return type;
 }
 
-function joinConflictSources(sources: string[]) {
-  const uniqueSources = [...new Set(sources)];
-
-  if (uniqueSources.length <= 1) {
-    return uniqueSources[0] ?? 'your lineup';
-  }
-
-  if (uniqueSources.length === 2) {
-    return `${uniqueSources[0]} and ${uniqueSources[1]}`;
-  }
-
-  return `${uniqueSources.slice(0, -1).join(', ')}, and ${uniqueSources[uniqueSources.length - 1]}`;
-}
-
 function getConflictSummaries(slipBets: SlipBet[]) {
   const legsWithBet = slipBets.flatMap((bet) =>
     bet.legs.map((leg) => ({
@@ -487,29 +742,30 @@ function getConflictSummaries(slipBets: SlipBet[]) {
     })),
   );
   const games = new Map<string, typeof legsWithBet>();
-  const selections = new Map<string, typeof legsWithBet>();
 
   legsWithBet.forEach((item) => {
     games.set(item.leg.game_id, [...(games.get(item.leg.game_id) ?? []), item]);
-    selections.set(item.leg.selectionKey, [
-      ...(selections.get(item.leg.selectionKey) ?? []),
-      item,
-    ]);
   });
   const contradictorySelections: string[] = [];
 
   [...games.values()].forEach((items) => {
     items.forEach((left, leftIndex) => {
       items.slice(leftIndex + 1).forEach((right) => {
-        if (!areContradictingSameGameLegs(left.leg, right.leg)) {
+        if (!areDirectlyContradictingPicks(left.leg, right.leg)) {
           return;
         }
 
         const matchup = formatMatchupLabel(left.leg);
+        const sources = `${getBetTypeLabel(left.bet.bet_type)} and ${getBetTypeLabel(
+          right.bet.bet_type,
+        )}`;
         contradictorySelections.push(
-          `${formatLegConflictLabel(left.leg)} and ${formatLegConflictLabel(
+          `${formatLegConflictLabel(left.leg)} conflicts with ${formatLegConflictLabel(
             right.leg,
-          )} conflict on ${matchup} — remove one.`,
+          )} between your ${sources} on ${matchup} because ${formatPickConflictReason(
+            left.leg,
+            right.leg,
+          )}. Remove one.`,
         );
       });
     });
@@ -517,22 +773,13 @@ function getConflictSummaries(slipBets: SlipBet[]) {
 
   return {
     contradictorySelections,
-    duplicateSelections: [...selections.values()]
-      .filter((items) => items.length > 1)
-      .map((items) => {
-        const selection = formatLegConflictLabel(items[0].leg);
-        const sources = items.map((item) => getBetTypeLabel(item.bet.bet_type));
-        return `${selection} appears in both your ${joinConflictSources(
-          sources,
-        )} — remove the duplicate.`;
-      }),
   };
 }
 
 function getValidationState(slipBets: SlipBet[]): ValidationState {
   const totalAllocated = slipBets.reduce((sum, bet) => sum + bet.amount, 0);
   const lockCount = slipBets.filter((bet) => bet.is_lock).length;
-  const { contradictorySelections, duplicateSelections } = getConflictSummaries(slipBets);
+  const { contradictorySelections } = getConflictSummaries(slipBets);
   const errors: string[] = [];
   const warnings: string[] = [];
 
@@ -560,7 +807,6 @@ function getValidationState(slipBets: SlipBet[]): ValidationState {
   }
 
   errors.push(...contradictorySelections);
-  errors.push(...duplicateSelections);
 
   slipBets.forEach((bet) => {
     if (bet.bet_type === 'parlay') {
@@ -631,17 +877,19 @@ function BudgetTracker({
   const remaining = WEEKLY_BUDGET - totalAllocated;
   const overBudget = remaining < 0;
 
+  const minimumMet = displayedBets.length >= MINIMUM_BETS_PER_WEEK;
+  const fullyAllocated = totalAllocated === WEEKLY_BUDGET;
+
   const progress = Math.min(Math.max(totalAllocated / WEEKLY_BUDGET, 0), 1);
   const barColor = overBudget
     ? THEME_COLORS.coralRed
-    : progress > 0.95
-      ? THEME_COLORS.coralRed
-      : progress > 0.65
-        ? THEME_COLORS.amberAccent
-        : THEME_COLORS.electricGreen;
-
-  const minimumMet = displayedBets.length >= MINIMUM_BETS_PER_WEEK;
-  const fullyAllocated = totalAllocated === WEEKLY_BUDGET;
+    : fullyAllocated
+      ? THEME_COLORS.electricGreen
+      : progress > 0.95
+        ? THEME_COLORS.coralRed
+        : progress > 0.65
+          ? THEME_COLORS.amberAccent
+          : THEME_COLORS.electricGreen;
 
   return (
     <Card tone="highlight">
@@ -807,6 +1055,7 @@ function LeagueSelector({
         onRequestClose={() => setPickerOpen(false)}
         transparent
         visible={pickerOpen}>
+        <ModalShell variant="overlay">
         <Pressable
           accessibilityRole="button"
           className="flex-1 justify-center bg-black/75 px-5"
@@ -885,7 +1134,54 @@ function LeagueSelector({
             </Card>
           </Pressable>
         </Pressable>
+        </ModalShell>
       </Modal>
+    </View>
+  );
+}
+
+function PickConflictNotice({
+  actionLabel,
+  message,
+  onAction,
+  onDismiss,
+}: {
+  actionLabel?: string;
+  message: string;
+  onAction?: () => void;
+  onDismiss: () => void;
+}) {
+  return (
+    <View className="rounded-2xl border border-coral-red/35 bg-coral-red/10 p-3">
+      <View className="flex-row items-start gap-2">
+        <Ionicons color={THEME_COLORS.coralRed} name="alert-circle" size={16} />
+        <View className="flex-1 gap-2">
+          <Text className="text-sm font-semibold leading-5 text-coral-red">
+            {message}
+          </Text>
+          {actionLabel && onAction ? (
+            <Pressable
+              accessibilityLabel={actionLabel}
+              accessibilityRole="button"
+              onPress={onAction}>
+              <View className="self-start rounded-full border border-coral-red/45 bg-coral-red/15 px-3 py-1.5">
+                <Text
+                  className="text-[10px] font-black uppercase text-coral-red"
+                  style={{ letterSpacing: 1.1 }}>
+                  {actionLabel}
+                </Text>
+              </View>
+            </Pressable>
+          ) : null}
+        </View>
+        <Pressable
+          accessibilityLabel="Dismiss pick conflict message"
+          accessibilityRole="button"
+          hitSlop={8}
+          onPress={onDismiss}>
+          <Ionicons color={THEME_COLORS.coralRed} name="close" size={16} />
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -924,6 +1220,7 @@ function OddsLogoChip({
 }
 
 function OddsButton({
+  hasConflict,
   disabled,
   isSelected,
   mode,
@@ -932,6 +1229,7 @@ function OddsButton({
   teaserPoints,
 }: {
   disabled?: boolean;
+  hasConflict?: boolean;
   isSelected: boolean;
   mode: BetMode;
   onPress: () => void;
@@ -965,6 +1263,7 @@ function OddsButton({
         shadowRadius: 12,
       }
     : null;
+  const conflict = Boolean(hasConflict && !isSelected);
 
   return (
     <PressableScale
@@ -982,7 +1281,7 @@ function OddsButton({
         flexBasis: 0,
         minHeight: 68,
         minWidth: 0,
-        opacity: disabled ? 0.32 : pressed ? 0.92 : 1,
+        opacity: disabled || conflict ? 0.36 : pressed ? 0.92 : 1,
         width: '100%',
       })}>
       <View
@@ -990,9 +1289,13 @@ function OddsButton({
         style={[
           {
             backgroundColor: isSelected ? `${accentHex}2E` : 'rgba(255,255,255,0.04)',
-            borderColor: isSelected ? accentHex : inactiveBorderColor,
+            borderColor: conflict
+              ? 'rgba(255,71,87,0.45)'
+              : isSelected
+                ? accentHex
+                : inactiveBorderColor,
             borderRadius: 16,
-            borderWidth: isSelected ? 2 : 1,
+            borderWidth: isSelected || conflict ? 2 : 1,
             alignItems: 'center',
             flexDirection: 'row',
             gap: 8,
@@ -1044,6 +1347,12 @@ function OddsButton({
             <Ionicons color={accentHex} name="checkmark-circle" size={14} />
           </View>
         ) : null}
+        {conflict ? (
+          <View
+            className="absolute right-2 top-2 h-5 w-5 items-center justify-center rounded-full border border-coral-red/50 bg-coral-red/20">
+            <Ionicons color={THEME_COLORS.coralRed} name="warning" size={11} />
+          </View>
+        ) : null}
       </View>
     </PressableScale>
   );
@@ -1052,6 +1361,7 @@ function OddsButton({
 function GameCard({
   builderLegSelectionKeys,
   game,
+  getSelectionConflict,
   market,
   mode,
   onMarketChange,
@@ -1061,6 +1371,7 @@ function GameCard({
 }: {
   builderLegSelectionKeys: Set<string>;
   game: OddsGame;
+  getSelectionConflict: (game: OddsGame, selection: OddsSelection) => SelectionConflict | null;
   market: BetMarket;
   mode: BetMode;
   onMarketChange: (market: BetMarket) => void;
@@ -1140,12 +1451,14 @@ function GameCard({
             {selections.map((selection) => {
               const key = getSelectionKey(game.id, selection);
               const isSelected = builderLegSelectionKeys.has(key);
+              const conflict = isSelected ? null : getSelectionConflict(game, selection);
               return (
                 <View
                   key={`${selection.market}:${selection.selection}:${selection.line ?? 'na'}`}
                   style={{ flex: 1, flexBasis: 0, minWidth: 0 }}>
                   <OddsButton
                     disabled={readOnly}
+                    hasConflict={Boolean(conflict)}
                     isSelected={isSelected}
                     mode={mode}
                     selection={selection}
@@ -2183,6 +2496,7 @@ function AmountModal({
       transparent
       visible={visible}
       onRequestClose={onClose}>
+      <ModalShell variant="overlay">
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         className="flex-1 justify-center bg-black/75 px-5">
@@ -2341,6 +2655,7 @@ function AmountModal({
           </Card>
         </View>
       </KeyboardAvoidingView>
+      </ModalShell>
     </Modal>
   );
 }
@@ -2362,19 +2677,25 @@ function ConfirmRow({ bet }: { bet: SlipBet }) {
     <View
       className="rounded-2xl border bg-white/[0.04] p-3"
       style={{ borderColor: `${accentByType}55` }}>
+      {bet.is_lock ? (
+        <View className="mb-2 flex-row">
+          <LockBadge compact />
+        </View>
+      ) : null}
       <View className="flex-row items-center justify-between gap-2">
-        <View className="flex-row items-center gap-2">
+        <View className="flex-row items-center gap-2 shrink">
           <Badge betType={bet.bet_type} />
-          {bet.is_lock ? <LockBadge compact /> : null}
           <Text
             className="text-[10px] font-black uppercase text-white/45"
-            style={{ letterSpacing: 1.5 }}>
+            style={{ letterSpacing: 1.5 }}
+            numberOfLines={1}>
             {formatAmericanOdds(bet.odds)}
           </Text>
         </View>
         <Text
-          className="text-sm font-black"
-          style={{ color: accentByType, letterSpacing: -0.3 }}>
+          className="text-sm font-black shrink-0"
+          style={{ color: accentByType, letterSpacing: -0.3 }}
+          numberOfLines={1}>
           {formatCurrency(bet.amount)} → {formatCurrency(displayedReward)}
           {cappedParlay ? ' (capped)' : ''}
         </Text>
@@ -2419,6 +2740,7 @@ function ConfirmationModal({
 
   return (
     <Modal animationType="fade" transparent visible={visible} onRequestClose={onCancel}>
+      <ModalShell variant="overlay">
       <View className="flex-1 justify-center bg-black/80 px-5">
         <View>
           <Card>
@@ -2521,6 +2843,7 @@ function ConfirmationModal({
           </Card>
         </View>
       </View>
+      </ModalShell>
     </Modal>
   );
 }
@@ -2686,19 +3009,21 @@ function BetBoardTour({
 
   return (
     <Modal animationType="fade" transparent visible={visible} onRequestClose={dismiss}>
-      <Pressable
-        accessibilityRole="button"
-        onPress={handleOverlayTap}
-        style={{ backgroundColor: 'rgba(5, 8, 18, 0.78)', flex: 1 }}>
-        {layout}
-        <View className="absolute bottom-3 left-0 right-0 items-center">
-          <Text
-            className="text-[10px] font-black uppercase text-white/40"
-            style={{ letterSpacing: 1.5 }}>
-            Tap anywhere to advance
-          </Text>
-        </View>
-      </Pressable>
+      <ModalShell variant="overlay">
+        <Pressable
+          accessibilityRole="button"
+          onPress={handleOverlayTap}
+          style={{ backgroundColor: 'rgba(5, 8, 18, 0.78)', flex: 1 }}>
+          {layout}
+          <View className="absolute bottom-3 left-0 right-0 items-center">
+            <Text
+              className="text-[10px] font-black uppercase text-white/40"
+              style={{ letterSpacing: 1.5 }}>
+              Tap anywhere to advance
+            </Text>
+          </View>
+        </Pressable>
+      </ModalShell>
     </Modal>
   );
 }
@@ -2707,29 +3032,558 @@ function BetBoardTour({
 // Placed Bets View
 // ============================================================
 
+function LockStatusPill() {
+  return (
+    <View className="flex-row items-center gap-1 rounded-full border border-white/15 bg-white/[0.06] px-3 py-1">
+      <Ionicons color="rgba(255,255,255,0.55)" name="lock-closed" size={10} />
+      <Text
+        className="text-[10px] font-black uppercase text-white/55"
+        style={{ letterSpacing: 1.5 }}>
+        Locked
+      </Text>
+    </View>
+  );
+}
+
+function EditActionButton() {
+  return (
+    <View className="flex-row items-center gap-1.5 rounded-full border border-electric-green/45 bg-electric-green/15 px-3 py-1.5">
+      <Ionicons color={THEME_COLORS.electricGreen} name="pencil" size={11} />
+      <Text
+        className="text-[10px] font-black uppercase text-electric-green"
+        style={{ letterSpacing: 1.4 }}>
+        Edit
+      </Text>
+    </View>
+  );
+}
+
+function PotwStarButton({
+  disabled,
+  isActive,
+  onPress,
+  visible,
+}: {
+  disabled: boolean;
+  isActive: boolean;
+  onPress: () => void;
+  visible: boolean;
+}) {
+  if (!visible) {
+    return null;
+  }
+
+  const iconName = isActive ? 'star' : 'star-outline';
+
+  if (disabled || isActive) {
+    return (
+      <View
+        accessibilityLabel={isActive ? 'Current Pick of the Week' : 'Pick of the Week unavailable'}
+        className={cn(
+          'h-8 w-8 items-center justify-center rounded-full border',
+          isActive ? 'border-gold/55 bg-gold/15' : 'border-white/10 bg-white/[0.04]',
+        )}>
+        <Ionicons color={isActive ? THEME_COLORS.gold : 'rgba(255,255,255,0.35)'} name={iconName} size={16} />
+      </View>
+    );
+  }
+
+  return (
+    <Pressable
+      accessibilityLabel="Make Pick of the Week"
+      accessibilityRole="button"
+      className="h-8 w-8 items-center justify-center rounded-full border border-gold/45 bg-gold/10"
+      hitSlop={8}
+      onPress={onPress}>
+      <Ionicons color={THEME_COLORS.gold} name={iconName} size={16} />
+    </Pressable>
+  );
+}
+
+function LegLockPill({ label, locked }: { label: string; locked: boolean }) {
+  return (
+    <View
+      className={cn(
+        'self-start flex-row items-center gap-1 rounded-full border px-3 py-1',
+        locked ? 'border-white/15 bg-white/[0.06]' : 'border-electric-green/40 bg-electric-green/15',
+      )}>
+      {locked ? <Ionicons color="rgba(255,255,255,0.55)" name="lock-closed" size={10} /> : null}
+      <Text
+        className={cn(
+          'text-[10px] font-black uppercase',
+          locked ? 'text-white/55' : 'text-electric-green',
+        )}
+        style={{ letterSpacing: 1.5 }}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+function EditLegRow({
+  isSelected,
+  leg,
+  onPress,
+  teaserPoints,
+}: {
+  isSelected: boolean;
+  leg: EditingPlacedLeg;
+  onPress: () => void;
+  teaserPoints: TeaserPoints | null;
+}) {
+  const isTotal = leg.market === 'over_under';
+  const isOver = leg.selection.toLowerCase().startsWith('over');
+  const accentColor = teaserPoints ? THEME_COLORS.cyanAccent : THEME_COLORS.amberAccent;
+
+  return (
+    <PressableScale
+      accessibilityRole="button"
+      accessibilityState={{ disabled: leg.locked, selected: isSelected }}
+      disabled={leg.locked}
+      onPress={onPress}
+      pressedScale={0.98}>
+      <View
+        className="rounded-2xl border bg-white/[0.04] p-3"
+        style={{
+          borderColor: isSelected ? accentColor : 'rgba(255,255,255,0.08)',
+          opacity: leg.locked ? 0.62 : 1,
+        }}>
+        <View className="flex-row items-center justify-between gap-3">
+          <View className="flex-1 flex-row items-center gap-2.5">
+            {isTotal ? (
+              <View className="h-6 w-6 items-center justify-center rounded-full border border-white/15 bg-white/[0.06]">
+                <Ionicons
+                  color="rgba(255,255,255,0.86)"
+                  name={isOver ? 'arrow-up' : 'arrow-down'}
+                  size={13}
+                />
+              </View>
+            ) : (
+              <NflTeamLogo size={24} teamName={getSelectedTeamLogoName(leg)} />
+            )}
+            <View className="flex-1">
+              <Text className="text-sm font-black text-white" numberOfLines={1}>
+                {leg.label}
+              </Text>
+              <Text className="mt-1 text-[11px] font-semibold text-white/45" numberOfLines={1}>
+                {marketLabel(leg.market)} · {formatGameTime(leg.game_start_time)}
+              </Text>
+            </View>
+          </View>
+          <LegLockPill
+            label={leg.locked ? 'Locked' : isSelected ? 'Swapping' : 'Open'}
+            locked={leg.locked}
+          />
+        </View>
+        {teaserPoints ? (
+          <Text className="mt-2 text-[11px] font-black text-cyan-accent">
+            {formatLine(leg.original_line)} → {formatLine(leg.adjusted_line)}
+          </Text>
+        ) : null}
+      </View>
+    </PressableScale>
+  );
+}
+
+function EditSelectionGrid({
+  game,
+  market,
+  mode,
+  onMarketChange,
+  onSelect,
+  selectedKeys,
+  teaserPoints,
+}: {
+  game: OddsGame;
+  market: BetMarket;
+  mode: BetMode;
+  onMarketChange?: (market: BetMarket) => void;
+  onSelect: (game: OddsGame, selection: OddsSelection) => void;
+  selectedKeys: Set<string>;
+  teaserPoints?: TeaserPoints;
+}) {
+  const resolvedMarket = mode === 'teaser' && market === 'moneyline' ? 'spread' : market;
+  const selections = game.markets[resolvedMarket];
+  const accentHex = modeAccentHex(mode);
+  const { dayLabel, timeLabel } = getGameDateParts(game.commenceTime);
+  const marketOptions = MARKET_OPTIONS.filter(
+    (option) => mode !== 'teaser' || option.value !== 'moneyline',
+  ).map((option) => ({
+    ...option,
+    accent: getModeTone(mode),
+  }));
+
+  return (
+    <View className="rounded-2xl border border-white/[0.08] bg-white/[0.035] p-3">
+      <View className="gap-3">
+        <View>
+          <Text
+            className="text-[10px] font-black uppercase text-white/45"
+            style={{ letterSpacing: 1.5 }}>
+            NFL · {dayLabel} · {timeLabel}
+          </Text>
+          <Text
+            className="mt-1 text-base font-black uppercase text-white"
+            numberOfLines={2}
+            style={{ letterSpacing: -0.2 }}>
+            {game.awayTeam}
+            <Text style={{ color: accentHex }}>{' @ '}</Text>
+            {game.homeTeam}
+          </Text>
+        </View>
+
+        {onMarketChange ? (
+          <SegmentedToggle
+            accent={getModeTone(mode)}
+            compact
+            onChange={(value) => {
+              haptics.selection();
+              onMarketChange(value);
+            }}
+            options={marketOptions}
+            value={resolvedMarket}
+          />
+        ) : null}
+
+        {selections.length === 0 ? (
+          <View className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
+            <Text className="text-sm font-semibold text-white/50">
+              {marketLabel(resolvedMarket)} lines aren't published for this game yet.
+            </Text>
+          </View>
+        ) : (
+          <View className="flex-row gap-2">
+            {selections.map((selection) => {
+              const key = getSelectionKey(game.id, selection);
+              return (
+                <View
+                  key={`${selection.market}:${selection.selection}:${selection.line ?? 'na'}`}
+                  style={{ flex: 1, flexBasis: 0, minWidth: 0 }}>
+                  <OddsButton
+                    isSelected={selectedKeys.has(key)}
+                    mode={mode}
+                    selection={selection}
+                    teaserPoints={teaserPoints}
+                    onPress={() => onSelect(game, selection)}
+                  />
+                </View>
+              );
+            })}
+          </View>
+        )}
+      </View>
+    </View>
+  );
+}
+
+function PostSubmitEditModal({
+  bet,
+  isSaving,
+  oddsGames,
+  onCancel,
+  onSave,
+  placedBets,
+}: {
+  bet: PlacedBet | null;
+  isSaving: boolean;
+  oddsGames: OddsGame[];
+  onCancel: () => void;
+  onSave: (edit: BetEditSubmission) => Promise<void>;
+  placedBets: PlacedBet[];
+}) {
+  const [legs, setLegs] = useState<EditingPlacedLeg[]>([]);
+  const [selectedLegId, setSelectedLegId] = useState<string | null>(null);
+  const [marketByGameId, setMarketByGameId] = useState<Record<string, BetMarket>>({});
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!bet) {
+      setLegs([]);
+      setSelectedLegId(null);
+      setMarketByGameId({});
+      setErrorMessage(null);
+      return;
+    }
+
+    const editableLegs = makeEditablePlacedLegs(bet, oddsGames);
+    setLegs(editableLegs);
+    setSelectedLegId(editableLegs.find((leg) => !leg.locked)?.id ?? editableLegs[0]?.id ?? null);
+    setMarketByGameId(
+      Object.fromEntries(editableLegs.map((leg) => [leg.game_id, leg.market])),
+    );
+    setErrorMessage(null);
+  }, [bet, oddsGames]);
+
+  if (!bet) {
+    return null;
+  }
+
+  const mode = bet.bet_type;
+  const tone = getModeTone(mode);
+  const accent = modeAccentHex(mode);
+  const metrics = getEditedPlacedBetMetrics(bet, legs);
+  const selectedLeg = legs.find((leg) => leg.id === selectedLegId) ?? null;
+  const selectedKeys = new Set(legs.map((leg) => leg.selectionKey));
+  const otherLegs = getPlacedBetConflictLegs(placedBets, bet.id, oddsGames);
+  const straightGame = selectedLeg ? findOddsGame(oddsGames, selectedLeg.game_id) : undefined;
+  const changed = legs.some((leg) => {
+    const original = bet.bet_legs.find((item) => item.id === leg.betLegId);
+    return Boolean(
+      original &&
+        (original.game_id !== leg.game_id ||
+          original.market !== leg.market ||
+          original.selection !== leg.selection ||
+          original.original_line !== leg.original_line ||
+          original.adjusted_line !== leg.adjusted_line ||
+          original.leg_odds !== leg.leg_odds ||
+          original.game_start_time !== leg.game_start_time),
+    );
+  });
+  const canSave = changed && !isSaving && !errorMessage;
+
+  const replaceSelectedLeg = (game: OddsGame, selection: OddsSelection) => {
+    if (!selectedLeg) {
+      setErrorMessage('Choose a leg to swap first.');
+      return;
+    }
+
+    if (selectedLeg.locked) {
+      setErrorMessage('That leg is locked because its game has started.');
+      return;
+    }
+
+    if (mode === 'straight' && (game.id !== selectedLeg.game_id || selection.market !== selectedLeg.market)) {
+      setErrorMessage('Straight pick edits keep the same game and market.');
+      return;
+    }
+
+    if (mode === 'teaser' && selection.market === 'moneyline') {
+      setErrorMessage('Teasers can only use spreads and over/unders.');
+      return;
+    }
+
+    const adjustedLine =
+      mode === 'teaser' && bet.teaser_points
+        ? getAdjustedTeaserLine(selection, bet.teaser_points)
+        : selection.line;
+    const nextLeg = makeEditedPlacedLeg(selectedLeg, game, selection, adjustedLine);
+    const draftLegs = legs.filter((leg) => leg.id !== selectedLeg.id);
+    const conflict = findContradictingPick([...otherLegs, ...draftLegs], nextLeg);
+
+    if (conflict) {
+      haptics.warning();
+      setErrorMessage(formatAddConflictMessage(nextLeg, conflict));
+      return;
+    }
+
+    haptics.light();
+    setErrorMessage(null);
+    setLegs((current) => current.map((leg) => (leg.id === selectedLeg.id ? nextLeg : leg)));
+  };
+
+  const save = async () => {
+    if (!canSave) return;
+
+    await onSave({
+      bet_id: bet.id,
+      legs: legs.map(editableLegToSubmissionLeg),
+      odds: metrics.odds,
+      potential_payout: metrics.potential_payout,
+      teaser_points: metrics.teaser_points,
+    });
+  };
+
+  const gameList =
+    mode === 'straight'
+      ? straightGame
+        ? [straightGame]
+        : []
+      : oddsGames;
+
+  return (
+    <Modal animationType="slide" onRequestClose={onCancel} visible={Boolean(bet)}>
+      <ModalShell>
+        <ScrollView
+          contentContainerStyle={{
+            gap: 16,
+            paddingBottom: 28,
+            paddingHorizontal: 20,
+            paddingTop: 12,
+          }}>
+            <View className="flex-row items-start justify-between gap-3">
+              <View className="flex-1">
+                <Text
+                  className="text-[10px] font-black uppercase"
+                  style={{ color: accent, letterSpacing: 2.5 }}>
+                  Edit Submitted Pick
+                </Text>
+                <Text
+                  className="mt-2 text-2xl font-black uppercase text-white"
+                  style={{ letterSpacing: -0.4 }}>
+                  {mode === 'straight' ? 'Swap Side' : `Edit ${mode}`}
+                </Text>
+              </View>
+              <Pressable
+                accessibilityLabel="Close edit flow"
+                accessibilityRole="button"
+                hitSlop={8}
+                onPress={onCancel}>
+                <View className="h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06]">
+                  <Ionicons color="rgba(255,255,255,0.72)" name="close" size={18} />
+                </View>
+              </Pressable>
+            </View>
+
+            <Card>
+              <View className="gap-3">
+                <View className="flex-row items-center justify-between gap-2">
+                  <Badge betType={mode} />
+                  <Text
+                    className="text-[11px] font-black uppercase text-white/55"
+                    style={{ letterSpacing: 1.5 }}>
+                    {formatCurrency(bet.amount)} fixed
+                  </Text>
+                </View>
+                <Text className="text-sm font-semibold leading-5 text-white/55">
+                  {mode === 'straight'
+                    ? 'Choose the other side from this same game and market. Coins stay fixed.'
+                    : 'Choose an unlocked leg, then tap a replacement line. Coins stay fixed.'}
+                </Text>
+                <View className="flex-row items-center justify-between border-t border-white/[0.08] pt-3">
+                  <Text
+                    className="text-[10px] font-black uppercase text-white/45"
+                    style={{ letterSpacing: 1.5 }}>
+                    New Reward
+                  </Text>
+                  <Text className="text-base font-black" style={{ color: accent }}>
+                    {formatAmericanOdds(metrics.odds)} · {formatCurrency(metrics.potential_payout)}
+                  </Text>
+                </View>
+              </View>
+            </Card>
+
+            {errorMessage ? (
+              <PickConflictNotice message={errorMessage} onDismiss={() => setErrorMessage(null)} />
+            ) : null}
+
+            {mode !== 'straight' ? (
+              <View className="gap-2">
+                <Text
+                  className="text-[10px] font-black uppercase text-white/50"
+                  style={{ letterSpacing: 2 }}>
+                  Pick Leg to Swap
+                </Text>
+                {legs.map((leg) => (
+                  <EditLegRow
+                    isSelected={leg.id === selectedLegId}
+                    key={leg.id}
+                    leg={leg}
+                    teaserPoints={bet.teaser_points}
+                    onPress={() => {
+                      haptics.selection();
+                      setSelectedLegId(leg.id);
+                      setErrorMessage(null);
+                    }}
+                  />
+                ))}
+              </View>
+            ) : null}
+
+            <View className="gap-3">
+              <Text
+                className="text-[10px] font-black uppercase text-white/50"
+                style={{ letterSpacing: 2 }}>
+                Replacement Lines
+              </Text>
+              {gameList.length === 0 ? (
+                <Card>
+                  <Text className="text-sm font-semibold leading-5 text-white/55">
+                    Lines for this pick are not available right now. Pull to refresh the Pick Board and try again.
+                  </Text>
+                </Card>
+              ) : (
+                gameList.map((game) => {
+                  const activeMarket =
+                    mode === 'straight'
+                      ? selectedLeg?.market ?? 'moneyline'
+                      : marketByGameId[game.id] ?? (mode === 'teaser' ? 'spread' : 'moneyline');
+
+                  return (
+                    <EditSelectionGrid
+                      game={game}
+                      key={game.id}
+                      market={activeMarket}
+                      mode={mode}
+                      selectedKeys={selectedKeys}
+                      teaserPoints={bet.teaser_points ?? undefined}
+                      onMarketChange={
+                        mode === 'straight'
+                          ? undefined
+                          : (market) =>
+                              setMarketByGameId((current) => ({
+                                ...current,
+                                [game.id]: market,
+                              }))
+                      }
+                      onSelect={replaceSelectedLeg}
+                    />
+                  );
+                })
+              )}
+            </View>
+
+            <View className="flex-row gap-3">
+              <View className="flex-1">
+                <Button title="Cancel" variant="secondary" onPress={onCancel} />
+              </View>
+              <View className="flex-[1.35]">
+                <Button
+                  disabled={!canSave}
+                  loading={isSaving}
+                  title={changed ? 'Save Changes' : 'Choose a Swap'}
+                  onPress={() => {
+                    void save();
+                  }}
+                />
+              </View>
+            </View>
+        </ScrollView>
+      </ModalShell>
+    </Modal>
+  );
+}
+
 function PlacedBetCard({
   bet,
   cosmetics,
+  highlighted,
   isLockHeadline,
+  onEdit,
   onShare,
+  onSetPotw,
+  potwSwapClosed,
+  potwSwapPending,
   shareLoading,
 }: {
   bet: PlacedBet;
   cosmetics?: EquippedCosmeticsByCategory;
+  highlighted: boolean;
   isLockHeadline: boolean;
+  onEdit: () => void;
   onShare: () => Promise<void>;
+  onSetPotw: () => void;
+  potwSwapClosed: boolean;
+  potwSwapPending: boolean;
   shareLoading: boolean;
 }) {
-  const allLocked = bet.bet_legs.every(
-    (leg) => leg.locked || new Date(leg.game_start_time).getTime() <= Date.now(),
-  );
+  const isLocked = isPlacedBetLocked(bet);
   const isLock = bet.is_lock;
   const displayedReward = getDisplayedPlacedPayout(bet);
   const cappedParlay = isCappedPlacedParlay(bet);
   const dim = !isLockHeadline && !isLock; // gently de-emphasize non-lock bets after headline
-
-  return (
-    <LockEffect cosmetics={isLock ? cosmetics : undefined}>
+  const showPotwStar = isLock || (!potwSwapClosed && !isLocked);
+  const canSetPotw = !isLock && !potwSwapClosed && !isLocked && !potwSwapPending;
+  const card = (
     <View
       className={cn(
         'overflow-hidden rounded-2xl border bg-white/[0.04]',
@@ -2761,8 +3615,13 @@ function PlacedBetCard({
         <View className="flex-row items-start justify-between gap-3">
           <View className="flex-1 gap-2">
             <View className="flex-row flex-wrap items-center gap-2">
+              <PotwStarButton
+                disabled={!canSetPotw}
+                isActive={isLock}
+                onPress={onSetPotw}
+                visible={showPotwStar}
+              />
               <Badge betType={bet.bet_type} />
-              {isLock ? <LockBadge compact /> : null}
             </View>
             <Text
               className={cn(
@@ -2776,11 +3635,11 @@ function PlacedBetCard({
                 : `${bet.bet_legs.length}-leg ${bet.bet_type}`}
             </Text>
           </View>
-          <Badge label={allLocked ? 'Closed' : 'Editable'} tone={allLocked ? 'red' : 'green'} />
+          {isLocked ? <LockStatusPill /> : <EditActionButton />}
         </View>
         {bet.bet_legs.map((leg) => {
-          const legLocked =
-            leg.locked || new Date(leg.game_start_time).getTime() <= Date.now();
+          const legLocked = isPlacedLegLocked(leg);
+          const showLegLockState = legLocked;
           return (
             <View className="rounded-2xl bg-white/[0.04] p-3" key={leg.id}>
               <View className="flex-row justify-between gap-3">
@@ -2790,10 +3649,7 @@ function PlacedBetCard({
                     {marketLabel(leg.market)} · {formatGameTime(leg.game_start_time)}
                   </Text>
                 </View>
-                <Badge
-                  label={legLocked ? 'Closed' : 'Open'}
-                  tone={legLocked ? 'red' : 'green'}
-                />
+                {showLegLockState ? <LegLockPill label="Locked" locked={legLocked} /> : null}
               </View>
               {bet.bet_type === 'teaser' ? (
                 <Text className="mt-2 text-[11px] font-black text-cyan-accent">
@@ -2837,6 +3693,29 @@ function PlacedBetCard({
         />
       </View>
     </View>
+  );
+
+  const content = isLocked ? (
+    card
+  ) : (
+    <PressableScale
+      accessibilityLabel="Edit submitted pick"
+      accessibilityRole="button"
+      onPress={onEdit}
+      pressedScale={0.985}>
+      {card}
+    </PressableScale>
+  );
+
+  return (
+    <LockEffect cosmetics={isLock ? cosmetics : undefined}>
+      {highlighted ? (
+        <LivePulse color={THEME_COLORS.gold} intensity={0.65} style={{ borderRadius: 18 }}>
+          {content}
+        </LivePulse>
+      ) : (
+        content
+      )}
     </LockEffect>
   );
 }
@@ -2844,10 +3723,20 @@ function PlacedBetCard({
 function PlacedBetsView({
   bets,
   cosmetics,
+  highlightedPotwBetId,
+  onEdit,
+  onSetPotw,
+  potwSwapClosed,
+  potwSwapPendingBetId,
   userId,
 }: {
   bets: PlacedBet[];
   cosmetics?: EquippedCosmeticsByCategory;
+  highlightedPotwBetId: string | null;
+  onEdit: (bet: PlacedBet) => void;
+  onSetPotw: (bet: PlacedBet) => void;
+  potwSwapClosed: boolean;
+  potwSwapPendingBetId: string | null;
   userId: string | undefined;
 }) {
   const shareBet = useShareBetToChat(userId);
@@ -2891,7 +3780,7 @@ function PlacedBetsView({
             This Week is Submitted
           </Text>
           <Text className="text-sm font-semibold text-white/55">
-            Multi-pick cards stay editable until every leg's game starts.
+            Picks stay editable until their lock game starts. Pick of the Week can be moved until first kickoff.
           </Text>
           <View className="mt-2 flex-row items-center justify-between">
             <Text
@@ -2918,9 +3807,14 @@ function PlacedBetsView({
         <PlacedBetCard
           bet={bet}
           cosmetics={cosmetics}
+          highlighted={highlightedPotwBetId === bet.id}
           isLockHeadline={index === 0 && bet.is_lock}
           key={bet.id}
+          onEdit={() => onEdit(bet)}
           onShare={() => handleShare(bet)}
+          onSetPotw={() => onSetPotw(bet)}
+          potwSwapClosed={potwSwapClosed}
+          potwSwapPending={potwSwapPendingBetId === bet.id}
           shareLoading={shareBet.isPending}
         />
       ))}
@@ -2972,7 +3866,11 @@ export default function BetBoardScreen() {
   const [teaserPoints, setTeaserPoints] = useState<TeaserPoints>(6);
   const [slipSnap, setSlipSnap] = useState<SnapIndex>(0);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [editingPlacedBet, setEditingPlacedBet] = useState<PlacedBet | null>(null);
+  const [highlightedPotwBetId, setHighlightedPotwBetId] = useState<string | null>(null);
   const [tourVisible, setTourVisible] = useState(false);
+  const [pickConflictMessage, setPickConflictMessage] = useState<string | null>(null);
+  const [selectionConflict, setSelectionConflict] = useState<SelectionConflict | null>(null);
 
   const leagueSummaries = leaguesQuery.data ?? [];
   const leagues = leagueSummaries.map((summary) => summary.league);
@@ -2983,11 +3881,27 @@ export default function BetBoardScreen() {
     weekNumber: selectedLeague?.current_week,
   });
   const placedBetsQuery = usePlacedBets(selectedLeague?.id, user?.id, selectedLeague?.current_week);
+  const revealTimeQuery = useLeagueWeekRevealTime(selectedLeague?.id, selectedLeague?.current_week);
   const submitBets = useSubmitBetsMutation(selectedLeague?.id, user?.id, selectedLeague?.current_week);
+  const updatePlacedBet = useUpdatePlacedBetMutation(
+    selectedLeague?.id,
+    user?.id,
+    selectedLeague?.current_week,
+  );
+  const setPickOfWeek = useSetPickOfWeekMutation(
+    selectedLeague?.id,
+    user?.id,
+    selectedLeague?.current_week,
+  );
   const placedBets = placedBetsQuery.data ?? [];
   const isReadOnly = placedBets.length > 0;
   const canAccessBetBoard = accessQuery.data ?? true;
+  const potwSwapClosed = revealTimeQuery.data
+    ? Date.now() >= new Date(revealTimeQuery.data).getTime()
+    : false;
   const validation = useMemo(() => getValidationState(slipBets), [slipBets]);
+  useSyncLeagueWeekSlate(selectedLeague?.id, selectedLeague?.current_week, oddsQuery.data);
+  useLockClock(isReadOnly);
 
   const builderLegSelectionKeys = useMemo(() => {
     const keys = new Set<string>();
@@ -3013,6 +3927,10 @@ export default function BetBoardScreen() {
     setTeaserLegs([]);
     setParlayAmount('');
     setTeaserAmount('');
+    setEditingPlacedBet(null);
+    setHighlightedPotwBetId(null);
+    setPickConflictMessage(null);
+    setSelectionConflict(null);
   }, [selectedLeagueId]);
 
   useEffect(() => {
@@ -3021,10 +3939,217 @@ export default function BetBoardScreen() {
     }
   }, [leagues.length, tourFlag.isLoading, tourFlag.value]);
 
+  useEffect(() => {
+    if (!highlightedPotwBetId) {
+      return;
+    }
+
+    const timeout = setTimeout(() => setHighlightedPotwBetId(null), 1600);
+    return () => clearTimeout(timeout);
+  }, [highlightedPotwBetId]);
+
+  useEffect(() => {
+    if (!selectionConflict) {
+      return;
+    }
+
+    const timeout = setTimeout(() => setSelectionConflict(null), 5500);
+    return () => clearTimeout(timeout);
+  }, [selectionConflict]);
+
+  const getTargetLegForSelection = (game: OddsGame, selection: OddsSelection) => {
+    if (mode === 'teaser') {
+      if (selection.market === 'moneyline') {
+        return null;
+      }
+
+      return makeSlipLeg(game, selection, getAdjustedTeaserLine(selection, teaserPoints));
+    }
+
+    return makeSlipLeg(game, selection);
+  };
+
+  const getConflictSources = () => {
+    const builderSources: { leg: SlipLeg; source: ConflictSource }[] = [
+      ...parlayLegs.map((leg) => ({
+        leg,
+        source: { kind: 'builder' as const, mode: 'parlay' as const },
+      })),
+      ...teaserLegs.map((leg) => ({
+        leg,
+        source: { kind: 'builder' as const, mode: 'teaser' as const },
+      })),
+    ];
+
+    const slipSources = slipBets.flatMap((bet) =>
+      bet.legs.map((leg) => ({
+        leg,
+        source: { bet, kind: 'slip' as const },
+      })),
+    );
+
+    return [...builderSources, ...slipSources];
+  };
+
+  const getSelectionConflict = (game: OddsGame, selection: OddsSelection) => {
+    const nextLeg = getTargetLegForSelection(game, selection);
+    if (!nextLeg) {
+      return null;
+    }
+
+    const selectedInCurrentBuilder =
+      (mode === 'parlay' && parlayLegs.some((leg) => leg.selectionKey === nextLeg.selectionKey)) ||
+      (mode === 'teaser' && teaserLegs.some((leg) => leg.selectionKey === nextLeg.selectionKey));
+
+    if (selectedInCurrentBuilder) {
+      return null;
+    }
+
+    const conflict = getConflictSources().find((item) =>
+      areDirectlyContradictingPicks(item.leg, nextLeg),
+    );
+
+    if (!conflict) {
+      return null;
+    }
+
+    return makeSelectionConflict({
+      existingLeg: conflict.leg,
+      game,
+      nextLeg,
+      selection,
+      source: conflict.source,
+      targetMode: mode,
+    });
+  };
+
+  const removeConflictSource = (conflict: SelectionConflict) => {
+    if (conflict.source.kind === 'builder') {
+      if (conflict.source.mode === 'parlay') {
+        setParlayLegs((current) =>
+          current.filter((leg) => leg.selectionKey !== conflict.existingLeg.selectionKey),
+        );
+      } else {
+        setTeaserLegs((current) =>
+          current.filter((leg) => leg.selectionKey !== conflict.existingLeg.selectionKey),
+        );
+      }
+      return;
+    }
+
+    const sourceBet = conflict.source.bet;
+
+    setSlipBets((current) =>
+      current.flatMap((bet) => {
+        if (bet.id !== sourceBet.id) {
+          return [bet];
+        }
+
+        const updatedBet = getUpdatedSlipBetAfterLegRemoval(
+          bet,
+          conflict.existingLeg.id,
+        );
+        return updatedBet ? [updatedBet] : [];
+      }),
+    );
+  };
+
+  const addConflictReplacement = (conflict: SelectionConflict) => {
+    if (conflict.targetMode === 'straight') {
+      setEditingSlipBet(null);
+      setPendingStraightSelection({ game: conflict.game, selection: conflict.selection });
+      return;
+    }
+
+    if (conflict.targetMode === 'parlay') {
+      setParlayLegs((current) => {
+        const replacedInCurrent = current.some(
+          (leg) => leg.selectionKey === conflict.existingLeg.selectionKey,
+        );
+
+        if (replacedInCurrent) {
+          return current.map((leg) =>
+            leg.selectionKey === conflict.existingLeg.selectionKey ? conflict.nextLeg : leg,
+          );
+        }
+
+        if (current.some((leg) => leg.selectionKey === conflict.nextLeg.selectionKey)) {
+          return current;
+        }
+
+        if (current.length >= 6) {
+          Alert.alert('Leg limit reached', 'This pick can have up to 6 legs.');
+          return current;
+        }
+
+        return [...current, conflict.nextLeg];
+      });
+      return;
+    }
+
+    setTeaserLegs((current) => {
+      const replacedInCurrent = current.some(
+        (leg) => leg.selectionKey === conflict.existingLeg.selectionKey,
+      );
+
+      if (replacedInCurrent) {
+        return current.map((leg) =>
+          leg.selectionKey === conflict.existingLeg.selectionKey ? conflict.nextLeg : leg,
+        );
+      }
+
+      if (current.some((leg) => leg.selectionKey === conflict.nextLeg.selectionKey)) {
+        return current;
+      }
+
+      if (current.length >= 4) {
+        Alert.alert('Leg limit reached', 'This pick can have up to 4 legs.');
+        return current;
+      }
+
+      return [...current, conflict.nextLeg];
+    });
+  };
+
+  const applySelectionConflictSwap = (conflict: SelectionConflict) => {
+    if (
+      conflict.targetMode === 'parlay' &&
+      !(conflict.source.kind === 'builder' && conflict.source.mode === 'parlay') &&
+      parlayLegs.length >= 6
+    ) {
+      Alert.alert('Leg limit reached', 'This pick can have up to 6 legs.');
+      return;
+    }
+
+    if (
+      conflict.targetMode === 'teaser' &&
+      !(conflict.source.kind === 'builder' && conflict.source.mode === 'teaser') &&
+      teaserLegs.length >= 4
+    ) {
+      Alert.alert('Leg limit reached', 'This pick can have up to 4 legs.');
+      return;
+    }
+
+    haptics.medium();
+    removeConflictSource(conflict);
+    addConflictReplacement(conflict);
+    setPickConflictMessage(null);
+    setSelectionConflict(null);
+  };
+
   const addBuilderLeg = (currentLegs: SlipLeg[], nextLeg: SlipLeg, maxLegs: number) => {
     if (currentLegs.some((leg) => leg.selectionKey === nextLeg.selectionKey)) {
       haptics.light();
+      setPickConflictMessage(null);
       return currentLegs.filter((leg) => leg.selectionKey !== nextLeg.selectionKey);
+    }
+
+    const conflictingLeg = findContradictingPick([...getSlipLegs(slipBets), ...currentLegs], nextLeg);
+    if (conflictingLeg) {
+      haptics.warning();
+      setPickConflictMessage(formatAddConflictMessage(nextLeg, conflictingLeg));
+      setSelectionConflict(null);
+      return currentLegs;
     }
 
     if (currentLegs.length >= maxLegs) {
@@ -3033,19 +4158,9 @@ export default function BetBoardScreen() {
       return currentLegs;
     }
 
-    const conflictingLeg = findContradictingLeg(currentLegs, nextLeg);
-    if (conflictingLeg) {
-      haptics.warning();
-      Alert.alert(
-        'Conflicting legs',
-        `${formatLegConflictLabel(nextLeg)} conflicts with ${formatLegConflictLabel(
-          conflictingLeg,
-        )} on ${formatMatchupLabel(nextLeg)}. Choose one side.`,
-      );
-      return currentLegs;
-    }
-
     haptics.light();
+    setPickConflictMessage(null);
+    setSelectionConflict(null);
     return [...currentLegs, nextLeg];
   };
 
@@ -3065,8 +4180,29 @@ export default function BetBoardScreen() {
       return;
     }
 
+    const selectionConflictForTap = getSelectionConflict(game, selection);
+    if (selectionConflictForTap) {
+      haptics.warning();
+      setPickConflictMessage(null);
+      setSelectionConflict(selectionConflictForTap);
+      return;
+    }
+
     if (mode === 'straight') {
+      const nextLeg = makeSlipLeg(game, selection);
+      const conflictingLeg = findContradictingPick(
+        [...getSlipLegs(slipBets), ...parlayLegs, ...teaserLegs],
+        nextLeg,
+      );
+      if (conflictingLeg) {
+        haptics.warning();
+        setPickConflictMessage(formatAddConflictMessage(nextLeg, conflictingLeg));
+        return;
+      }
+
       haptics.light();
+      setPickConflictMessage(null);
+      setSelectionConflict(null);
       setEditingSlipBet(null);
       setPendingStraightSelection({ game, selection });
       return;
@@ -3110,6 +4246,8 @@ export default function BetBoardScreen() {
         { ...nextBet, is_lock: existing?.is_lock ?? false },
       ];
     });
+    setPickConflictMessage(null);
+    setSelectionConflict(null);
     setPendingStraightSelection(null);
     setSlipSnap(1);
   };
@@ -3127,6 +4265,8 @@ export default function BetBoardScreen() {
     setSlipBets((current) =>
       current.map((bet) => (bet.id === betId ? updateSlipBetAmount(bet, amount) : bet)),
     );
+    setPickConflictMessage(null);
+    setSelectionConflict(null);
     setEditingSlipBet(null);
     setSlipSnap(1);
   };
@@ -3139,6 +4279,8 @@ export default function BetBoardScreen() {
           haptics.medium();
           setEditingSlipBet(null);
           setSlipBets([]);
+          setPickConflictMessage(null);
+          setSelectionConflict(null);
           setSlipSnap(0);
         },
         style: 'destructive',
@@ -3172,6 +4314,15 @@ export default function BetBoardScreen() {
       rawPotentialReward: rawReward,
       teaser_points: null,
     };
+    const contradiction = findPickContradiction(getSlipLegs(slipBets), bet.legs);
+    if (contradiction) {
+      haptics.warning();
+      setPickConflictMessage(
+        formatAddConflictMessage(contradiction.nextLeg, contradiction.existingLeg),
+      );
+      setSelectionConflict(null);
+      return;
+    }
 
     setSlipBets((current) => {
       const existing = current.find((item) => item.id === bet.id);
@@ -3180,6 +4331,8 @@ export default function BetBoardScreen() {
         { ...bet, is_lock: existing?.is_lock ?? false },
       ];
     });
+    setPickConflictMessage(null);
+    setSelectionConflict(null);
     setParlayLegs([]);
     setParlayAmount('');
     setSlipSnap(1);
@@ -3209,6 +4362,15 @@ export default function BetBoardScreen() {
       potential_payout: calculatePotentialPayout(amount, odds),
       teaser_points: teaserPoints,
     };
+    const contradiction = findPickContradiction(getSlipLegs(slipBets), bet.legs);
+    if (contradiction) {
+      haptics.warning();
+      setPickConflictMessage(
+        formatAddConflictMessage(contradiction.nextLeg, contradiction.existingLeg),
+      );
+      setSelectionConflict(null);
+      return;
+    }
 
     setSlipBets((current) => {
       const existing = current.find((item) => item.id === bet.id);
@@ -3217,6 +4379,8 @@ export default function BetBoardScreen() {
         { ...bet, is_lock: existing?.is_lock ?? false },
       ];
     });
+    setPickConflictMessage(null);
+    setSelectionConflict(null);
     setTeaserLegs([]);
     setTeaserAmount('');
     setSlipSnap(1);
@@ -3247,6 +4411,62 @@ export default function BetBoardScreen() {
     } catch (error) {
       haptics.error();
       Alert.alert('Could not submit picks', error instanceof Error ? error.message : 'Try again.');
+    }
+  };
+
+  const handleOpenPlacedBetEdit = (bet: PlacedBet) => {
+    if (isPlacedBetLocked(bet)) {
+      haptics.warning();
+      Alert.alert('Pick locked', 'This pick is locked because one of its games has started.');
+      return;
+    }
+
+    haptics.selection();
+    setEditingPlacedBet(bet);
+  };
+
+  const handleSavePlacedBetEdit = async (edit: BetEditSubmission) => {
+    try {
+      await updatePlacedBet.mutateAsync(edit);
+      setEditingPlacedBet(null);
+      haptics.success();
+      Alert.alert('Pick updated', 'Your submitted pick has been updated.');
+    } catch (error) {
+      haptics.error();
+      Alert.alert('Could not update pick', error instanceof Error ? error.message : 'Try again.');
+    }
+  };
+
+  const handleSetPlacedPotw = async (bet: PlacedBet) => {
+    if (bet.is_lock || setPickOfWeek.isPending) {
+      return;
+    }
+
+    if (potwSwapClosed) {
+      haptics.warning();
+      Alert.alert(
+        'Pick of the Week locked',
+        'Pick of the Week can no longer be changed after first kickoff.',
+      );
+      return;
+    }
+
+    if (isPlacedBetLocked(bet)) {
+      haptics.warning();
+      Alert.alert('Pick locked', 'This pick is locked and cannot become Pick of the Week.');
+      return;
+    }
+
+    try {
+      await setPickOfWeek.mutateAsync(bet.id);
+      setHighlightedPotwBetId(bet.id);
+      haptics.success();
+    } catch (error) {
+      haptics.error();
+      Alert.alert(
+        'Could not change Pick of the Week',
+        error instanceof Error ? error.message : 'Try again.',
+      );
     }
   };
 
@@ -3303,6 +4523,7 @@ export default function BetBoardScreen() {
                     accent="green"
                     onChange={(value) => {
                       haptics.selection();
+                      setSelectionConflict(null);
                       setMode(value);
                     }}
                     options={BET_MODE_OPTIONS}
@@ -3321,6 +4542,22 @@ export default function BetBoardScreen() {
                 placedBets={isReadOnly ? placedBets : undefined}
                 slipBets={slipBets}
               />
+
+              {pickConflictMessage ? (
+                <PickConflictNotice
+                  message={pickConflictMessage}
+                  onDismiss={() => setPickConflictMessage(null)}
+                />
+              ) : null}
+
+              {selectionConflict ? (
+                <PickConflictNotice
+                  actionLabel={selectionConflict.actionLabel}
+                  message={selectionConflict.message}
+                  onAction={() => applySelectionConflictSwap(selectionConflict)}
+                  onDismiss={() => setSelectionConflict(null)}
+                />
+              ) : null}
 
               {!isReadOnly && !canAccessBetBoard ? (
                 <Card tone="highlight">
@@ -3343,9 +4580,11 @@ export default function BetBoardScreen() {
                   legs={parlayLegs}
                   onAddToSlip={addParlayToSlip}
                   onAmountChange={setParlayAmount}
-                  onRemoveLeg={(id) =>
-                    setParlayLegs((current) => current.filter((leg) => leg.id !== id))
-                  }
+                  onRemoveLeg={(id) => {
+                    setPickConflictMessage(null);
+                    setSelectionConflict(null);
+                    setParlayLegs((current) => current.filter((leg) => leg.id !== id));
+                  }}
                 />
               ) : null}
 
@@ -3355,11 +4594,14 @@ export default function BetBoardScreen() {
                   legs={teaserLegs}
                   onAddToSlip={addTeaserToSlip}
                   onAmountChange={setTeaserAmount}
-                  onRemoveLeg={(id) =>
-                    setTeaserLegs((current) => current.filter((leg) => leg.id !== id))
-                  }
+                  onRemoveLeg={(id) => {
+                    setPickConflictMessage(null);
+                    setSelectionConflict(null);
+                    setTeaserLegs((current) => current.filter((leg) => leg.id !== id));
+                  }}
                   onTeaserPointsChange={(points) => {
                     setTeaserPoints(points);
+                    setSelectionConflict(null);
                     setTeaserLegs((current) =>
                       current.map((leg) => ({
                         ...leg,
@@ -3393,6 +4635,11 @@ export default function BetBoardScreen() {
                 <PlacedBetsView
                   bets={placedBets}
                   cosmetics={cosmeticsQuery.data?.equippedByCategory}
+                  highlightedPotwBetId={highlightedPotwBetId}
+                  onEdit={handleOpenPlacedBetEdit}
+                  onSetPotw={handleSetPlacedPotw}
+                  potwSwapClosed={potwSwapClosed}
+                  potwSwapPendingBetId={setPickOfWeek.variables ?? null}
                   userId={user?.id}
                 />
               ) : null}
@@ -3443,11 +4690,17 @@ export default function BetBoardScreen() {
           refreshControl={
             <RefreshControl
               tintColor={THEME_COLORS.electricGreen}
-              refreshing={oddsQuery.isRefetching || placedBetsQuery.isRefetching || accessQuery.isRefetching}
+              refreshing={
+                oddsQuery.isRefetching ||
+                placedBetsQuery.isRefetching ||
+                accessQuery.isRefetching ||
+                revealTimeQuery.isRefetching
+              }
               onRefresh={() => {
                 void oddsQuery.refetch();
                 void placedBetsQuery.refetch();
                 void accessQuery.refetch();
+                void revealTimeQuery.refetch();
               }}
             />
           }
@@ -3456,13 +4709,15 @@ export default function BetBoardScreen() {
               <GameCard
                 builderLegSelectionKeys={builderLegSelectionKeys}
                 game={item}
+                getSelectionConflict={getSelectionConflict}
                 market={
                   marketByGameId[item.id] ?? (mode === 'teaser' ? 'spread' : 'moneyline')
                 }
                 mode={mode}
-                onMarketChange={(market) =>
-                  setMarketByGameId((current) => ({ ...current, [item.id]: market }))
-                }
+                onMarketChange={(market) => {
+                  setSelectionConflict(null);
+                  setMarketByGameId((current) => ({ ...current, [item.id]: market }));
+                }}
                 onSelect={(selection) => handleSelectOdds(item, selection)}
                 readOnly={isReadOnly}
                 teaserPoints={teaserPoints}
@@ -3489,6 +4744,15 @@ export default function BetBoardScreen() {
         }}
       />
 
+      <PostSubmitEditModal
+        bet={editingPlacedBet}
+        isSaving={updatePlacedBet.isPending}
+        oddsGames={oddsQuery.data ?? []}
+        placedBets={placedBets}
+        onCancel={() => setEditingPlacedBet(null)}
+        onSave={handleSavePlacedBetEdit}
+      />
+
       <BetSlipSheet
         isSubmitting={submitBets.isPending}
         cosmetics={cosmeticsQuery.data?.equippedByCategory}
@@ -3504,6 +4768,8 @@ export default function BetBoardScreen() {
           if (editingSlipBet?.bet.id === id) {
             setEditingSlipBet(null);
           }
+          setPickConflictMessage(null);
+          setSelectionConflict(null);
           setSlipBets((current) => current.filter((bet) => bet.id !== id));
         }}
         onSnapChange={setSlipSnap}

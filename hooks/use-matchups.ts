@@ -14,15 +14,26 @@ import type {
 
 export type { BetWithLegs } from '@/types/database';
 
+export type MatchupPickVisibility = {
+  hiddenReason: 'own_card' | 'revealed' | 'hidden_until_kickoff' | 'not_submitted' | 'no_user';
+  isSubmitted: boolean;
+  isVisible: boolean;
+  revealAt: string | null;
+  userId: string | null;
+};
+
 export type MatchupDetail = {
   awayBets: BetWithLegs[];
+  awayPickVisibility: MatchupPickVisibility;
   awayStanding: StandingRow | null;
   awayUser: UserRow | null;
   homeBets: BetWithLegs[];
+  homePickVisibility: MatchupPickVisibility;
   homeStanding: StandingRow | null;
   homeUser: UserRow;
   league: LeagueRow;
   matchup: WeeklyMatchupRow;
+  revealAt: string | null;
 };
 
 export type HomeLeagueCard = {
@@ -133,6 +144,15 @@ function sortByCreatedAt(bets: BetWithLegs[]) {
   return [...bets].sort((left, right) => left.created_at.localeCompare(right.created_at));
 }
 
+function normalizeMatchupDetail(data: unknown): MatchupDetail {
+  const detail = data as MatchupDetail;
+  return {
+    ...detail,
+    awayBets: sortByCreatedAt(detail.awayBets ?? []),
+    homeBets: sortByCreatedAt(detail.homeBets ?? []),
+  };
+}
+
 export function useMatchupDetail(matchupId: string | undefined) {
   return useQuery({
     enabled: Boolean(matchupId),
@@ -141,56 +161,11 @@ export function useMatchupDetail(matchupId: string | undefined) {
         throw new Error('Matchup is required.');
       }
 
-      const { data: matchupData, error: matchupError } = await supabase
-        .from('weekly_matchups')
-        .select('*')
-        .eq('id', matchupId)
-        .single();
-      const matchup = assertSupabaseResult(matchupData as WeeklyMatchupRow | null, matchupError);
+      const { data, error } = await supabase.rpc('get_matchup_detail', {
+        p_matchup_id: matchupId,
+      });
 
-      const [leagueResult, standingsResult, users, bets] = await Promise.all([
-        supabase.from('leagues').select('*').eq('id', matchup.league_id).single(),
-        supabase
-          .from('standings')
-          .select('*')
-          .eq('league_id', matchup.league_id)
-          .eq('week_number', matchup.week_number)
-          .in(
-            'user_id',
-            matchup.away_user_id
-              ? [matchup.home_user_id, matchup.away_user_id]
-              : [matchup.home_user_id],
-          ),
-        fetchUsersByIds(
-          matchup.away_user_id
-            ? [matchup.home_user_id, matchup.away_user_id]
-            : [matchup.home_user_id],
-        ),
-        fetchBetsForUsers({
-          leagueId: matchup.league_id,
-          userIds: matchup.away_user_id
-            ? [matchup.home_user_id, matchup.away_user_id]
-            : [matchup.home_user_id],
-          weekNumbers: [matchup.week_number],
-        }),
-      ]);
-
-      const league = assertSupabaseResult(leagueResult.data as LeagueRow | null, leagueResult.error);
-      const standings = assertSupabaseResult(standingsResult.data as StandingRow[] | null, standingsResult.error);
-      const usersById = indexUsers(users);
-
-      return {
-        awayBets: sortByCreatedAt(betsForUserWeek(bets, matchup.away_user_id, matchup.week_number)),
-        awayStanding:
-          standings.find((standing) => standing.user_id === matchup.away_user_id) ?? null,
-        awayUser: matchup.away_user_id ? usersById[matchup.away_user_id] ?? null : null,
-        homeBets: sortByCreatedAt(betsForUserWeek(bets, matchup.home_user_id, matchup.week_number)),
-        homeStanding:
-          standings.find((standing) => standing.user_id === matchup.home_user_id) ?? null,
-        homeUser: usersById[matchup.home_user_id],
-        league,
-        matchup,
-      };
+      return normalizeMatchupDetail(assertSupabaseResult(data, error));
     },
     queryKey: matchupKeys.detail(matchupId),
   });

@@ -8,6 +8,7 @@ export { Button } from './button';
 export { Card } from './card';
 export { Confetti } from './confetti';
 export { LivePulse } from './live-pulse';
+export { ModalShell } from './modal-shell';
 export { NflTeamLogo } from './nfl-team-logo';
 export { PressableScale } from './pressable-scale';
 export { ScreenWrapper } from './screen-wrapper';
