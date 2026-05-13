@@ -32,6 +32,8 @@ import {
   formatRecord,
   getProfitTone,
 } from '@/lib/format';
+import { formatBetLegLabel, formatPickTitle } from '@/lib/pick-labels';
+import { isParentPickLocked } from '@/lib/pick-locking';
 
 function bestBet(bets: BetWithLegs[], direction: 'best' | 'worst') {
   const settled = bets.filter((bet) => bet.profit !== null);
@@ -48,13 +50,7 @@ function bestBet(bets: BetWithLegs[], direction: 'best' | 'worst') {
 }
 
 function hasLiveBets(bets: BetWithLegs[]) {
-  return bets.some(
-    (bet) =>
-      bet.result === 'pending' &&
-      bet.bet_legs.some(
-        (leg) => leg.locked || new Date(leg.game_start_time).getTime() <= Date.now(),
-      ),
-  );
+  return bets.some((bet) => bet.result === 'pending' && isParentPickLocked(bet));
 }
 
 function Header() {
@@ -455,7 +451,6 @@ function NotableBet({
   label: string;
   tone: 'green' | 'red';
 }) {
-  const firstLeg = bet.bet_legs[0];
   const profit = bet.profit ?? 0;
 
   return (
@@ -486,7 +481,7 @@ function NotableBet({
           className="text-sm font-black text-white"
           numberOfLines={1}
           style={{ letterSpacing: -0.2 }}>
-          {firstLeg?.selection ?? bet.bet_type} · {formatAmericanOdds(bet.odds)}
+          {formatPickTitle(bet)} · {formatAmericanOdds(bet.odds)}
         </Text>
       </View>
       <Text
@@ -675,13 +670,7 @@ function awardBetSummary(award: WeeklyAward) {
   const bet = award.bet;
   if (!bet) return null;
 
-  const firstLeg = bet.bet_legs[0];
-  const label =
-    bet.bet_type === 'straight'
-      ? firstLeg?.selection ?? 'Straight pick'
-      : `${bet.bet_legs.length}-leg ${bet.bet_type}`;
-
-  return { betType: bet.bet_type, label, odds: bet.odds, played: bet.amount };
+  return { betType: bet.bet_type, label: formatPickTitle(bet), odds: bet.odds, played: bet.amount };
 }
 
 function AwardTrophy({ award, kind }: { award: WeeklyAward; kind: AwardKind }) {
@@ -784,6 +773,22 @@ function AwardTrophy({ award, kind }: { award: WeeklyAward; kind: AwardKind }) {
                 Profit {formatProfit(award.profit)}
               </Text>
             </View>
+            {award.bet && award.bet.bet_legs.length > 1 ? (
+              <View className="mt-3 gap-1.5">
+                {award.bet.bet_legs.map((leg, index) => (
+                  <View
+                    className="flex-row items-center justify-between gap-2 rounded-lg border border-white/[0.07] bg-white/[0.035] px-2 py-1.5"
+                    key={leg.id}>
+                    <Text className="flex-1 text-[10px] font-semibold text-white/65" numberOfLines={1}>
+                      {index + 1}. {formatBetLegLabel(leg, { betType: award.bet?.bet_type })}
+                    </Text>
+                    <Text className={cn('text-[9px] font-black uppercase', getProfitTone(leg.result === 'win' ? 1 : leg.result === 'loss' ? -1 : 0))}>
+                      {leg.result}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
           </View>
         ) : null}
       </View>

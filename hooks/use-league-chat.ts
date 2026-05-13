@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
 import { logAnalyticsEvent } from '@/lib/analytics';
+import { formatPickTitle } from '@/lib/pick-labels';
 import { supabase } from '@/lib/supabase';
 import type {
   BetWithLegs,
@@ -27,10 +28,10 @@ export type SharedBetMetadata = {
   isLock?: boolean;
   legs: {
     adjustedLine: number | null;
-    market: string;
+    market: BetLegRow['market'];
     odds: number;
     originalLine: number | null;
-    result: string;
+    result: BetLegRow['result'];
     selection: string;
   }[];
   odds: number;
@@ -65,7 +66,7 @@ function messageBodyForBet(bet: ShareableBet) {
   const lockPrefix = bet.is_lock ? 'Shared a Pick of the Week: ' : 'Shared a pick: ';
 
   if (bet.bet_type === 'straight') {
-    return `${lockPrefix}${bet.bet_legs[0]?.selection ?? 'Straight pick'}`;
+    return `${lockPrefix}${formatPickTitle(bet)}`;
   }
 
   return bet.is_lock

@@ -1,3 +1,5 @@
+import { formatPickLineValue, getPickLegBaseLabel } from '@/lib/pick-labels';
+
 export type PickConflictMarket = 'moneyline' | 'spread' | 'over_under';
 
 export type PickConflictLeg = {
@@ -15,17 +17,13 @@ export type PickContradiction<TLeg extends PickConflictLeg> = {
 
 const LINE_EPSILON = 0.001;
 
-function stripSpreadLine(selection: string) {
-  return selection.replace(/\s[+-]\d+(?:\.\d+)?$/, '');
-}
-
 export function getPickConflictSide(leg: PickConflictLeg) {
   if (leg.market === 'spread') {
-    return stripSpreadLine(leg.selection);
+    return getPickLegBaseLabel(leg);
   }
 
   if (leg.market === 'over_under') {
-    return leg.selection.toLowerCase().startsWith('over') ? 'Over' : 'Under';
+    return getPickLegBaseLabel(leg);
   }
 
   return leg.selection;
@@ -98,14 +96,6 @@ export function findPickContradiction<TLeg extends PickConflictLeg>(
   return null;
 }
 
-function formatSignedLine(value: number | null) {
-  if (value === null) {
-    return '';
-  }
-
-  return value > 0 ? `+${value}` : `${value}`;
-}
-
 export function formatPickConflictReason(left: PickConflictLeg, right: PickConflictLeg) {
   if (left.market === 'moneyline') {
     return 'both teams cannot win the same game';
@@ -116,10 +106,10 @@ export function formatPickConflictReason(left: PickConflictLeg, right: PickConfl
   if (left.market === 'spread') {
     return line === null
       ? 'they are opposite sides of the same spread'
-      : `they are opposite sides of the same ${formatSignedLine(line)} spread`;
+      : `they are opposite sides of the same ${formatPickLineValue(line, left.market)} spread`;
   }
 
   return line === null
     ? 'they are opposite sides of the same total'
-    : `they are opposite sides of the same ${line} total`;
+    : `they are opposite sides of the same ${formatPickLineValue(line, left.market)} total`;
 }

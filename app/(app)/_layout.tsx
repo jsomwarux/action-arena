@@ -44,7 +44,6 @@ export default function AppLayout() {
       <Stack.Screen name="disclosure" options={{ title: 'How Action Arena Works' }} />
       <Stack.Screen name="leagues/create" options={{ title: 'Create League' }} />
       <Stack.Screen name="leagues/join" options={{ title: 'Join League' }} />
-      <Stack.Screen name="matchups/[matchupId]" options={{ title: 'Matchup Detail' }} />
       <Stack.Screen name="members/[memberId]" options={{ title: 'Member Profile' }} />
       <Stack.Screen name="bets/[betId]" options={{ title: 'Pick Detail' }} />
       <Stack.Screen name="settings" options={{ title: 'Settings' }} />

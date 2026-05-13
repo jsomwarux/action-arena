@@ -2,6 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Tabs } from 'expo-router';
 import React from 'react';
 
+import { BackButton } from '@/components/ui/back-button';
 import { THEME_COLORS } from '@/constants/theme';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -67,6 +68,21 @@ export default function TabLayout() {
         options={{
           title: 'Profile',
           tabBarIcon: ({ color }) => <TabIcon color={color} name="person-circle-outline" />,
+        }}
+      />
+      <Tabs.Screen
+        name="matchups/[matchupId]"
+        options={{
+          href: null,
+          headerLeft: () => <BackButton />,
+          headerShadowVisible: false,
+          headerShown: true,
+          headerStyle: { backgroundColor: THEME_COLORS.background },
+          headerTintColor: THEME_COLORS.electricGreen,
+          headerTitleStyle: {
+            fontWeight: '900',
+          },
+          title: 'Matchup Detail',
         }}
       />
     </Tabs>

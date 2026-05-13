@@ -1,51 +1,73 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
-import { RefreshControl, ScrollView, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, Modal, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CosmeticAvatar, LockEffect, WinCelebration } from '@/components/cosmetics';
+import { LiveBetStatusSummary, LiveLegScoreLine } from '@/components/picks/live-pick-status';
+import { PostSubmitEditModal } from '@/components/picks/post-submit-edit-modal';
 import {
   AnimatedNumber,
   Badge,
   Card,
   LivePulse,
+  ModalShell,
   NflTeamLogo,
+  PressableScale,
   SkeletonLoader,
   StaggeredItem,
+  WeekNavigator,
 } from '@/components/ui';
 import { LOCK_OF_THE_WEEK_MULTIPLIER } from '@/constants/rules';
 import { THEME_COLORS } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
 import { useEquippedCosmeticsForUsers } from '@/hooks/use-cosmetics';
 import { useLocalFlag } from '@/hooks/use-local-flags';
+import { useLiveScores } from '@/hooks/use-live-scores';
 import {
   type BetWithLegs,
   type MatchupDetail,
   type MatchupPickVisibility,
   useMatchupDetail,
+  useUserWeekMatchup,
 } from '@/hooks/use-matchups';
+import { useUpcomingNflOdds } from '@/hooks/use-odds';
 import { useSeasonPass } from '@/hooks/use-season-pass';
+import {
+  type BetEditSubmission,
+  type PlacedBet,
+  usePlacedBets,
+  useUpdatePlacedBetMutation,
+} from '@/hooks/use-straight-bets';
 import { logAnalyticsEvent } from '@/lib/analytics';
 import { triggerAdHook } from '@/lib/ad-hooks';
+import { getOutcomeRewardTone, getRealizedReward, isSettledResult } from '@/lib/bet-outcome';
 import { cn } from '@/lib/cn';
 import {
   formatAmericanOdds,
   formatCurrency,
+  formatGameTime,
   formatLeagueType,
   formatProfit,
   formatRecord,
   getProfitTone,
 } from '@/lib/format';
+import { haptics } from '@/lib/haptics';
+import { evaluateLiveBetStatus } from '@/lib/live-pick-status';
+import { formatBetLegLabel, formatPickTitle, getPickLogoLabel } from '@/lib/pick-labels';
+import { isParentPickLocked } from '@/lib/pick-locking';
 import type {
-  BetLegRow,
   BetResult,
   BetType,
   EquippedCosmeticsByCategory,
+  LiveGameStateRow,
   UserRow,
 } from '@/types/database';
 
 type Side = 'home' | 'away';
+
+const REGULAR_SEASON_WEEKS = 14;
 
 const resultLabel: Record<BetResult, string> = {
   loss: 'Loss',
@@ -113,26 +135,7 @@ function isInProgress(bet: BetWithLegs) {
   if (bet.result !== 'pending') {
     return false;
   }
-  return bet.bet_legs.some(
-    (leg) => leg.locked || new Date(leg.game_start_time).getTime() <= Date.now(),
-  );
-}
-
-function selectionLabel(leg: BetLegRow, betType: BetType) {
-  // leg.selection already embeds the spread/total line for non-moneyline markets
-  // (e.g. "Dallas Cowboys +2.5", "Under 44.5"), so we only append the line
-  // transformation for teasers — never re-append the base line.
-  if (leg.market === 'moneyline') {
-    return leg.selection;
-  }
-  if (betType === 'teaser' && leg.adjusted_line !== null) {
-    const adjusted =
-      leg.market === 'spread' && leg.adjusted_line > 0
-        ? `+${leg.adjusted_line}`
-        : `${leg.adjusted_line}`;
-    return `${leg.selection} → ${adjusted}`;
-  }
-  return leg.selection;
+  return isParentPickLocked(bet);
 }
 
 function marketCopy(market: string) {
@@ -263,16 +266,26 @@ function BetCard({
   bet,
   cosmetics,
   isUser,
+  liveScoresByGameId = {},
+  onPress,
 }: {
   bet: BetWithLegs;
   cosmetics?: EquippedCosmeticsByCategory;
   isUser: boolean;
+  liveScoresByGameId?: Record<string, LiveGameStateRow | undefined>;
+  onPress?: () => void;
 }) {
   const accent = betTypeAccent(bet.bet_type);
   const inProgress = isInProgress(bet);
   const isMultiLeg = bet.bet_type !== 'straight';
   const firstLeg = bet.bet_legs[0];
   const isLock = bet.is_lock;
+  const isTappable = Boolean(onPress);
+  const liveStatus = evaluateLiveBetStatus(bet, liveScoresByGameId);
+  const isSettled = isSettledResult(bet.result);
+  const displayedReward = isSettled ? getRealizedReward(bet) : bet.potential_payout;
+  const rewardLabel = isSettled ? 'Outcome' : 'Reward';
+  const rewardTone = isSettled ? getOutcomeRewardTone(bet.result) : '';
 
   const inner = (
     <View
@@ -322,13 +335,13 @@ function BetCard({
             {!isMultiLeg && firstLeg ? (
               <View className="flex-row items-center gap-2">
                 {firstLeg.market !== 'over_under' ? (
-                  <NflTeamLogo size={28} teamName={firstLeg.selection} />
+                  <NflTeamLogo size={28} teamName={getPickLogoLabel(firstLeg)} />
                 ) : null}
                 <Text
                   className="flex-1 text-base font-black text-white"
                   numberOfLines={2}
                   style={{ letterSpacing: -0.3 }}>
-                  {selectionLabel(firstLeg, bet.bet_type)}
+                  {formatBetLegLabel(firstLeg, { betType: bet.bet_type })}
                 </Text>
               </View>
             ) : !isMultiLeg ? (
@@ -338,8 +351,17 @@ function BetCard({
                 Selection unavailable
               </Text>
             ) : null}
+            <LiveBetStatusSummary status={liveStatus} />
+            {!isMultiLeg && firstLeg ? (
+              <LiveLegScoreLine leg={firstLeg} score={liveScoresByGameId[firstLeg.game_id]} />
+            ) : null}
           </View>
-          <ResultPill bet={bet} />
+          <View className="flex-row items-center gap-1.5">
+            <ResultPill bet={bet} />
+            {isTappable ? (
+              <Ionicons color="rgba(255,255,255,0.34)" name="chevron-forward" size={17} />
+            ) : null}
+          </View>
         </View>
 
         <View className="flex-row justify-between rounded-xl bg-white/[0.04] px-3 py-3">
@@ -357,10 +379,12 @@ function BetCard({
             <Text
               className="text-[10px] font-black uppercase text-white/40"
               style={{ letterSpacing: 1.4 }}>
-              Reward
+              {rewardLabel}
             </Text>
-            <Text className="mt-1 text-sm font-black text-white" style={{ color: accent.hex }}>
-              {formatCurrency(bet.potential_payout)}
+            <Text
+              className={cn('mt-1 text-sm font-black text-white', rewardTone)}
+              style={isSettled ? undefined : { color: accent.hex }}>
+              {formatCurrency(displayedReward)}
             </Text>
           </View>
           <View className="items-end">
@@ -394,7 +418,7 @@ function BetCard({
                   className="flex-row items-center justify-between gap-3 rounded-xl border border-white/[0.06] bg-white/[0.04] px-3 py-3">
                   <View className="flex-1 flex-row items-center gap-3">
                     {leg.market !== 'over_under' ? (
-                      <NflTeamLogo size={24} teamName={leg.selection} />
+                      <NflTeamLogo size={24} teamName={getPickLogoLabel(leg)} />
                     ) : (
                       <View
                         className="h-6 w-6 items-center justify-center rounded-full border"
@@ -409,18 +433,19 @@ function BetCard({
                         </Text>
                       </View>
                     )}
-                    <View className="flex-1">
-                      <Text
-                        className="text-sm font-black text-white"
+                <View className="flex-1">
+                  <Text
+                    className="text-sm font-black text-white"
                         numberOfLines={2}
                         style={{ letterSpacing: -0.2 }}>
-                        {selectionLabel(leg, bet.bet_type)}
+                        {formatBetLegLabel(leg, { betType: bet.bet_type })}
                       </Text>
-                      <Text className="mt-1 text-[11px] font-semibold uppercase text-white/40">
-                        {marketCopy(leg.market)} · {formatAmericanOdds(leg.leg_odds)}
-                      </Text>
-                    </View>
-                  </View>
+                  <Text className="mt-1 text-[11px] font-semibold uppercase text-white/40">
+                    {marketCopy(leg.market)} · {formatAmericanOdds(leg.leg_odds)}
+                  </Text>
+                  <LiveLegScoreLine leg={leg} score={liveScoresByGameId[leg.game_id]} />
+                </View>
+              </View>
                   <LegResultPill result={leg.result} />
                 </View>
               ))}
@@ -431,15 +456,28 @@ function BetCard({
     </View>
   );
 
+  const decorated = isLock ? <LockEffect cosmetics={cosmetics}>{inner}</LockEffect> : inner;
+  const tappable = onPress ? (
+    <PressableScale
+      accessibilityLabel="Open pick"
+      accessibilityRole="button"
+      onPress={onPress}
+      pressedScale={0.985}>
+      {decorated}
+    </PressableScale>
+  ) : (
+    decorated
+  );
+
   if (inProgress) {
     return (
       <LivePulse color={THEME_COLORS.gold} intensity={0.55}>
-        {isLock ? <LockEffect cosmetics={cosmetics}>{inner}</LockEffect> : inner}
+        {tappable}
       </LivePulse>
     );
   }
 
-  return isLock ? <LockEffect cosmetics={cosmetics}>{inner}</LockEffect> : inner;
+  return tappable;
 }
 
 function PlayerSide({
@@ -571,7 +609,6 @@ function ProfitTug({
                 diff > 0 ? 'text-electric-green' : diff < 0 ? 'text-coral-red' : 'text-white/55',
               )}
               style={{ letterSpacing: 1.5 }}>
-              {diff > 0 ? '+' : ''}
               {formatProfit(diff)}
             </Text>
           </View>
@@ -711,14 +748,18 @@ function LockShowdownSide({
   bet,
   cosmetics,
   isUser,
+  liveScoresByGameId,
   name,
+  onBetPress,
   sideLabel,
   visibility,
 }: {
   bet: BetWithLegs | null;
   cosmetics?: EquippedCosmeticsByCategory;
   isUser: boolean;
+  liveScoresByGameId: Record<string, LiveGameStateRow | undefined>;
   name: string;
+  onBetPress?: (bet: BetWithLegs) => void;
   sideLabel: string;
   visibility: MatchupPickVisibility;
 }) {
@@ -742,7 +783,13 @@ function LockShowdownSide({
       {hidden ? (
         <HiddenPicksPlaceholder revealAt={visibility.revealAt} submitted={visibility.isSubmitted} />
       ) : bet ? (
-        <BetCard bet={bet} cosmetics={cosmetics} isUser={isUser} />
+        <BetCard
+          bet={bet}
+          cosmetics={cosmetics}
+          isUser={isUser}
+          liveScoresByGameId={liveScoresByGameId}
+          onPress={onBetPress ? () => onBetPress(bet) : undefined}
+        />
       ) : !visibility.isSubmitted && visibility.isVisible ? (
         <View className="items-center justify-center rounded-2xl border border-dashed border-gold/25 bg-white/[0.02] px-3 py-8">
           <Ionicons color="rgba(255,215,0,0.55)" name="remove-circle-outline" size={26} />
@@ -767,6 +814,9 @@ function LockShowdown({
   awayCosmetics,
   awayVisibility,
   awayName,
+  liveScoresByGameId,
+  onAwayBetPress,
+  onHomeBetPress,
   homeBet,
   homeCosmetics,
   homeIsUser,
@@ -779,6 +829,9 @@ function LockShowdown({
   awayVisibility: MatchupPickVisibility;
   awayName: string;
   awayIsUser: boolean;
+  liveScoresByGameId: Record<string, LiveGameStateRow | undefined>;
+  onAwayBetPress?: (bet: BetWithLegs) => void;
+  onHomeBetPress?: (bet: BetWithLegs) => void;
   homeBet: BetWithLegs | null;
   homeCosmetics?: EquippedCosmeticsByCategory;
   homeIsUser: boolean;
@@ -822,7 +875,9 @@ function LockShowdown({
             bet={homeBet}
             cosmetics={homeCosmetics}
             isUser={homeIsUser}
+            liveScoresByGameId={liveScoresByGameId}
             name={homeName}
+            onBetPress={onHomeBetPress}
             sideLabel="Home"
             visibility={homeVisibility}
           />
@@ -848,7 +903,9 @@ function LockShowdown({
             bet={awayBet}
             cosmetics={awayCosmetics}
             isUser={awayIsUser}
+            liveScoresByGameId={liveScoresByGameId}
             name={awayName}
+            onBetPress={onAwayBetPress}
             sideLabel="Away"
             visibility={awayVisibility}
           />
@@ -863,6 +920,8 @@ function BetColumnSection({
   cosmetics,
   emptyVariant,
   isUser,
+  liveScoresByGameId,
+  onBetPress,
   side,
   subtitle,
   title,
@@ -872,6 +931,8 @@ function BetColumnSection({
   cosmetics?: EquippedCosmeticsByCategory;
   emptyVariant: 'You' | 'Opponent' | 'Player';
   isUser: boolean;
+  liveScoresByGameId: Record<string, LiveGameStateRow | undefined>;
+  onBetPress?: (bet: BetWithLegs) => void;
   side: Side;
   subtitle?: string;
   title: string;
@@ -883,13 +944,16 @@ function BetColumnSection({
       ? THEME_COLORS.cyanAccent
       : THEME_COLORS.coralRed;
   const hidden = !isUser && !visibility.isVisible;
+  const notSubmittedRevealed = !isUser && visibility.isVisible && !visibility.isSubmitted;
   const statusLabel = hidden
     ? visibility.isSubmitted
       ? 'Submitted'
       : 'Not submitted'
-    : `${bets.length} ${bets.length === 1 ? 'pick' : 'picks'}`;
+    : notSubmittedRevealed
+      ? 'Not submitted'
+      : `${bets.length} ${bets.length === 1 ? 'pick' : 'picks'}`;
   const hiddenMessage = hidden ? revealMessage(visibility.revealAt) : null;
-  const resolvedSubtitle = hidden ? null : subtitle;
+  const resolvedSubtitle = hidden || notSubmittedRevealed ? null : subtitle;
 
   return (
     <View className="gap-3">
@@ -962,12 +1026,180 @@ function BetColumnSection({
         <View className="gap-3">
           {bets.map((bet, index) => (
             <StaggeredItem index={index} key={bet.id} perItemDelay={60}>
-              <BetCard bet={bet} cosmetics={cosmetics} isUser={isUser} />
+              <BetCard
+                bet={bet}
+                cosmetics={cosmetics}
+                isUser={isUser}
+                liveScoresByGameId={liveScoresByGameId}
+                onPress={onBetPress ? () => onBetPress(bet) : undefined}
+              />
             </StaggeredItem>
           ))}
         </View>
       )}
     </View>
+  );
+}
+
+function ReadOnlyPickDetailModal({
+  bet,
+  liveScoresByGameId,
+  onClose,
+  ownerLabel,
+}: {
+  bet: BetWithLegs | null;
+  liveScoresByGameId: Record<string, LiveGameStateRow | undefined>;
+  onClose: () => void;
+  ownerLabel: string;
+}) {
+  if (!bet) {
+    return null;
+  }
+
+  const accent = betTypeAccent(bet.bet_type);
+  const isMultiLeg = bet.bet_type !== 'straight';
+  const inProgress = isInProgress(bet);
+  const outcomeLabel = inProgress ? 'Live' : resultLabel[bet.result];
+  const liveStatus = evaluateLiveBetStatus(bet, liveScoresByGameId);
+  const isSettled = isSettledResult(bet.result);
+  const displayedReward = isSettled ? getRealizedReward(bet) : bet.potential_payout;
+  const rewardLabel = isSettled ? 'Outcome' : 'Reward';
+  const rewardTone = isSettled ? getOutcomeRewardTone(bet.result) : '';
+
+  return (
+    <Modal animationType="slide" onRequestClose={onClose} visible={Boolean(bet)}>
+      <ModalShell>
+        <ScrollView
+          contentContainerStyle={{
+            gap: 16,
+            paddingBottom: 28,
+            paddingHorizontal: 20,
+            paddingTop: 12,
+          }}>
+          <View className="flex-row items-start justify-between gap-3">
+            <View className="flex-1">
+              <Text
+                className="text-[10px] font-black uppercase"
+                style={{ color: accent.hex, letterSpacing: 2.5 }}>
+                Pick Details
+              </Text>
+              <Text className="mt-2 text-2xl font-black uppercase text-white">
+                {ownerLabel}
+              </Text>
+              <Text className="mt-1 text-sm font-semibold text-white/50">
+                Read-only view
+              </Text>
+            </View>
+            <Pressable accessibilityLabel="Close pick details" accessibilityRole="button" hitSlop={8} onPress={onClose}>
+              <View className="h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06]">
+                <Ionicons color="rgba(255,255,255,0.72)" name="close" size={18} />
+              </View>
+            </Pressable>
+          </View>
+
+          <Card>
+            <View className="gap-4">
+              <View className="flex-row items-start justify-between gap-3">
+                <View className="flex-1 gap-2">
+                  <View className="flex-row items-center gap-2">
+                    <Badge betType={bet.bet_type} />
+                    {bet.is_lock ? <LockPill /> : null}
+                  </View>
+                  <Text className="text-xl font-black text-white">
+                    {formatPickTitle(bet)}
+                  </Text>
+                  <LiveBetStatusSummary status={liveStatus} />
+                </View>
+                <ResultPill bet={bet} />
+              </View>
+
+              <View className="flex-row justify-between rounded-xl bg-white/[0.04] px-3 py-3">
+                <View>
+                  <Text className="text-[10px] font-black uppercase text-white/40" style={{ letterSpacing: 1.4 }}>
+                    Played
+                  </Text>
+                  <Text className="mt-1 text-sm font-black text-white">{formatCurrency(bet.amount)}</Text>
+                </View>
+                <View className="items-center">
+                  <Text className="text-[10px] font-black uppercase text-white/40" style={{ letterSpacing: 1.4 }}>
+                    {rewardLabel}
+                  </Text>
+                  <Text
+                    className={cn('mt-1 text-sm font-black', rewardTone)}
+                    style={isSettled ? undefined : { color: accent.hex }}>
+                    {formatCurrency(displayedReward)}
+                  </Text>
+                </View>
+                <View className="items-end">
+                  <Text className="text-[10px] font-black uppercase text-white/40" style={{ letterSpacing: 1.4 }}>
+                    Profit
+                  </Text>
+                  <Text className={cn('mt-1 text-sm font-black', getProfitTone(bet.profit ?? 0))}>
+                    {bet.profit === null ? outcomeLabel : formatProfit(bet.profit)}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </Card>
+
+          <View className="gap-2">
+            <Text className="text-[10px] font-black uppercase text-white/50" style={{ letterSpacing: 2 }}>
+              {isMultiLeg ? 'Legs' : 'Selection'}
+            </Text>
+            {bet.bet_legs.map((leg, index) => {
+              const legLocked = leg.locked || new Date(leg.game_start_time).getTime() <= Date.now();
+              return (
+                <View
+                  className="rounded-2xl border border-white/[0.08] bg-white/[0.04] p-3"
+                  key={leg.id}>
+                  <View className="flex-row items-start justify-between gap-3">
+                    <View className="flex-1 flex-row items-center gap-3">
+                      {leg.market !== 'over_under' ? (
+                        <NflTeamLogo size={28} teamName={getPickLogoLabel(leg)} />
+                      ) : (
+                        <View
+                          className="h-7 w-7 items-center justify-center rounded-full border"
+                          style={{
+                            backgroundColor: `${accent.hex}1a`,
+                            borderColor: `${accent.hex}66`,
+                          }}>
+                          <Text className="text-[10px] font-black" style={{ color: accent.hex }}>
+                            {index + 1}
+                          </Text>
+                        </View>
+                      )}
+                      <View className="flex-1">
+                        <Text className="text-base font-black text-white" numberOfLines={2}>
+                          {formatBetLegLabel(leg, { betType: bet.bet_type })}
+                        </Text>
+                        <Text className="mt-1 text-[11px] font-semibold uppercase text-white/42">
+                          {marketCopy(leg.market)} · {formatAmericanOdds(leg.leg_odds)}
+                        </Text>
+                        <Text className="mt-1 text-[11px] font-semibold text-white/42">
+                          {formatGameTime(leg.game_start_time)}
+                        </Text>
+                        <LiveLegScoreLine leg={leg} score={liveScoresByGameId[leg.game_id]} />
+                      </View>
+                    </View>
+                    <View className="items-end gap-2">
+                      <LegResultPill result={leg.result} />
+                      {legLocked ? (
+                        <View className="flex-row items-center gap-1 rounded-full border border-white/15 bg-white/[0.06] px-2 py-[2px]">
+                          <Ionicons color="rgba(255,255,255,0.55)" name="lock-closed" size={9} />
+                          <Text className="text-[9px] font-black uppercase text-white/55" style={{ letterSpacing: 1 }}>
+                            Locked
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        </ScrollView>
+      </ModalShell>
+    </Modal>
   );
 }
 
@@ -984,27 +1216,152 @@ function LoadingState() {
   );
 }
 
+function WeekUnavailableCard({ weekNumber }: { weekNumber: number }) {
+  return (
+    <Card>
+      <View className="items-center gap-3 py-5">
+        <View className="h-14 w-14 items-center justify-center rounded-2xl border border-cyan-accent/30 bg-cyan-accent/10">
+          <Ionicons color={THEME_COLORS.cyanAccent} name="calendar-outline" size={24} />
+        </View>
+        <Text
+          className="text-center text-xl font-black uppercase text-white"
+          style={{ letterSpacing: -0.3 }}>
+          Odds Release Monday
+        </Text>
+        <Text className="text-center text-sm font-semibold leading-5 text-white/55">
+          Week {weekNumber} will unlock when the slate is posted. No matchup details
+          or picks are interactive yet.
+        </Text>
+      </View>
+    </Card>
+  );
+}
+
+function NoMatchupScheduledCard({ weekNumber }: { weekNumber: number }) {
+  return (
+    <Card>
+      <View className="items-center gap-3 py-5">
+        <Ionicons color="rgba(255,255,255,0.5)" name="calendar-clear-outline" size={26} />
+        <Text className="text-center text-lg font-black text-white">
+          No matchup scheduled for Week {weekNumber}
+        </Text>
+        <Text className="text-center text-sm font-semibold text-white/50">
+          This week is not available in the league schedule yet.
+        </Text>
+      </View>
+    </Card>
+  );
+}
+
+function ByeWeekBanner({ weekNumber }: { weekNumber: number }) {
+  return (
+    <View className="rounded-2xl border border-cyan-accent/20 bg-cyan-accent/[0.07] p-5">
+      <View className="flex-row items-start gap-3">
+        <View className="h-11 w-11 items-center justify-center rounded-2xl border border-cyan-accent/25 bg-white/[0.04]">
+          <Ionicons color={THEME_COLORS.cyanAccent} name="pause-circle-outline" size={22} />
+        </View>
+        <View className="flex-1">
+          <Text
+            className="text-[10px] font-black uppercase text-cyan-accent"
+            style={{ letterSpacing: 2 }}>
+            Week {weekNumber} · Bye
+          </Text>
+          <Text
+            className="mt-2 text-2xl font-black uppercase text-white"
+            style={{ letterSpacing: -0.4 }}>
+            You're on bye this week.
+          </Text>
+          <Text className="mt-2 text-sm font-semibold leading-5 text-white/58">
+            No matchup, no record impact.
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
 export default function MatchupDetailScreen() {
   const { matchupId } = useLocalSearchParams();
   const resolvedMatchupId = getParamValue(matchupId);
   const { user } = useAuth();
-  const matchupQuery = useMatchupDetail(resolvedMatchupId);
-  const detail = matchupQuery.data;
+  const initialMatchupQuery = useMatchupDetail(resolvedMatchupId);
+  const initialDetail = initialMatchupQuery.data;
   const userId = user?.id;
+  const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
+  const selectedWeekNumber = selectedWeek ?? initialDetail?.matchup.week_number ?? 1;
+  const isFutureWeek =
+    initialDetail !== undefined && selectedWeekNumber > initialDetail.league.current_week;
+  const isInitialWeek =
+    initialDetail !== undefined && selectedWeekNumber === initialDetail.matchup.week_number;
+  const selectedWeekMatchupQuery = useUserWeekMatchup(
+    initialDetail?.league.id,
+    userId,
+    selectedWeekNumber,
+  );
+  const activeMatchupId = isInitialWeek
+    ? resolvedMatchupId
+    : isFutureWeek
+      ? undefined
+      : selectedWeekMatchupQuery.data?.id;
+  const activeMatchupQuery = useMatchupDetail(isInitialWeek ? undefined : activeMatchupId);
+  const detail = isInitialWeek ? initialDetail : activeMatchupQuery.data;
+  const leagueId = initialDetail?.league.id ?? detail?.matchup.league_id;
+  const weekNumber = selectedWeekNumber;
+  const isCurrentWeek =
+    initialDetail !== undefined && selectedWeekNumber === initialDetail.league.current_week;
   const seasonPassQuery = useSeasonPass(userId);
+  const placedBetsQuery = usePlacedBets(leagueId, userId, weekNumber);
+  const oddsQuery = useUpcomingNflOdds();
+  const updatePlacedBet = useUpdatePlacedBetMutation(leagueId, userId, weekNumber);
+  const liveScoreGameIds = useMemo(
+    () =>
+      [...(detail?.homeBets ?? []), ...(detail?.awayBets ?? [])].flatMap((bet) =>
+        bet.bet_legs.map((leg) => leg.game_id),
+      ),
+    [detail?.awayBets, detail?.homeBets],
+  );
+  const liveScoresQuery = useLiveScores(liveScoreGameIds);
   const cosmeticsQuery = useEquippedCosmeticsForUsers([
     detail?.matchup.home_user_id,
     detail?.matchup.away_user_id,
     userId,
   ]);
   const celebrationFlag = useLocalFlag(
-    resolvedMatchupId ? `action-arena.win-celebration.${resolvedMatchupId}` : 'action-arena.win-celebration.pending',
+    detail?.matchup.id
+      ? `action-arena.win-celebration.${detail.matchup.id}`
+      : 'action-arena.win-celebration.pending',
   );
   const [celebrationVisible, setCelebrationVisible] = useState(false);
+  const [editingBet, setEditingBet] = useState<PlacedBet | null>(null);
+  const [detailBet, setDetailBet] = useState<{
+    bet: BetWithLegs;
+    ownerLabel: string;
+  } | null>(null);
   const adHookTriggered = useRef(false);
   const userWonMatchupForEffect = Boolean(
     userId && detail?.matchup.winner_id && detail.matchup.winner_id === userId,
   );
+
+  const refetchActiveDetail = useCallback(async () => {
+    await initialMatchupQuery.refetch();
+    await selectedWeekMatchupQuery.refetch();
+    if (!isInitialWeek) {
+      await activeMatchupQuery.refetch();
+    }
+  }, [
+    activeMatchupQuery.refetch,
+    initialMatchupQuery.refetch,
+    isInitialWeek,
+    selectedWeekMatchupQuery.refetch,
+  ]);
+
+  useEffect(() => {
+    if (!initialDetail || initialDetail.matchup.id !== resolvedMatchupId) {
+      return;
+    }
+
+    setSelectedWeek(initialDetail.matchup.week_number);
+  }, [initialDetail?.matchup.id, initialDetail?.matchup.week_number, resolvedMatchupId]);
 
   useEffect(() => {
     if (!detail) return;
@@ -1027,11 +1384,11 @@ export default function MatchupDetailScreen() {
     }
 
     const timeout = setTimeout(() => {
-      void matchupQuery.refetch();
+      void refetchActiveDetail();
     }, Math.min(delay + 1000, 2_147_483_647));
 
     return () => clearTimeout(timeout);
-  }, [detail?.revealAt, matchupQuery.refetch]);
+  }, [detail?.revealAt, refetchActiveDetail]);
 
   useEffect(() => {
     if (!detail || adHookTriggered.current || seasonPassQuery.isLoading) {
@@ -1059,11 +1416,17 @@ export default function MatchupDetailScreen() {
     setCelebrationVisible(true);
   }, [celebrationFlag.isLoading, celebrationFlag.value, userWonMatchupForEffect]);
 
-  if (matchupQuery.isLoading) {
+  const matchupLoading =
+    initialMatchupQuery.isLoading ||
+    (!isInitialWeek &&
+      !isFutureWeek &&
+      (selectedWeekMatchupQuery.isLoading || activeMatchupQuery.isLoading));
+
+  if (matchupLoading) {
     return <LoadingState />;
   }
 
-  if (!detail) {
+  if (!initialDetail) {
     return (
       <SafeAreaView className="flex-1 bg-arena-bg">
         <View className="flex-1 items-center justify-center gap-4 px-5">
@@ -1079,6 +1442,46 @@ export default function MatchupDetailScreen() {
             This matchup could not be loaded.
           </Text>
         </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (isFutureWeek || !detail) {
+    return (
+      <SafeAreaView className="flex-1 bg-arena-bg">
+        <ScrollView
+          className="flex-1"
+          contentContainerStyle={{ gap: 18, padding: 20, paddingBottom: 36 }}
+          refreshControl={
+            <RefreshControl
+              tintColor={THEME_COLORS.electricGreen}
+              refreshing={
+                initialMatchupQuery.isRefetching ||
+                selectedWeekMatchupQuery.isRefetching ||
+                activeMatchupQuery.isRefetching
+              }
+              onRefresh={refetchActiveDetail}
+            />
+          }
+          showsVerticalScrollIndicator={false}>
+          <View className="items-end">
+            <WeekNavigator
+              maxWeek={REGULAR_SEASON_WEEKS}
+              onChange={(week) => {
+                haptics.selection();
+                setSelectedWeek(week);
+                setEditingBet(null);
+                setDetailBet(null);
+              }}
+              week={selectedWeekNumber}
+            />
+          </View>
+          {isFutureWeek ? (
+            <WeekUnavailableCard weekNumber={selectedWeekNumber} />
+          ) : (
+            <NoMatchupScheduledCard weekNumber={selectedWeekNumber} />
+          )}
+        </ScrollView>
       </SafeAreaView>
     );
   }
@@ -1099,6 +1502,37 @@ export default function MatchupDetailScreen() {
   const awayNonLockBets = detail.awayBets.filter((bet) => !bet.is_lock);
   const homeIsUser = detail.matchup.home_user_id === userId;
   const awayIsUser = Boolean(detail.matchup.away_user_id) && detail.matchup.away_user_id === userId;
+  const isByeWeek = detail.matchup.away_user_id === null;
+  const placedBets = placedBetsQuery.data ?? [];
+  const activeEditingBet = isCurrentWeek && editingBet
+    ? placedBets.find((bet) => bet.id === editingBet.id) ?? editingBet
+    : null;
+
+  const handleBetPress = (bet: BetWithLegs, isOwnPick: boolean, ownerLabel: string) => {
+    if (isOwnPick && isCurrentWeek && bet.result === 'pending' && !isParentPickLocked(bet)) {
+      haptics.selection();
+      setDetailBet(null);
+      setEditingBet(bet as PlacedBet);
+      return;
+    }
+
+    haptics.selection();
+    setEditingBet(null);
+    setDetailBet({ bet, ownerLabel });
+  };
+
+  const handleSavePlacedBetEdit = async (edit: BetEditSubmission) => {
+    try {
+      await updatePlacedBet.mutateAsync(edit);
+      setEditingBet(null);
+      haptics.success();
+      await refetchActiveDetail();
+      Alert.alert('Pick updated', 'Your submitted pick has been updated.');
+    } catch (error) {
+      haptics.error();
+      Alert.alert('Could not update pick', error instanceof Error ? error.message : 'Try again.');
+    }
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-arena-bg">
@@ -1111,14 +1545,32 @@ export default function MatchupDetailScreen() {
         }}
         visible={celebrationVisible}
       />
+      <PostSubmitEditModal
+        bet={activeEditingBet}
+        isSaving={updatePlacedBet.isPending}
+        oddsGames={oddsQuery.data ?? []}
+        placedBets={placedBets}
+        onCancel={() => setEditingBet(null)}
+        onSave={handleSavePlacedBetEdit}
+      />
+      <ReadOnlyPickDetailModal
+        bet={detailBet?.bet ?? null}
+        liveScoresByGameId={liveScoresQuery.scoresByGameId}
+        ownerLabel={detailBet?.ownerLabel ?? 'Pick'}
+        onClose={() => setDetailBet(null)}
+      />
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ gap: 18, padding: 20, paddingBottom: 36 }}
         refreshControl={
           <RefreshControl
             tintColor={THEME_COLORS.electricGreen}
-            refreshing={matchupQuery.isRefetching}
-            onRefresh={matchupQuery.refetch}
+            refreshing={
+              initialMatchupQuery.isRefetching ||
+              selectedWeekMatchupQuery.isRefetching ||
+              activeMatchupQuery.isRefetching
+            }
+            onRefresh={refetchActiveDetail}
           />
         }
         showsVerticalScrollIndicator={false}>
@@ -1141,78 +1593,105 @@ export default function MatchupDetailScreen() {
                 </Text>
               </View>
             ) : null}
-            <View className="flex-row items-center gap-1.5 rounded-full border border-electric-green/30 bg-electric-green/10 px-3 py-2">
-              <Ionicons color={THEME_COLORS.electricGreen} name="calendar" size={12} />
-              <Text
-                className="text-[10px] font-black uppercase text-electric-green"
-                style={{ letterSpacing: 1.5 }}>
-                Week {detail.matchup.week_number} of 14
-              </Text>
-            </View>
+            <WeekNavigator
+              maxWeek={REGULAR_SEASON_WEEKS}
+              onChange={(week) => {
+                haptics.selection();
+                setSelectedWeek(week);
+                setEditingBet(null);
+                setDetailBet(null);
+              }}
+              week={selectedWeekNumber}
+            />
           </View>
         </View>
 
-        <FightCardHeader
-          cosmeticsByUserId={cosmeticsByUserId}
-          detail={detail}
-          userId={userId}
-        />
-        <ProfitTug
-          awayName={awayName}
-          awayProfit={awayProfit}
-          homeName={homeName}
-          homeProfit={homeProfit}
-        />
-        <LockShowdown
-          awayBet={awayLockBet}
-          awayCosmetics={
-            detail.matchup.away_user_id
-              ? cosmeticsByUserId[detail.matchup.away_user_id]
-              : undefined
-          }
-          awayIsUser={awayIsUser}
-          awayName={awayName}
-          awayVisibility={detail.awayPickVisibility}
-          homeBet={homeLockBet}
-          homeCosmetics={cosmeticsByUserId[detail.matchup.home_user_id]}
-          homeIsUser={homeIsUser}
-          homeName={homeName}
-          homeVisibility={detail.homePickVisibility}
-        />
-        <View className="gap-5">
-          <BetColumnSection
-            bets={homeNonLockBets}
-            cosmetics={cosmeticsByUserId[detail.matchup.home_user_id]}
-            emptyVariant={homeIsUser ? 'You' : 'Opponent'}
-            isUser={homeIsUser}
-            side="home"
-            subtitle={`${homeNonLockBets.length === 0 ? 'No' : homeNonLockBets.length} undercard ${
-              homeNonLockBets.length === 1 ? 'pick' : 'picks'
-            } besides the Pick of the Week`}
-            title={homeName}
-            visibility={detail.homePickVisibility}
-          />
-          <BetColumnSection
-            bets={awayNonLockBets}
-            cosmetics={
-              detail.matchup.away_user_id
-                ? cosmeticsByUserId[detail.matchup.away_user_id]
-                : undefined
-            }
-            emptyVariant={awayIsUser ? 'You' : detail.matchup.away_user_id ? 'Opponent' : 'Player'}
-            isUser={awayIsUser}
-            side="away"
-            subtitle={
-              detail.matchup.away_user_id
-                ? `${awayNonLockBets.length === 0 ? 'No' : awayNonLockBets.length} undercard ${
-                    awayNonLockBets.length === 1 ? 'pick' : 'picks'
-                  } besides the Pick of the Week`
-                : 'Opponent has a bye this week.'
-            }
-            title={awayName}
-            visibility={detail.awayPickVisibility}
-          />
-        </View>
+        {isByeWeek ? (
+          <>
+            <ByeWeekBanner weekNumber={selectedWeekNumber} />
+            <View className="gap-5">
+              <BetColumnSection
+                bets={detail.homeBets}
+                cosmetics={cosmeticsByUserId[detail.matchup.home_user_id]}
+                emptyVariant="You"
+                isUser
+                liveScoresByGameId={liveScoresQuery.scoresByGameId}
+                onBetPress={(bet) => handleBetPress(bet, true, 'Your Pick')}
+                side="home"
+                subtitle="Your picks this week (does not affect H2H record)"
+                title={homeName}
+                visibility={detail.homePickVisibility}
+              />
+            </View>
+          </>
+        ) : (
+          <>
+            <FightCardHeader
+              cosmeticsByUserId={cosmeticsByUserId}
+              detail={detail}
+              userId={userId}
+            />
+            <ProfitTug
+              awayName={awayName}
+              awayProfit={awayProfit}
+              homeName={homeName}
+              homeProfit={homeProfit}
+            />
+            <LockShowdown
+              awayBet={awayLockBet}
+              awayCosmetics={
+                detail.matchup.away_user_id
+                  ? cosmeticsByUserId[detail.matchup.away_user_id]
+                  : undefined
+              }
+              awayIsUser={awayIsUser}
+              awayName={awayName}
+              awayVisibility={detail.awayPickVisibility}
+              homeBet={homeLockBet}
+              homeCosmetics={cosmeticsByUserId[detail.matchup.home_user_id]}
+              homeIsUser={homeIsUser}
+              homeName={homeName}
+              homeVisibility={detail.homePickVisibility}
+              liveScoresByGameId={liveScoresQuery.scoresByGameId}
+              onAwayBetPress={(bet) => handleBetPress(bet, awayIsUser, awayIsUser ? 'Your Pick' : `${awayName}'s Pick`)}
+              onHomeBetPress={(bet) => handleBetPress(bet, homeIsUser, homeIsUser ? 'Your Pick' : `${homeName}'s Pick`)}
+            />
+            <View className="gap-5">
+              <BetColumnSection
+                bets={homeNonLockBets}
+                cosmetics={cosmeticsByUserId[detail.matchup.home_user_id]}
+                emptyVariant={homeIsUser ? 'You' : 'Opponent'}
+                isUser={homeIsUser}
+                liveScoresByGameId={liveScoresQuery.scoresByGameId}
+                onBetPress={(bet) => handleBetPress(bet, homeIsUser, homeIsUser ? 'Your Pick' : `${homeName}'s Pick`)}
+                side="home"
+                subtitle={`${homeNonLockBets.length === 0 ? 'No' : homeNonLockBets.length} undercard ${
+                  homeNonLockBets.length === 1 ? 'pick' : 'picks'
+                } besides the Pick of the Week`}
+                title={homeName}
+                visibility={detail.homePickVisibility}
+              />
+              <BetColumnSection
+                bets={awayNonLockBets}
+                cosmetics={
+                  detail.matchup.away_user_id
+                    ? cosmeticsByUserId[detail.matchup.away_user_id]
+                    : undefined
+                }
+                emptyVariant={awayIsUser ? 'You' : 'Opponent'}
+                isUser={awayIsUser}
+                liveScoresByGameId={liveScoresQuery.scoresByGameId}
+                onBetPress={(bet) => handleBetPress(bet, awayIsUser, awayIsUser ? 'Your Pick' : `${awayName}'s Pick`)}
+                side="away"
+                subtitle={`${awayNonLockBets.length === 0 ? 'No' : awayNonLockBets.length} undercard ${
+                  awayNonLockBets.length === 1 ? 'pick' : 'picks'
+                } besides the Pick of the Week`}
+                title={awayName}
+                visibility={detail.awayPickVisibility}
+              />
+            </View>
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );

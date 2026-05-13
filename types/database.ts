@@ -7,6 +7,7 @@ export type LeagueStatus = 'drafting' | 'active' | 'playoffs' | 'complete';
 export type BetType = 'straight' | 'parlay' | 'teaser';
 export type BetMarket = 'moneyline' | 'spread' | 'over_under';
 export type BetResult = 'pending' | 'win' | 'loss' | 'push';
+export type LiveGameStatus = 'scheduled' | 'in_progress' | 'halftime' | 'final';
 export type TeaserPoints = 6 | 6.5 | 7;
 export type TeaserLegCount = 2 | 3 | 4;
 export type AchievementKey =
@@ -464,6 +465,82 @@ export type LeagueWeekSlateGameInsert = {
 
 export type LeagueWeekSlateGameUpdate = Partial<LeagueWeekSlateGameInsert>;
 
+export type GameRow = {
+  away_team: string | null;
+  commence_time: string;
+  created_at: string;
+  game_id: string;
+  home_team: string | null;
+  season_year: number | null;
+  sport: LeagueSport;
+  updated_at: string;
+  week_number: number | null;
+};
+
+export type GameInsert = {
+  away_team?: string | null;
+  commence_time: string;
+  created_at?: string;
+  game_id: string;
+  home_team?: string | null;
+  season_year?: number | null;
+  sport?: LeagueSport;
+  updated_at?: string;
+  week_number?: number | null;
+};
+
+export type GameUpdate = Partial<GameInsert>;
+
+export type GlobalSportWeekRow = {
+  current_week: number;
+  season_year: number;
+  sport: LeagueSport;
+  updated_at: string;
+  updated_by: string | null;
+};
+
+export type GlobalSportWeekInsert = {
+  current_week: number;
+  season_year: number;
+  sport: LeagueSport;
+  updated_at?: string;
+  updated_by?: string | null;
+};
+
+export type GlobalSportWeekUpdate = Partial<GlobalSportWeekInsert>;
+
+export type LiveGameStateRow = {
+  away_score: number;
+  away_team: string;
+  created_at: string;
+  current_period: string | null;
+  game_id: string;
+  home_score: number;
+  home_team: string;
+  last_updated: string;
+  sport_key: string;
+  status: LiveGameStatus;
+  time_remaining: string | null;
+  updated_at: string;
+};
+
+export type LiveGameStateInsert = {
+  away_score?: number;
+  away_team: string;
+  created_at?: string;
+  current_period?: string | null;
+  game_id: string;
+  home_score?: number;
+  home_team: string;
+  last_updated?: string;
+  sport_key?: string;
+  status?: LiveGameStatus;
+  time_remaining?: string | null;
+  updated_at?: string;
+};
+
+export type LiveGameStateUpdate = Partial<LiveGameStateInsert>;
+
 export type SeasonAward = {
   award_key: SeasonAwardKey;
   award_label: string;
@@ -547,6 +624,32 @@ export type Database = {
           p_league_id: string;
         };
         Returns: number;
+      };
+      align_active_nfl_leagues_to_week: {
+        Args: {
+          p_dry_run?: boolean;
+          p_excluded_league_names?: string[];
+          p_prune_future_artifacts?: boolean;
+          p_season_year?: number | null;
+          p_target_week: number;
+        };
+        Returns: Json;
+      };
+      align_nfl_leagues_to_week: {
+        Args: {
+          p_dry_run?: boolean;
+          p_prune_future_artifacts?: boolean;
+          p_season_year?: number | null;
+          p_target_week: number;
+        };
+        Returns: Json;
+      };
+      advance_global_nfl_week_if_ready: {
+        Args: {
+          p_completed_week: number;
+          p_season_year: number;
+        };
+        Returns: boolean;
       };
       create_league: {
         Args: {
@@ -635,6 +738,16 @@ export type Database = {
         };
         Returns: string | null;
       };
+      live_score_polling_candidates: {
+        Args: Record<PropertyKey, never>;
+        Returns: Array<{
+          away_team: string;
+          commence_time: string;
+          game_id: string;
+          home_team: string;
+          status: LiveGameStatus;
+        }>;
+      };
       enqueue_weekly_award_notification: {
         Args: {
           p_award_label: string;
@@ -661,6 +774,15 @@ export type Database = {
         };
         Returns: string;
       };
+      set_global_sport_week: {
+        Args: {
+          p_season_year: number;
+          p_sport: LeagueSport;
+          p_target_week: number;
+          p_updated_by?: string | null;
+        };
+        Returns: Json;
+      };
       set_pick_of_week: {
         Args: {
           p_bet_id: string;
@@ -679,6 +801,27 @@ export type Database = {
           p_scores: Json;
         };
         Returns: Json;
+      };
+      simulate_global_week_completion: {
+        Args: {
+          p_scores: Json;
+          p_season_year?: number | null;
+          p_week_number: number;
+        };
+        Returns: Json;
+      };
+      simulate_global_week_kickoff: {
+        Args: {
+          p_season_year?: number | null;
+          p_week_number: number;
+        };
+        Returns: Json;
+      };
+      upsert_live_game_states: {
+        Args: {
+          p_scores: Json;
+        };
+        Returns: number;
       };
       submit_straight_bets: {
         Args: {
@@ -757,6 +900,18 @@ export type Database = {
         Row: BetRow;
         Update: BetUpdate;
       };
+      games: {
+        Insert: GameInsert;
+        Relationships: [];
+        Row: GameRow;
+        Update: GameUpdate;
+      };
+      global_sport_weeks: {
+        Insert: GlobalSportWeekInsert;
+        Relationships: [];
+        Row: GlobalSportWeekRow;
+        Update: GlobalSportWeekUpdate;
+      };
       league_members: {
         Insert: LeagueMemberInsert;
         Relationships: [
@@ -819,6 +974,12 @@ export type Database = {
         ];
         Row: LeagueWeekSlateGameRow;
         Update: LeagueWeekSlateGameUpdate;
+      };
+      live_game_states: {
+        Insert: LiveGameStateInsert;
+        Relationships: [];
+        Row: LiveGameStateRow;
+        Update: LiveGameStateUpdate;
       };
       seasons: {
         Insert: SeasonInsert;

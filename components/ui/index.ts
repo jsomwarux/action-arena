@@ -19,3 +19,4 @@ export { StaggeredItem } from './staggered-item';
 export { SwipeableRow } from './swipeable-row';
 export { TextInput } from './text-input';
 export { ToggleRow } from './toggle-row';
+export { WeekNavigator } from './week-navigator';

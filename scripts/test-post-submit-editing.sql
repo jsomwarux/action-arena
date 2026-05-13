@@ -484,6 +484,47 @@ begin
         sqlerrm
       );
   end;
+
+  update public.bet_legs
+  set
+    locked = false,
+    game_start_time = now() - interval '1 minute'
+  where bet_id = teaser_bet_id
+    and game_id = 'SEA-LAR';
+
+  select jsonb_agg(
+    jsonb_build_object(
+      'id', bl.id,
+      'game_id', bl.game_id,
+      'market', bl.market,
+      'selection', bl.selection,
+      'original_line', bl.original_line,
+      'adjusted_line', bl.adjusted_line,
+      'leg_odds', bl.leg_odds,
+      'game_start_time', bl.game_start_time::text
+    )
+    order by bl.id
+  )
+  into edited_legs
+  from public.bet_legs bl
+  where bl.bet_id = teaser_bet_id;
+
+  begin
+    perform public.update_submitted_bet(teaser_bet_id, 200, 60, 6.5, edited_legs);
+
+    perform pg_temp.record_result(
+      'started multi-pick cannot be edited',
+      false,
+      'unexpectedly allowed edit after a sibling leg started'
+    );
+  exception
+    when others then
+      perform pg_temp.record_result(
+        'started multi-pick cannot be edited',
+        sqlerrm like '%locked because one of its games has started%',
+        sqlerrm
+      );
+  end;
 end;
 $$;
 

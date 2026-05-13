@@ -106,6 +106,9 @@ export function usePlacedBets(
       return assertSupabaseResult(data as PlacedBet[] | null, error);
     },
     queryKey: straightBetKeys.placed(leagueId, userId, weekNumber),
+    refetchOnMount: 'always',
+    refetchOnReconnect: 'always',
+    staleTime: 0,
   });
 }
 

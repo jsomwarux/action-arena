@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { type ReactNode, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -27,6 +27,7 @@ import {
   type ProfileSummary,
   type TeaserPointBreakdown,
 } from '@/hooks/use-profile-stats';
+import { getRealizedReward, isSettledResult } from '@/lib/bet-outcome';
 import { cn } from '@/lib/cn';
 import {
   formatAmericanOdds,
@@ -35,6 +36,11 @@ import {
   formatRecord,
   getProfitTone,
 } from '@/lib/format';
+import {
+  comparePicksByStartTimeDesc,
+  formatBetLegLabel,
+  formatPickTitle,
+} from '@/lib/pick-labels';
 import type { BetResult, BetType, BetWithLegs, TeaserPoints } from '@/types/database';
 
 type ProfileContentProps = {
@@ -52,6 +58,7 @@ type FilterState = {
 };
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
+type LeagueNameById = Record<string, string>;
 
 const RESULT_TONE: Record<BetResult, { bar: string; label: string; pill: string; pillBg: string; pillBorder: string; text: string }> = {
   loss: {
@@ -268,37 +275,6 @@ function StaticSegmentedToggle<V extends string>({
   );
 }
 
-function betLine(bet: BetWithLegs) {
-  const firstLeg = bet.bet_legs[0];
-
-  if (!firstLeg) {
-    return 'Selection unavailable';
-  }
-
-  if (bet.bet_type !== 'straight') {
-    return `${bet.bet_legs.length}-leg ${bet.bet_type}`;
-  }
-
-  if (firstLeg.market === 'moneyline') {
-    return firstLeg.selection;
-  }
-
-  return `${firstLeg.selection} ${firstLeg.adjusted_line ?? firstLeg.original_line ?? ''}`;
-}
-
-function legDescriptor(bet: BetWithLegs, index: number) {
-  const leg = bet.bet_legs[index];
-  if (!leg) return null;
-
-  if (bet.bet_type === 'teaser' && leg.original_line !== null && leg.adjusted_line !== null) {
-    return `${leg.selection} ${leg.original_line} → ${leg.adjusted_line}`;
-  }
-  if (leg.market === 'moneyline') {
-    return leg.selection;
-  }
-  return `${leg.selection} ${leg.adjusted_line ?? leg.original_line ?? ''}`;
-}
-
 function marketCopy(market: string) {
   if (market === 'moneyline') return 'Winner';
   if (market === 'spread') return 'Spread';
@@ -308,7 +284,7 @@ function marketCopy(market: string) {
 function LockPill() {
   return (
     <View
-      className="flex-row items-center gap-1 rounded-full border border-gold/55 bg-gold/15 px-2.5 py-1"
+      className="self-start flex-row items-center gap-1 rounded-full border border-gold/55 bg-gold/15 px-2.5 py-1"
       style={{
         shadowColor: THEME_COLORS.gold,
         shadowOffset: { width: 0, height: 0 },
@@ -462,7 +438,7 @@ function HeroStats({ summary }: { summary: ProfileSummary }) {
             </Text>
           </View>
           <Text className="mt-2 text-sm font-semibold text-white/65">
-            {formatRecord(stats.wins, stats.losses, stats.ties)} record over{' '}
+            {formatRecord(stats.wins, stats.losses, stats.ties)} league record ·{' '}
             {stats.totalSettledBets} settled pick{stats.totalSettledBets === 1 ? '' : 's'}
           </Text>
         </View>
@@ -523,6 +499,10 @@ function BestBetCard({ bet }: { bet: BetWithLegs }) {
   const meta = BET_TYPE_META[bet.bet_type];
   const isMultiLeg = bet.bet_type !== 'straight';
   const profit = bet.profit ?? 0;
+  const rewardLabel = isSettledResult(bet.result) ? 'Outcome' : 'Reward';
+  const displayedReward = isSettledResult(bet.result)
+    ? getRealizedReward(bet)
+    : bet.potential_payout;
 
   return (
     <View>
@@ -536,12 +516,12 @@ function BestBetCard({ bet }: { bet: BetWithLegs }) {
         }}>
         <View className="h-[3px] w-full bg-gold" />
         <View className="gap-4 p-4">
-          <View className="flex-row items-center justify-between">
-            <View className="flex-row items-center gap-2">
+          <View className="flex-row items-start justify-between gap-3">
+            <View className="min-w-0 flex-1 flex-row items-center gap-2">
               <View className="h-9 w-9 items-center justify-center rounded-xl border border-gold/55 bg-gold/15">
                 <Ionicons color={THEME_COLORS.gold} name="trophy" size={16} />
               </View>
-              <View>
+              <View className="min-w-0 flex-1">
                 <Text
                   className="text-[10px] font-black uppercase text-gold"
                   style={{ letterSpacing: 2 }}>
@@ -551,18 +531,36 @@ function BestBetCard({ bet }: { bet: BetWithLegs }) {
                   className="text-base font-black uppercase text-white"
                   style={{ letterSpacing: -0.3 }}
                   numberOfLines={1}>
-                  {betLine(bet)}
+                  {formatPickTitle(bet)}
                 </Text>
               </View>
             </View>
-            <View className="items-end gap-1">
+            <View className="shrink-0 items-end">
               <Badge betType={bet.bet_type} />
-              {bet.is_lock ? <LockPill /> : null}
             </View>
           </View>
 
-          <View className="flex-row items-end justify-between">
-            <View>
+          {bet.is_lock ? (
+            <View className="items-start">
+              <LockPill />
+            </View>
+          ) : null}
+
+          <View className="flex-row items-end justify-between gap-3">
+            <View className="min-w-0 flex-1">
+              <Text
+                className="text-[10px] font-black uppercase text-white/45"
+                style={{ letterSpacing: 1.5 }}>
+                Played · Value
+              </Text>
+              <Text className="text-sm font-black text-white" numberOfLines={1}>
+                {formatCurrency(bet.amount)} · {formatAmericanOdds(bet.odds)}
+              </Text>
+              <Text className="text-[11px] font-semibold text-white/55" numberOfLines={1}>
+                {rewardLabel} {formatCurrency(displayedReward)}
+              </Text>
+            </View>
+            <View className="shrink-0 items-end gap-0.5">
               <Text
                 className="text-[10px] font-black uppercase text-white/45"
                 style={{ letterSpacing: 1.5 }}>
@@ -572,19 +570,6 @@ function BestBetCard({ bet }: { bet: BetWithLegs }) {
                 className="text-3xl font-black text-electric-green"
                 style={{ letterSpacing: -0.8 }}>
                 {formatProfit(profit)}
-              </Text>
-            </View>
-            <View className="items-end gap-0.5">
-              <Text
-                className="text-[10px] font-black uppercase text-white/45"
-                style={{ letterSpacing: 1.5 }}>
-                Played · Value
-              </Text>
-              <Text className="text-sm font-black text-white">
-                {formatCurrency(bet.amount)} · {formatAmericanOdds(bet.odds)}
-              </Text>
-              <Text className="text-[11px] font-semibold text-white/55">
-                Reward {formatCurrency(bet.potential_payout)}
               </Text>
             </View>
           </View>
@@ -619,7 +604,7 @@ function BestBetCard({ bet }: { bet: BetWithLegs }) {
                             className="text-xs font-black text-white"
                             numberOfLines={1}
                             style={{ letterSpacing: -0.2 }}>
-                            {legDescriptor(bet, index)}
+                            {formatBetLegLabel(leg, { betType: bet.bet_type })}
                           </Text>
                           <Text className="mt-0.5 text-[10px] font-semibold uppercase text-white/45">
                             {marketCopy(leg.market)} · {formatAmericanOdds(leg.leg_odds)}
@@ -642,13 +627,13 @@ function BestBetCard({ bet }: { bet: BetWithLegs }) {
 function WorstBetCard({ bet }: { bet: BetWithLegs }) {
   return (
     <View>
-      <View className="rounded-2xl border border-coral-red/20 bg-white/[0.03] p-4">
-        <View className="flex-row items-center justify-between">
-          <View className="flex-1 flex-row items-center gap-2">
+      <View className="gap-3 rounded-2xl border border-coral-red/20 bg-white/[0.03] p-4">
+        <View className="flex-row items-start justify-between gap-3">
+          <View className="min-w-0 flex-1 flex-row items-center gap-2">
             <View className="h-8 w-8 items-center justify-center rounded-xl border border-coral-red/35 bg-coral-red/[0.08]">
               <Ionicons color={THEME_COLORS.coralRed} name="trending-down" size={14} />
             </View>
-            <View className="flex-1">
+            <View className="min-w-0 flex-1">
               <Text
                 className="text-[10px] font-black uppercase text-white/45"
                 style={{ letterSpacing: 1.6 }}>
@@ -658,21 +643,29 @@ function WorstBetCard({ bet }: { bet: BetWithLegs }) {
                 className="text-sm font-black text-white"
                 numberOfLines={1}
                 style={{ letterSpacing: -0.2 }}>
-                {betLine(bet)}
+                {formatPickTitle(bet)}
               </Text>
             </View>
           </View>
-          <View className="items-end">
+          <View className="shrink-0 items-end">
             <Badge betType={bet.bet_type} />
-            {bet.is_lock ? <LockPill /> : null}
-            <Text className="mt-1 text-base font-black text-coral-red">
-              {formatProfit(bet.profit ?? 0)}
-            </Text>
           </View>
         </View>
-        <Text className="mt-2 text-[11px] font-semibold text-white/45">
-          Week {bet.week_number} · {formatCurrency(bet.amount)} played · {formatAmericanOdds(bet.odds)}
-        </Text>
+
+        {bet.is_lock ? (
+          <View className="items-start">
+            <LockPill />
+          </View>
+        ) : null}
+
+        <View className="flex-row items-end justify-between gap-3">
+          <Text className="min-w-0 flex-1 text-[11px] font-semibold text-white/45" numberOfLines={2}>
+            Week {bet.week_number} · {formatCurrency(bet.amount)} played · {formatAmericanOdds(bet.odds)}
+          </Text>
+          <Text className="shrink-0 text-base font-black text-coral-red">
+            {formatProfit(bet.profit ?? 0)}
+          </Text>
+        </View>
       </View>
     </View>
   );
@@ -951,7 +944,13 @@ function Achievements({ achievements }: { achievements: AchievementDisplay[] }) 
 // Pick history
 // ============================================================
 
-function BetHistoryCard({ bet }: { bet: BetWithLegs }) {
+function BetHistoryCard({
+  bet,
+  leagueName,
+}: {
+  bet: BetWithLegs;
+  leagueName: string;
+}) {
   const { user } = useAuth();
   const shareBet = useShareBetToChat(user?.id);
   const meta = BET_TYPE_META[bet.bet_type];
@@ -959,6 +958,10 @@ function BetHistoryCard({ bet }: { bet: BetWithLegs }) {
   const profit = bet.profit ?? 0;
   const isMultiLeg = bet.bet_type !== 'straight';
   const isLock = bet.is_lock;
+  const rewardLabel = isSettledResult(bet.result) ? 'Outcome' : 'Reward';
+  const displayedReward = isSettledResult(bet.result)
+    ? getRealizedReward(bet)
+    : bet.potential_payout;
 
   return (
     <View
@@ -982,16 +985,17 @@ function BetHistoryCard({ bet }: { bet: BetWithLegs }) {
               <Badge betType={bet.bet_type} />
               {isLock ? <LockPill /> : null}
               <Text
-                className="text-[10px] font-black uppercase text-white/45"
-                style={{ letterSpacing: 1.4 }}>
-                Week {bet.week_number}
+                className="min-w-0 max-w-full text-[10px] font-black uppercase text-white/45"
+                numberOfLines={1}
+                style={{ letterSpacing: 1.2 }}>
+                Week {bet.week_number} · {leagueName}
               </Text>
             </View>
             <Text
               className="text-base font-black text-white"
               numberOfLines={2}
               style={{ letterSpacing: -0.3 }}>
-              {betLine(bet)}
+              {formatPickTitle(bet)}
             </Text>
           </View>
           <View className="items-end gap-1">
@@ -1038,7 +1042,7 @@ function BetHistoryCard({ bet }: { bet: BetWithLegs }) {
           <Text
             className="text-[11px] font-black uppercase text-white/55"
             style={{ letterSpacing: 1.2 }}>
-            Reward {formatCurrency(bet.potential_payout)}
+            {rewardLabel} {formatCurrency(displayedReward)}
           </Text>
         </View>
 
@@ -1063,7 +1067,7 @@ function BetHistoryCard({ bet }: { bet: BetWithLegs }) {
                     <Text
                       className="flex-1 text-xs font-semibold text-white/75"
                       numberOfLines={1}>
-                      {legDescriptor(bet, index)}
+                      {formatBetLegLabel(leg, { betType: bet.bet_type })}
                     </Text>
                   </View>
                   <Text
@@ -1132,9 +1136,13 @@ function WeekFilterChip({
 function BetHistory({
   bets,
   leagueId,
+  leagueNameById,
+  scopeLabel,
 }: {
   bets: BetWithLegs[];
   leagueId: string | 'all';
+  leagueNameById: LeagueNameById;
+  scopeLabel: string;
 }) {
   const [filters, setFilters] = useState<FilterState>({ betType: 'all', result: 'all', week: 'all' });
   const [visibleCount, setVisibleCount] = useState(12);
@@ -1142,10 +1150,15 @@ function BetHistory({
     () => [...new Set(bets.map((bet) => bet.week_number))].sort((left, right) => right - left),
     [bets],
   );
-  const filtered = filterProfileBets({ ...filters, bets, leagueId }).sort((left, right) =>
-    right.created_at.localeCompare(left.created_at),
+  const filtered = useMemo(
+    () => filterProfileBets({ ...filters, bets, leagueId }).sort(comparePicksByStartTimeDesc),
+    [bets, filters, leagueId],
   );
   const visible = filtered.slice(0, visibleCount);
+
+  useEffect(() => {
+    setVisibleCount(12);
+  }, [filters.betType, filters.result, filters.week, leagueId]);
 
   return (
     <View className="gap-3">
@@ -1158,8 +1171,8 @@ function BetHistory({
             Pick History
           </Text>
         </View>
-        <Text className="text-[10px] font-semibold text-white/45">
-          {filtered.length} {filtered.length === 1 ? 'pick' : 'picks'}
+        <Text className="flex-1 text-right text-[10px] font-semibold text-white/45" numberOfLines={1}>
+          {scopeLabel} · {filtered.length} {filtered.length === 1 ? 'pick' : 'picks'}
         </Text>
       </View>
 
@@ -1206,7 +1219,10 @@ function BetHistory({
         <View className="gap-2">
           {visible.map((bet, index) => (
             <StaggeredItem index={index} key={bet.id} perItemDelay={45}>
-              <BetHistoryCard bet={bet} />
+              <BetHistoryCard
+                bet={bet}
+                leagueName={leagueNameById[bet.league_id] ?? 'Unknown league'}
+              />
             </StaggeredItem>
           ))}
         </View>
@@ -1459,6 +1475,18 @@ export function ProfileContent({
     () => buildProfileSummary(data, resolvedLeagueId),
     [data, resolvedLeagueId],
   );
+  const scopeLabel =
+    resolvedLeagueId === 'all'
+      ? 'All leagues'
+      : data.leagueOptions.find((option) => option.id === resolvedLeagueId)?.label ?? 'Selected league';
+  const leagueNameById = useMemo(
+    () =>
+      data.leagues.reduce<LeagueNameById>((names, league) => {
+        names[league.id] = league.name;
+        return names;
+      }, {}),
+    [data.leagues],
+  );
 
   return (
     <View className="gap-4">
@@ -1501,7 +1529,12 @@ export function ProfileContent({
       <BestWorst summary={summary} />
       <Breakdown breakdowns={summary.betTypeBreakdowns} teasers={summary.teaserBreakdowns} />
       <Achievements achievements={summary.achievements} />
-      <BetHistory bets={summary.bets} leagueId={resolvedLeagueId} />
+      <BetHistory
+        bets={summary.bets}
+        leagueId={resolvedLeagueId}
+        leagueNameById={leagueNameById}
+        scopeLabel={scopeLabel}
+      />
     </View>
   );
 }

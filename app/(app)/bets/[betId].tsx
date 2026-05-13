@@ -9,6 +9,7 @@ import { THEME_COLORS } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
 import { useUserCosmetics } from '@/hooks/use-cosmetics';
 import { useShareBetToChat } from '@/hooks/use-league-chat';
+import { getOutcomeRewardTone, getRealizedReward, isSettledResult } from '@/lib/bet-outcome';
 import { supabase } from '@/lib/supabase';
 import {
   formatAmericanOdds,
@@ -16,18 +17,11 @@ import {
   formatProfit,
   getProfitTone,
 } from '@/lib/format';
+import { formatBetLegLabel, formatPickLineValue, formatPickTitle } from '@/lib/pick-labels';
 import type { BetWithLegs } from '@/types/database';
 
 function getParamValue(param: string | string[] | undefined) {
   return Array.isArray(param) ? param[0] : param;
-}
-
-function lineLabel(value: number | null) {
-  if (value === null) {
-    return '-';
-  }
-
-  return value > 0 ? `+${value}` : `${value}`;
 }
 
 function marketCopy(market: string) {
@@ -102,13 +96,14 @@ export default function BetDetailScreen() {
                         </View>
                       ) : null}
                       <Badge label={betQuery.data.result} tone={betQuery.data.result === 'win' ? 'green' : betQuery.data.result === 'loss' ? 'red' : 'gold'} />
+                      <Text className="text-[10px] font-black uppercase text-white/45">
+                        {formatAmericanOdds(betQuery.data.odds)}
+                      </Text>
                     </View>
                     <Text
                       className="mt-3 text-3xl font-black uppercase text-white"
                       style={{ letterSpacing: -0.7, lineHeight: 34 }}>
-                      {betQuery.data.bet_type === 'straight'
-                        ? betQuery.data.bet_legs[0]?.selection ?? 'Straight Pick'
-                        : `${betQuery.data.bet_legs.length}-Leg ${betQuery.data.bet_type}`}
+                      {formatPickTitle(betQuery.data)}
                     </Text>
                   </View>
                   <Ionicons color={THEME_COLORS.electricGreen} name="receipt" size={24} />
@@ -122,9 +117,20 @@ export default function BetDetailScreen() {
                     </Text>
                   </View>
                   <View className="flex-1 rounded-2xl border border-white/[0.07] bg-white/[0.04] p-3">
-                    <Text className="text-[10px] font-black uppercase text-white/45">Value</Text>
-                    <Text className="mt-1 text-lg font-black text-white">
-                      {formatAmericanOdds(betQuery.data.odds)}
+                    <Text className="text-[10px] font-black uppercase text-white/45">
+                      {isSettledResult(betQuery.data.result) ? 'Outcome' : 'Potential'}
+                    </Text>
+                    <Text
+                      className={`mt-1 text-lg font-black ${
+                        isSettledResult(betQuery.data.result)
+                          ? getOutcomeRewardTone(betQuery.data.result)
+                          : 'text-electric-green'
+                      }`}>
+                      {formatCurrency(
+                        isSettledResult(betQuery.data.result)
+                          ? getRealizedReward(betQuery.data)
+                          : betQuery.data.potential_payout,
+                      )}
                     </Text>
                   </View>
                   <View className="flex-1 rounded-2xl border border-white/[0.07] bg-white/[0.04] p-3">
@@ -162,13 +168,19 @@ export default function BetDetailScreen() {
                         tone={leg.result === 'win' ? 'green' : leg.result === 'loss' ? 'red' : 'gold'}
                       />
                     </View>
-                    <Text className="text-lg font-black text-white">{leg.selection}</Text>
+                    <Text className="text-lg font-black text-white">
+                      {formatBetLegLabel(leg, {
+                        betType: betQuery.data.bet_type,
+                        includeTeaserMovement: false,
+                      })}
+                    </Text>
                     <Text className="text-xs font-semibold uppercase text-white/45">
                       {marketCopy(leg.market)} · {formatAmericanOdds(leg.leg_odds)}
                     </Text>
                     {betQuery.data.bet_type === 'teaser' ? (
                       <Text className="text-sm font-black text-cyan-accent">
-                        {lineLabel(leg.original_line)} → {lineLabel(leg.adjusted_line)}
+                        {formatPickLineValue(leg.original_line, leg.market) || '-'} →{' '}
+                        {formatPickLineValue(leg.adjusted_line, leg.market) || '-'}
                       </Text>
                     ) : null}
                   </View>

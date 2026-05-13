@@ -17,6 +17,8 @@ import {
   Button,
   Card,
   ScreenWrapper,
+  SegmentedToggle,
+  type SegmentedOption,
   StaggeredItem,
 } from '@/components/ui';
 import { THEME_COLORS } from '@/constants/theme';
@@ -41,11 +43,9 @@ type RankAccent = {
   text: string;
 };
 
-const BOARD_VIEW_OPTIONS: {
-  icon: React.ComponentProps<typeof Ionicons>['name'];
-  label: string;
-  value: BoardView;
-}[] = [
+const BRONZE_COLOR = '#CD7F32';
+
+const BOARD_VIEW_OPTIONS: SegmentedOption<BoardView>[] = [
   { icon: 'globe', label: 'Season', value: 'season' },
   { icon: 'flame', label: 'This Week', value: 'week' },
 ];
@@ -90,62 +90,6 @@ function StaticSkeleton({
   );
 }
 
-function BoardViewToggle({
-  onChange,
-  value,
-}: {
-  onChange: (nextValue: BoardView) => void;
-  value: BoardView;
-}) {
-  return (
-    <View
-      className="flex-row rounded-2xl border border-white/10 bg-white/[0.04]"
-      style={{ padding: 4 }}>
-      {BOARD_VIEW_OPTIONS.map((option) => {
-        const active = option.value === value;
-        return (
-          <TapTarget
-            key={option.value}
-            onPress={() => onChange(option.value)}
-            style={{ flex: 1 }}>
-            <View
-              className={cn(
-                'h-11 w-full flex-row items-center justify-center gap-2 rounded-xl border',
-                active
-                  ? 'border-electric-green/45 bg-electric-green/15'
-                  : 'border-transparent bg-transparent',
-              )}
-              style={
-                active
-                  ? {
-                      shadowColor: THEME_COLORS.electricGreen,
-                      shadowOffset: { width: 0, height: 0 },
-                      shadowOpacity: 0.35,
-                      shadowRadius: 8,
-                    }
-                  : undefined
-              }>
-              <Ionicons
-                color={active ? THEME_COLORS.electricGreen : 'rgba(255,255,255,0.6)'}
-                name={option.icon}
-                size={16}
-              />
-              <Text
-                className={cn(
-                  'text-sm font-bold',
-                  active ? 'text-electric-green' : 'text-white/65',
-                )}
-                style={{ letterSpacing: 0.2 }}>
-                {option.label}
-              </Text>
-            </View>
-          </TapTarget>
-        );
-      })}
-    </View>
-  );
-}
-
 function rankAccent(rank: number): RankAccent {
   if (rank === 1) {
     return {
@@ -160,22 +104,24 @@ function rankAccent(rank: number): RankAccent {
   }
   if (rank === 2) {
     return {
-      bg: 'bg-white/[0.10]',
-      border: 'border-white/35',
+      bg: 'bg-white/[0.12]',
+      border: 'border-white/40',
+      glow: '#D8E0EE',
       icon: 'medal',
-      iconColor: '#D8E0EE',
+      iconColor: '#E8EEF7',
       label: 'Silver',
       text: 'text-white',
     };
   }
   if (rank === 3) {
     return {
-      bg: 'bg-amber-accent/[0.12]',
-      border: 'border-amber-accent/45',
+      bg: 'bg-bronze/15',
+      border: 'border-bronze/55',
+      glow: BRONZE_COLOR,
       icon: 'medal',
-      iconColor: THEME_COLORS.amberAccent,
+      iconColor: BRONZE_COLOR,
       label: 'Bronze',
-      text: 'text-amber-accent',
+      text: 'text-bronze-text',
     };
   }
   return {
@@ -188,7 +134,21 @@ function rankAccent(rank: number): RankAccent {
   };
 }
 
-function trendDescriptor(trend: LeaderboardRow['trend']) {
+type LeaderboardTrend = Exclude<LeaderboardRow['seasonTrend'], null>;
+
+function valueForRow(row: LeaderboardRow, boardView: BoardView) {
+  return boardView === 'week' ? row.weeklyProfit : row.seasonProfit;
+}
+
+function rankForRow(row: LeaderboardRow, boardView: BoardView) {
+  return boardView === 'week' ? row.weeklyRank : row.seasonRank;
+}
+
+function trendForRow(row: LeaderboardRow, boardView: BoardView) {
+  return boardView === 'week' ? row.weeklyTrend : row.seasonTrend;
+}
+
+function trendDescriptor(trend: LeaderboardTrend) {
   if (trend === 'up') {
     return {
       bg: 'bg-electric-green/15',
@@ -209,14 +169,8 @@ function trendDescriptor(trend: LeaderboardRow['trend']) {
       text: 'text-coral-red',
     };
   }
-  return {
-    bg: 'bg-white/[0.05]',
-    border: 'border-white/15',
-    color: 'rgba(255,255,255,0.55)',
-    icon: 'remove' as const,
-    label: 'Even',
-    text: 'text-white/55',
-  };
+
+  return null;
 }
 
 function getInitials(name: string) {
@@ -248,54 +202,77 @@ function LoadingState() {
 
 function PodiumCard({
   cosmetics,
-  index,
+  featured = false,
   isUser,
   onPress,
+  rank,
   row,
+  trend,
   value,
 }: {
   cosmetics?: EquippedCosmeticsByCategory;
-  index: number;
+  featured?: boolean;
   isUser: boolean;
   onPress: () => void;
+  rank: number;
   row: LeaderboardRow;
+  trend: LeaderboardTrend | null;
   value: number;
 }) {
-  const accent = rankAccent(row.standing?.rank ?? index + 1);
-  const trend = trendDescriptor(row.trend);
+  const accent = rankAccent(rank);
+  const trendMeta = trend ? trendDescriptor(trend) : null;
   const avatarName = row.member.team_name || row.profile?.display_name || '?';
+  const iconSize = featured ? 20 : 14;
+  const nameSize = featured ? 'text-sm' : 'text-xs';
+  const valueSize = featured ? 'text-base' : 'text-sm';
+  const padding = featured ? 'p-4' : 'p-3';
+  const minHeight = featured ? 168 : 144;
 
   return (
     <TapTarget onPress={onPress} style={{ flex: 1 }}>
       <View
-        className={cn('flex-1 items-center rounded-2xl border p-2.5', accent.bg, accent.border)}
-        style={
+        className={cn(
+          'flex-1 items-center rounded-2xl border',
+          padding,
+          accent.bg,
+          accent.border,
+        )}
+        style={[
+          { minHeight },
           accent.glow
             ? {
                 shadowColor: accent.glow,
                 shadowOffset: { width: 0, height: 0 },
-                shadowOpacity: 0.35,
-                shadowRadius: 10,
+                shadowOpacity: featured ? 0.55 : 0.3,
+                shadowRadius: featured ? 14 : 8,
               }
-            : undefined
-        }>
-        <Ionicons color={accent.iconColor} name={accent.icon} size={16} />
-        <View className="mt-1.5">
-          <CosmeticAvatar cosmetics={cosmetics} name={avatarName} size="md" />
+            : undefined,
+        ]}>
+        <Ionicons color={accent.iconColor} name={accent.icon} size={iconSize} />
+        <View className="mt-2">
+          <CosmeticAvatar
+            cosmetics={cosmetics}
+            name={avatarName}
+            size={featured ? 'lg' : 'md'}
+          />
         </View>
         <Text
-          className="mt-1.5 text-center text-xs font-semibold text-white"
+          className={cn('mt-2 text-center font-semibold text-white', nameSize)}
           numberOfLines={1}>
           {row.member.team_name}
         </Text>
-        <View className="mt-1 flex-row items-center gap-1">
-          <Ionicons color={trend.color} name={trend.icon} size={10} />
-          <Text className={cn('text-sm font-bold', getProfitTone(value))} style={{ letterSpacing: -0.2 }}>
+        <View className="mt-1.5 flex-row items-center gap-1">
+          {trendMeta ? (
+            <Ionicons color={trendMeta.color} name={trendMeta.icon} size={featured ? 12 : 10} />
+          ) : null}
+          <Text
+            className={cn('font-bold', valueSize, getProfitTone(value))}
+            style={{ letterSpacing: -0.2 }}>
             {formatProfit(value)}
           </Text>
         </View>
         {isUser ? (
-          <View className="mt-1 rounded-full border border-electric-green/40 bg-electric-green/15 px-1.5 py-px">
+          <View className="mt-1.5 rounded-full border border-electric-green/40 bg-electric-green/15 px-2 py-0.5">
             <Text className="text-[10px] font-semibold text-electric-green">You</Text>
           </View>
         ) : null}
@@ -310,6 +287,7 @@ function LeaderboardListRow({
   onPress,
   row,
   showRank,
+  trend,
   value,
 }: {
   cosmetics?: EquippedCosmeticsByCategory;
@@ -317,17 +295,18 @@ function LeaderboardListRow({
   onPress: () => void;
   row: LeaderboardRow;
   showRank: number;
+  trend: LeaderboardTrend | null;
   value: number;
 }) {
   const accent = rankAccent(showRank);
-  const trend = trendDescriptor(row.trend);
+  const trendMeta = trend ? trendDescriptor(trend) : null;
 
   return (
     <TapTarget onPress={onPress}>
       <View
         className={cn(
-          'flex-row items-center gap-3 px-4 py-3',
-          isUser ? 'bg-electric-green/[0.08]' : null,
+          'flex-row items-center gap-3 px-4 py-3.5',
+          isUser ? 'bg-electric-green/[0.10]' : null,
         )}
         style={
           isUser
@@ -389,94 +368,19 @@ function LeaderboardListRow({
             style={{ letterSpacing: -0.2 }}>
             {formatProfit(value)}
           </Text>
-          <View
-            className={cn(
-              'flex-row items-center gap-1 rounded-full border px-1.5 py-px',
-              trend.bg,
-              trend.border,
-            )}>
-            <Ionicons color={trend.color} name={trend.icon} size={9} />
-            <Text className={cn('text-[10px] font-semibold', trend.text)}>
-              {trend.label}
-            </Text>
-          </View>
-        </View>
-      </View>
-    </TapTarget>
-  );
-}
-
-function StickyUserBar({
-  boardView,
-  cosmetics,
-  isLeading,
-  onPress,
-  row,
-  totalRows,
-  value,
-}: {
-  boardView: BoardView;
-  cosmetics?: EquippedCosmeticsByCategory;
-  isLeading: boolean;
-  onPress: () => void;
-  row: LeaderboardRow;
-  totalRows: number;
-  value: number;
-}) {
-  const trend = trendDescriptor(row.trend);
-  const rank = row.standing?.rank ?? totalRows;
-
-  return (
-    <TapTarget onPress={onPress}>
-      <View
-        className="flex-row items-center gap-3 rounded-2xl border border-electric-green/55 bg-arena-surface p-2.5"
-        style={{
-          shadowColor: THEME_COLORS.electricGreen,
-          shadowOffset: { width: 0, height: 6 },
-          shadowOpacity: 0.35,
-          shadowRadius: 12,
-        }}>
-        <CosmeticAvatar
-          cosmetics={cosmetics}
-          name={row.member.team_name || row.profile?.display_name || 'Player'}
-          size="md"
-        />
-        <View className="flex-1">
-          <Text
-            className="text-[10px] font-semibold uppercase text-electric-green"
-            style={{ letterSpacing: 0.5 }}>
-            Your Position{isLeading ? ' · Leading' : ''}
-          </Text>
-          <Text
-            className="text-sm font-bold text-white"
-            numberOfLines={1}
-            style={{ letterSpacing: -0.2 }}>
-            {row.member.team_name}
-          </Text>
-          <Text className="text-[11px] font-medium text-white/55" numberOfLines={1}>
-            {boardView === 'season' ? 'Total' : 'This Week'} ·{' '}
-            {row.standing
-              ? formatRecord(row.standing.wins, row.standing.losses, row.standing.ties)
-              : '0-0'}
-          </Text>
-        </View>
-        <View className="items-end gap-1">
-          <Text
-            className={cn('text-base font-bold', getProfitTone(value))}
-            style={{ letterSpacing: -0.3 }}>
-            {formatProfit(value)}
-          </Text>
-          <View
-            className={cn(
-              'flex-row items-center gap-1 rounded-full border px-1.5 py-px',
-              trend.bg,
-              trend.border,
-            )}>
-            <Ionicons color={trend.color} name={trend.icon} size={9} />
-            <Text className={cn('text-[10px] font-semibold', trend.text)}>
-              {trend.label}
-            </Text>
-          </View>
+          {trendMeta ? (
+            <View
+              className={cn(
+                'flex-row items-center gap-1 rounded-full border px-1.5 py-px',
+                trendMeta.bg,
+                trendMeta.border,
+              )}>
+              <Ionicons color={trendMeta.color} name={trendMeta.icon} size={9} />
+              <Text className={cn('text-[10px] font-semibold', trendMeta.text)}>
+                {trendMeta.label}
+              </Text>
+            </View>
+          ) : null}
         </View>
       </View>
     </TapTarget>
@@ -500,17 +404,9 @@ export default function LeaderboardScreen() {
   );
   const sortedRows = useMemo(() => {
     const source = leaderboardQuery.data?.rows ?? [];
-    if (boardView === 'week') {
-      return [...source].sort(
-        (left, right) =>
-          (right.standing?.weekly_profit ?? 0) - (left.standing?.weekly_profit ?? 0),
-      );
-    }
-    return source;
+    return [...source].sort((left, right) => rankForRow(left, boardView) - rankForRow(right, boardView));
   }, [boardView, leaderboardQuery.data?.rows]);
 
-  const userRowIndex = sortedRows.findIndex((row) => row.member.user_id === user?.id);
-  const userRow = userRowIndex >= 0 ? sortedRows[userRowIndex] : null;
   const podiumRows = sortedRows.slice(0, Math.min(3, sortedRows.length));
   const cosmeticsQuery = useEquippedCosmeticsForUsers(
     sortedRows.map((row) => row.member.user_id),
@@ -530,18 +426,13 @@ export default function LeaderboardScreen() {
     });
   }, [leaderboardQuery.isLoading, seasonPassQuery.data, seasonPassQuery.isLoading, user?.id]);
 
-  const valueFor = (row: LeaderboardRow | undefined) =>
-    row && row.standing
-      ? boardView === 'week'
-        ? row.standing.weekly_profit
-        : row.standing.total_profit
-      : 0;
+  const valueFor = (row: LeaderboardRow | undefined) => (row ? valueForRow(row, boardView) : 0);
 
   return (
     <ScreenWrapper className="pb-0">
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ gap: 18, paddingBottom: userRow ? 130 : 36 }}
+        contentContainerStyle={{ gap: 18, paddingBottom: 120 }}
         refreshControl={
           <RefreshControl
             tintColor={THEME_COLORS.electricGreen}
@@ -572,7 +463,7 @@ export default function LeaderboardScreen() {
         {leaderboardQuery.isLoading ? <LoadingState /> : null}
 
         {!leaderboardQuery.isLoading && leaderboardQuery.data && sortedRows.length > 0 ? (
-          <View className="gap-4">
+          <View className="gap-5">
             {leaderboardQuery.data.leagueOptions.length > 1 ? (
               <View className="flex-row flex-wrap gap-2">
                 {leaderboardQuery.data.leagueOptions.map((league) => {
@@ -601,35 +492,42 @@ export default function LeaderboardScreen() {
               </View>
             ) : null}
 
-            <BoardViewToggle onChange={setBoardView} value={boardView} />
+            <SegmentedToggle
+              accent="green"
+              onChange={setBoardView}
+              options={BOARD_VIEW_OPTIONS}
+              value={boardView}
+            />
 
             {podiumRows.length >= 3 ? (
-              <View className="flex-row items-end gap-3">
-                {/* Reorder so #2 - #1 - #3 visually podium */}
-                <PodiumCard
-                  cosmetics={podiumRows[1] ? cosmeticsByUserId[podiumRows[1].member.user_id] : undefined}
-                  index={1}
-                  isUser={podiumRows[1]?.member.user_id === user?.id}
-                  onPress={() =>
-                    podiumRows[1] &&
-                    router.push({
-                      pathname: '/members/[memberId]',
-                      params: {
-                        leagueId: podiumRows[1].member.league_id,
-                        memberId: podiumRows[1].member.user_id,
-                      },
-                    })
-                  }
-                  row={podiumRows[1]}
-                  value={valueFor(podiumRows[1])}
-                />
-                <View className="flex-1" style={{ marginBottom: 12 }}>
+              <View className="flex-row items-end gap-3 pt-2">
+                {/* Silver (rank 2) on the left */}
+                <View style={{ flex: 1, paddingBottom: 16 }}>
                   <PodiumCard
-                    cosmetics={podiumRows[0] ? cosmeticsByUserId[podiumRows[0].member.user_id] : undefined}
-                    index={0}
-                    isUser={podiumRows[0]?.member.user_id === user?.id}
+                    cosmetics={cosmeticsByUserId[podiumRows[1].member.user_id]}
+                    isUser={podiumRows[1].member.user_id === user?.id}
                     onPress={() =>
-                      podiumRows[0] &&
+                      router.push({
+                        pathname: '/members/[memberId]',
+                        params: {
+                          leagueId: podiumRows[1].member.league_id,
+                          memberId: podiumRows[1].member.user_id,
+                        },
+                      })
+                    }
+                    rank={rankForRow(podiumRows[1], boardView)}
+                    row={podiumRows[1]}
+                    trend={trendForRow(podiumRows[1], boardView)}
+                    value={valueFor(podiumRows[1])}
+                  />
+                </View>
+                {/* Gold (rank 1) in the center, larger and raised */}
+                <View style={{ flex: 1.15 }}>
+                  <PodiumCard
+                    cosmetics={cosmeticsByUserId[podiumRows[0].member.user_id]}
+                    featured
+                    isUser={podiumRows[0].member.user_id === user?.id}
+                    onPress={() =>
                       router.push({
                         pathname: '/members/[memberId]',
                         params: {
@@ -638,31 +536,36 @@ export default function LeaderboardScreen() {
                         },
                       })
                     }
+                    rank={rankForRow(podiumRows[0], boardView)}
                     row={podiumRows[0]}
+                    trend={trendForRow(podiumRows[0], boardView)}
                     value={valueFor(podiumRows[0])}
                   />
                 </View>
-                <PodiumCard
-                  cosmetics={podiumRows[2] ? cosmeticsByUserId[podiumRows[2].member.user_id] : undefined}
-                  index={2}
-                  isUser={podiumRows[2]?.member.user_id === user?.id}
-                  onPress={() =>
-                    podiumRows[2] &&
-                    router.push({
-                      pathname: '/members/[memberId]',
-                      params: {
-                        leagueId: podiumRows[2].member.league_id,
-                        memberId: podiumRows[2].member.user_id,
-                      },
-                    })
-                  }
-                  row={podiumRows[2]}
-                  value={valueFor(podiumRows[2])}
-                />
+                {/* Bronze (rank 3) on the right */}
+                <View style={{ flex: 1, paddingBottom: 16 }}>
+                  <PodiumCard
+                    cosmetics={cosmeticsByUserId[podiumRows[2].member.user_id]}
+                    isUser={podiumRows[2].member.user_id === user?.id}
+                    onPress={() =>
+                      router.push({
+                        pathname: '/members/[memberId]',
+                        params: {
+                          leagueId: podiumRows[2].member.league_id,
+                          memberId: podiumRows[2].member.user_id,
+                        },
+                      })
+                    }
+                    rank={rankForRow(podiumRows[2], boardView)}
+                    row={podiumRows[2]}
+                    trend={trendForRow(podiumRows[2], boardView)}
+                    value={valueFor(podiumRows[2])}
+                  />
+                </View>
               </View>
             ) : null}
 
-            <Card padded={false}>
+            <Card padded={false} style={{ marginTop: 4 }}>
               <View>
                 <View className="flex-row items-center gap-3 px-4 pb-2 pt-3">
                   <Text
@@ -686,6 +589,7 @@ export default function LeaderboardScreen() {
                   const isUser = row.member.user_id === user?.id;
                   const isLast = index === sortedRows.length - 1;
                   const value = valueFor(row);
+                  const rowRank = rankForRow(row, boardView);
                   return (
                     <StaggeredItem index={index} key={row.member.id} perItemDelay={45}>
                       <LeaderboardListRow
@@ -701,7 +605,8 @@ export default function LeaderboardScreen() {
                           })
                         }
                         row={row}
-                        showRank={index + 1}
+                        showRank={rowRank}
+                        trend={trendForRow(row, boardView)}
                         value={value}
                       />
                       {!isLast ? <View className="h-px bg-white/[0.05]" /> : null}
@@ -742,34 +647,6 @@ export default function LeaderboardScreen() {
         ) : null}
       </ScrollView>
 
-      {userRow ? (
-        <View
-          pointerEvents="box-none"
-          style={{
-            bottom: 12,
-            left: 16,
-            position: 'absolute',
-            right: 16,
-          }}>
-          <StickyUserBar
-            boardView={boardView}
-            cosmetics={cosmeticsByUserId[userRow.member.user_id]}
-            isLeading={userRowIndex === 0}
-            onPress={() =>
-              router.push({
-                pathname: '/members/[memberId]',
-                params: {
-                  leagueId: userRow.member.league_id,
-                  memberId: userRow.member.user_id,
-                },
-              })
-            }
-            row={userRow}
-            totalRows={sortedRows.length}
-            value={valueFor(userRow)}
-          />
-        </View>
-      ) : null}
     </ScreenWrapper>
   );
 }

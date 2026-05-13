@@ -18,6 +18,7 @@ import { logAnalyticsEvent } from '@/lib/analytics';
 import { cn } from '@/lib/cn';
 import { formatProfit, getProfitTone } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
+import { getPickLegBaseLabel } from '@/lib/pick-labels';
 import type { BetWithLegs } from '@/types/database';
 
 function StatCard({
@@ -154,7 +155,7 @@ function teamSplits(bets: BetWithLegs[]) {
     .filter((bet) => bet.result !== 'pending')
     .forEach((bet) => {
       bet.bet_legs.forEach((leg) => {
-        const team = leg.selection.replace(/^Over\s+/i, '').replace(/^Under\s+/i, '');
+        const team = getPickLegBaseLabel(leg);
         const current = splits.get(team) ?? { profit: 0, total: 0 };
         splits.set(team, {
           profit: current.profit + (bet.profit ?? 0) / Math.max(1, bet.bet_legs.length),

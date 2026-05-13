@@ -1,9 +1,11 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
 
 import { WEEKLY_BUDGET } from '@/constants/rules';
 import { supabase } from '@/lib/supabase';
 import type {
   AchievementKey,
+  BetRow,
   BetResult,
   BetType,
   Json,
@@ -100,8 +102,13 @@ export type ProfileData = {
 export type LeaderboardRow = {
   member: LeagueMemberRow;
   profile: UserRow | null;
+  seasonProfit: number;
+  seasonRank: number;
   standing: StandingRow | null;
-  trend: 'down' | 'same' | 'up';
+  seasonTrend: 'down' | 'up' | null;
+  weeklyProfit: number;
+  weeklyRank: number;
+  weeklyTrend: 'down' | 'up' | null;
 };
 
 export type LeaderboardData = {
@@ -116,10 +123,23 @@ export type WeeklyAward = {
   profit: number;
   roi: number;
   user: UserRow | null;
+  users: UserRow[];
+};
+
+export type WeeklyLiveStanding = {
+  pendingPicks: number;
+  pickCount: number;
+  profit: number;
+  settledPicks: number;
+  user: UserRow | null;
+  userId: string;
 };
 
 export type WeeklyAwards = {
   coldStreak: WeeklyAward | null;
+  hasBets: boolean;
+  isFullySettled: boolean;
+  liveStandings: WeeklyLiveStanding[];
   lock: WeeklyAward | null;
   sharpest: WeeklyAward | null;
 };
@@ -143,7 +163,7 @@ export const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
   {
     description: 'Post positive weekly profit five weeks in a row.',
     key: 'budget_master',
-    title: 'Strategy Master',
+    title: 'Budget Master',
   },
   {
     description: 'Hit a parlay with four or more legs.',
@@ -196,8 +216,42 @@ function latestStanding(standings: StandingRow[]) {
   return [...standings].sort((left, right) => right.week_number - left.week_number)[0] ?? null;
 }
 
-function settledBets(bets: BetWithLegs[]) {
+function latestStandingAtOrBefore(standings: StandingRow[], weekNumber: number) {
+  return [...standings]
+    .filter((standing) => standing.week_number <= weekNumber)
+    .sort((left, right) => right.week_number - left.week_number)[0] ?? null;
+}
+
+function latestLeagueRecord(standings: StandingRow[]) {
+  const latestByLeague = new Map<string, StandingRow>();
+
+  standings.forEach((standing) => {
+    const current = latestByLeague.get(standing.league_id);
+    if (!current || standing.week_number > current.week_number) {
+      latestByLeague.set(standing.league_id, standing);
+    }
+  });
+
+  return [...latestByLeague.values()].reduce(
+    (record, standing) => ({
+      losses: record.losses + standing.losses,
+      ties: record.ties + standing.ties,
+      wins: record.wins + standing.wins,
+    }),
+    { losses: 0, ties: 0, wins: 0 },
+  );
+}
+
+function isSettledBet(bet: Pick<BetRow, 'profit' | 'result'>) {
+  return bet.result !== 'pending' && bet.profit !== null;
+}
+
+function settledBets<T extends Pick<BetRow, 'profit' | 'result'>>(bets: T[]) {
   return bets.filter((bet) => bet.result !== 'pending' && bet.profit !== null);
+}
+
+function sumSettledBetProfit<T extends Pick<BetRow, 'profit' | 'result'>>(bets: T[]) {
+  return settledBets(bets).reduce((sum, bet) => sum + (bet.profit ?? 0), 0);
 }
 
 function recordFromBets(bets: BetWithLegs[]) {
@@ -208,10 +262,12 @@ function recordFromBets(bets: BetWithLegs[]) {
 }
 
 function currentBetStreak(bets: BetWithLegs[]) {
-  const ordered = [...settledBets(bets)].sort((left, right) => right.created_at.localeCompare(left.created_at));
+  const ordered = [...settledBets(bets)]
+    .filter((bet) => bet.result === 'win' || bet.result === 'loss')
+    .sort((left, right) => right.created_at.localeCompare(left.created_at));
   const first = ordered[0];
 
-  if (!first || first.result === 'push') {
+  if (!first) {
     return 'No streak';
   }
 
@@ -225,7 +281,7 @@ function currentBetStreak(bets: BetWithLegs[]) {
     count += 1;
   }
 
-  return `${count}${first.result === 'win' ? 'W' : 'L'}`;
+  return `${first.result === 'win' ? 'W' : 'L'}${count}`;
 }
 
 function weeklyProfitMap(bets: BetWithLegs[]) {
@@ -242,26 +298,24 @@ function weeklyProfitMap(bets: BetWithLegs[]) {
 
 export function calculateProfileStats(bets: BetWithLegs[], standings: StandingRow[]): ProfileStats {
   const settled = settledBets(bets);
-  const totalProfit = settled.reduce((sum, bet) => sum + (bet.profit ?? 0), 0);
+  const totalProfit = sumSettledBetProfit(bets);
   const totalAmount = settled.reduce((sum, bet) => sum + bet.amount, 0);
-  const latest = latestStanding(standings);
-  const wins = latest?.wins ?? 0;
-  const losses = latest?.losses ?? 0;
-  const ties = latest?.ties ?? 0;
+  const record = latestLeagueRecord(standings);
   const wonBets = settled.filter((bet) => bet.result === 'win').length;
-  const decisiveBets = settled.filter((bet) => bet.result === 'win' || bet.result === 'loss').length;
+  const lostBets = settled.filter((bet) => bet.result === 'loss').length;
+  const decisiveBets = wonBets + lostBets;
 
   return {
     averageProfitPerBet: settled.length > 0 ? totalProfit / settled.length : 0,
     currentStreak: currentBetStreak(bets),
-    losses,
+    losses: record.losses,
     roi: totalAmount > 0 ? (totalProfit / totalAmount) * 100 : 0,
-    ties,
+    ties: record.ties,
     totalAmount,
     totalProfit,
     totalSettledBets: settled.length,
     winRate: decisiveBets > 0 ? (wonBets / decisiveBets) * 100 : 0,
-    wins,
+    wins: record.wins,
   };
 }
 
@@ -346,9 +400,16 @@ function achievementKeysForBets(bets: BetWithLegs[]) {
 
   const weeklyProfits = weeklyProfitMap(bets);
   let positiveWeeks = 0;
+  let previousWeek: number | null = null;
 
   weeklyProfits.forEach((week) => {
+    if (previousWeek !== null && week.week !== previousWeek + 1) {
+      positiveWeeks = 0;
+    }
+
     positiveWeeks = week.profit > 0 ? positiveWeeks + 1 : 0;
+    previousWeek = week.week;
+
     if (positiveWeeks >= 5) {
       earned.add('budget_master');
     }
@@ -421,6 +482,60 @@ function achievementUpserts(userId: string, bets: BetWithLegs[]) {
   });
 
   return rows;
+}
+
+function displayNameForLeaderboardRow(row: Pick<LeaderboardRow, 'member' | 'profile'>) {
+  return row.member.team_name || row.profile?.display_name || 'Player';
+}
+
+function compareLeaderboardRows(
+  left: Pick<LeaderboardRow, 'member' | 'profile' | 'seasonProfit' | 'standing' | 'weeklyProfit'>,
+  right: Pick<LeaderboardRow, 'member' | 'profile' | 'seasonProfit' | 'standing' | 'weeklyProfit'>,
+  value: 'seasonProfit' | 'weeklyProfit',
+) {
+  const profitDelta = right[value] - left[value];
+  if (profitDelta !== 0) {
+    return profitDelta;
+  }
+
+  const winsDelta = (right.standing?.wins ?? 0) - (left.standing?.wins ?? 0);
+  if (winsDelta !== 0) {
+    return winsDelta;
+  }
+
+  const lossesDelta = (left.standing?.losses ?? 0) - (right.standing?.losses ?? 0);
+  if (lossesDelta !== 0) {
+    return lossesDelta;
+  }
+
+  const nameDelta = displayNameForLeaderboardRow(left).localeCompare(displayNameForLeaderboardRow(right));
+  if (nameDelta !== 0) {
+    return nameDelta;
+  }
+
+  return left.member.joined_at.localeCompare(right.member.joined_at);
+}
+
+function indexedRanks<T extends { member: LeagueMemberRow }>(
+  rows: T[],
+  compare: (left: T, right: T) => number,
+) {
+  return [...rows].sort(compare).reduce<Record<string, number>>((ranks, row, index) => {
+    ranks[row.member.user_id] = index + 1;
+    return ranks;
+  }, {});
+}
+
+function trendFromRanks(currentRank: number, previousRank: number | null): 'down' | 'up' | null {
+  if (!previousRank || currentRank === previousRank) {
+    return null;
+  }
+
+  return currentRank < previousRank ? 'up' : 'down';
+}
+
+function hasLeaderboardSeparation<T>(rows: T[], valueFor: (row: T) => number) {
+  return new Set(rows.map(valueFor)).size > 1;
 }
 
 async function fetchUsersByIds(ids: string[]) {
@@ -635,7 +750,8 @@ export function filterProfileBets({
 }
 
 export function useLeaderboardData(userId: string | undefined, selectedLeagueId: string | undefined) {
-  return useQuery({
+  const queryClient = useQueryClient();
+  const query = useQuery({
     enabled: Boolean(userId),
     queryFn: async (): Promise<LeaderboardData> => {
       if (!userId) {
@@ -671,101 +787,320 @@ export function useLeaderboardData(userId: string | undefined, selectedLeagueId:
       }
 
       const previousWeek = Math.max(1, league.current_week - 1);
-      const [membersResult, standingsResult, previousStandingsResult] = await Promise.all([
+      const [membersResult, standingsResult, betsResult] = await Promise.all([
         supabase.from('league_members').select('*').eq('league_id', league.id).order('joined_at'),
         supabase
           .from('standings')
           .select('*')
           .eq('league_id', league.id)
-          .eq('week_number', league.current_week),
+          .lte('week_number', league.current_week),
         supabase
-          .from('standings')
+          .from('bets')
           .select('*')
           .eq('league_id', league.id)
-          .eq('week_number', previousWeek),
+          .lte('week_number', league.current_week)
+          .neq('result', 'pending')
+          .not('profit', 'is', null),
       ]);
       const members = assertSupabaseResult(membersResult.data as LeagueMemberRow[] | null, membersResult.error);
       const standings = assertSupabaseResult(standingsResult.data as StandingRow[] | null, standingsResult.error);
-      const previousStandings = assertSupabaseResult(
-        previousStandingsResult.data as StandingRow[] | null,
-        previousStandingsResult.error,
+      const bets = assertSupabaseResult(betsResult.data as BetRow[] | null, betsResult.error).filter(
+        isSettledBet,
       );
       const usersById = indexUsers(await fetchUsersByIds(members.map((member) => member.user_id)));
+
+      const draftRows = members.map((member) => {
+        const memberBets = bets.filter((bet) => bet.user_id === member.user_id);
+        const memberStandings = standings.filter((standing) => standing.user_id === member.user_id);
+        const latestStandingForMember = latestStandingAtOrBefore(memberStandings, league.current_week);
+        const currentStanding = memberStandings.find(
+          (standing) => standing.week_number === league.current_week,
+        ) ?? null;
+        const previousStanding =
+          league.current_week > 1 ? latestStandingAtOrBefore(memberStandings, previousWeek) : null;
+        const currentWeekBets = memberBets.filter((bet) => bet.week_number === league.current_week);
+        const previousWeekBets = memberBets.filter((bet) => bet.week_number === previousWeek);
+
+        return {
+          member,
+          previousSeasonProfit:
+            previousStanding?.total_profit ??
+            (league.current_week > 1
+              ? sumSettledBetProfit(memberBets.filter((bet) => bet.week_number <= previousWeek))
+              : 0),
+          previousWeeklyProfit: previousStanding?.weekly_profit ?? sumSettledBetProfit(previousWeekBets),
+          profile: usersById[member.user_id] ?? null,
+          seasonProfit: latestStandingForMember?.total_profit ?? sumSettledBetProfit(memberBets),
+          standing: latestStandingForMember,
+          weeklyProfit: currentStanding?.weekly_profit ?? sumSettledBetProfit(currentWeekBets),
+        };
+      });
+
+      const seasonRanks = indexedRanks(draftRows, (left, right) =>
+        compareLeaderboardRows(left, right, 'seasonProfit'),
+      );
+      const weeklyRanks = indexedRanks(draftRows, (left, right) =>
+        compareLeaderboardRows(left, right, 'weeklyProfit'),
+      );
+      const previousSeasonRanks: Record<string, number> =
+        league.current_week > 1
+          ? indexedRanks(
+              draftRows.map((row) => ({ ...row, seasonProfit: row.previousSeasonProfit })),
+              (left, right) => compareLeaderboardRows(left, right, 'seasonProfit'),
+            )
+          : {};
+      const previousWeeklyRanks: Record<string, number> =
+        league.current_week > 1
+          ? indexedRanks(
+              draftRows.map((row) => ({ ...row, weeklyProfit: row.previousWeeklyProfit })),
+              (left, right) => compareLeaderboardRows(left, right, 'weeklyProfit'),
+            )
+          : {};
+      const hasSeasonSeparation = hasLeaderboardSeparation(draftRows, (row) => row.seasonProfit);
+      const hasWeeklySeparation = hasLeaderboardSeparation(draftRows, (row) => row.weeklyProfit);
 
       return {
         leagueOptions: leagues.map((item) => ({ id: item.id, label: item.name })),
         leagues,
-        rows: members
-          .map((member) => {
-            const standing = standings.find((item) => item.user_id === member.user_id) ?? null;
-            const previous = previousStandings.find((item) => item.user_id === member.user_id) ?? null;
-            const trend: LeaderboardRow['trend'] =
-              previous && standing
-                ? standing.rank < previous.rank
-                  ? 'up'
-                  : standing.rank > previous.rank
-                    ? 'down'
-                    : 'same'
-                : 'same';
+        rows: draftRows
+          .map((row) => {
+            const seasonRank = seasonRanks[row.member.user_id] ?? members.length;
+            const weeklyRank = weeklyRanks[row.member.user_id] ?? members.length;
+            const previousSeasonRank = previousSeasonRanks[row.member.user_id] ?? null;
+            const previousWeeklyRank = previousWeeklyRanks[row.member.user_id] ?? null;
 
             return {
-              member,
-              profile: usersById[member.user_id] ?? null,
-              standing,
-              trend,
+              member: row.member,
+              profile: row.profile,
+              seasonProfit: row.seasonProfit,
+              seasonRank,
+              seasonTrend: hasSeasonSeparation ? trendFromRanks(seasonRank, previousSeasonRank) : null,
+              standing: row.standing,
+              weeklyProfit: row.weeklyProfit,
+              weeklyRank,
+              weeklyTrend: hasWeeklySeparation ? trendFromRanks(weeklyRank, previousWeeklyRank) : null,
             };
           })
           .sort((left, right) => {
-            const leftProfit = left.standing?.total_profit ?? 0;
-            const rightProfit = right.standing?.total_profit ?? 0;
-            return rightProfit - leftProfit;
+            return compareLeaderboardRows(left, right, 'seasonProfit');
           }),
       };
     },
     queryKey: profileKeys.leaderboard(userId, selectedLeagueId),
   });
+
+  const activeLeagueId = selectedLeagueId ?? query.data?.leagues[0]?.id;
+
+  useEffect(() => {
+    if (!userId || !activeLeagueId) {
+      return undefined;
+    }
+
+    const invalidateLeaderboard = () => {
+      void Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['leaderboard', userId] }),
+        queryClient.invalidateQueries({ queryKey: ['profile-stats'] }),
+        queryClient.invalidateQueries({ queryKey: ['home-dashboard', userId] }),
+        queryClient.invalidateQueries({ queryKey: ['leagues', 'detail', activeLeagueId] }),
+      ]);
+    };
+    const channelTopic = `leaderboard-settlement:${activeLeagueId}:${Date.now().toString(36)}:${Math.random()
+      .toString(36)
+      .slice(2)}`;
+    const channel = supabase
+      .channel(channelTopic)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          filter: `league_id=eq.${activeLeagueId}`,
+          schema: 'public',
+          table: 'bets',
+        },
+        invalidateLeaderboard,
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          filter: `league_id=eq.${activeLeagueId}`,
+          schema: 'public',
+          table: 'standings',
+        },
+        invalidateLeaderboard,
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          filter: `league_id=eq.${activeLeagueId}`,
+          schema: 'public',
+          table: 'weekly_matchups',
+        },
+        invalidateLeaderboard,
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'bet_legs',
+        },
+        invalidateLeaderboard,
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [activeLeagueId, queryClient, userId]);
+
+  return query;
 }
 
 export function calculateWeeklyAwards(
   bets: BetWithLegs[],
   usersById: Record<string, UserRow>,
+  standings: StandingRow[] = [],
 ): WeeklyAwards {
-  const settled = settledBets(bets);
-  const byUser = new Map<string, BetWithLegs[]>();
+  type AwardDraftRow = Omit<WeeklyAward, 'users'>;
 
-  settled.forEach((bet) => {
+  const settled = settledBets(bets);
+  const hasBets = bets.length > 0;
+  const hasResolvedStandings = standings.some(
+    (standing) =>
+      standing.weekly_profit !== 0 ||
+      standing.wins !== 0 ||
+      standing.losses !== 0 ||
+      standing.ties !== 0,
+  );
+  const isFullySettled = hasResolvedStandings || (hasBets && bets.every((bet) => bet.result !== 'pending'));
+  const userIds = uniqueValues([
+    ...Object.keys(usersById),
+    ...bets.map((bet) => bet.user_id),
+    ...standings.map((standing) => standing.user_id),
+  ]);
+  const byUser = new Map<string, BetWithLegs[]>();
+  const standingByUserId = standings.reduce<Record<string, StandingRow>>((accumulator, standing) => {
+    accumulator[standing.user_id] = standing;
+    return accumulator;
+  }, {});
+
+  bets.forEach((bet) => {
     byUser.set(bet.user_id, [...(byUser.get(bet.user_id) ?? []), bet]);
   });
 
-  const roiRows = [...byUser.entries()].map(([userId, userBets]) => {
-    const profit = userBets.reduce((sum, bet) => sum + (bet.profit ?? 0), 0);
-    const amount = userBets.reduce((sum, bet) => sum + bet.amount, 0) || WEEKLY_BUDGET;
+  const profitForUser = (userId: string, userBets: BetWithLegs[]) => {
+    const standing = standingByUserId[userId];
+
+    if (standing) {
+      return standing.weekly_profit;
+    }
+
+    if (isFullySettled && userBets.length === 0) {
+      return -WEEKLY_BUDGET;
+    }
+
+    return settledBets(userBets).reduce((sum, bet) => sum + (bet.profit ?? 0), 0);
+  };
+
+  const liveStandings = userIds
+    .map((userId) => {
+      const userBets = byUser.get(userId) ?? [];
+      const settledUserBets = settledBets(userBets);
+      const profit = profitForUser(userId, userBets);
+
+      return {
+        pendingPicks: userBets.filter((bet) => bet.result === 'pending').length,
+        pickCount: userBets.length,
+        profit,
+        settledPicks: settledUserBets.length,
+        user: usersById[userId] ?? null,
+        userId,
+      };
+    })
+    .sort((left, right) => {
+      if (right.profit !== left.profit) {
+        return right.profit - left.profit;
+      }
+
+      return (left.user?.display_name ?? '').localeCompare(right.user?.display_name ?? '');
+    });
+
+  const profitRows: AwardDraftRow[] = userIds.map((userId) => {
+    const userBets = byUser.get(userId) ?? [];
+    const profit = profitForUser(userId, userBets);
     return {
       bet: null,
       label: '',
       profit,
-      roi: amount > 0 ? (profit / amount) * 100 : 0,
+      roi: (profit / WEEKLY_BUDGET) * 100,
       user: usersById[userId] ?? null,
     };
   });
-  const lockBet = [...settled].sort((left, right) => (right.profit ?? 0) - (left.profit ?? 0))[0] ?? null;
+  const makeAward = (label: string, rows: AwardDraftRow[]): WeeklyAward | null => {
+    const first = rows[0];
+
+    if (!first) {
+      return null;
+    }
+
+    const users = rows.map((row) => row.user).filter((user): user is UserRow => Boolean(user));
+
+    return {
+      ...first,
+      label: rows.length > 1 ? `${label} Tie` : label,
+      users,
+    };
+  };
+  const lockRows: AwardDraftRow[] = bets
+    .filter((bet) => bet.is_lock)
+    .map((bet) => ({
+      bet,
+      label: '',
+      profit: bet.profit ?? 0,
+      roi: bet.amount > 0 ? ((bet.profit ?? 0) / bet.amount) * 100 : 0,
+      user: usersById[bet.user_id] ?? null,
+    }));
+  const topLockProfit =
+    isFullySettled && lockRows.length > 0
+      ? Math.max(...lockRows.map((row) => row.profit))
+      : null;
+  const lockAwardRows =
+    topLockProfit === null
+      ? lockRows.slice(0, 1)
+      : lockRows.filter((row) => row.profit === topLockProfit);
+  const lockAward = makeAward('Pick of the Week', lockAwardRows);
+
+  let sharpest: WeeklyAward | null = null;
+  let coldStreak: WeeklyAward | null = null;
+
+  if (isFullySettled && profitRows.length > 0) {
+    const profits = profitRows.map((row) => row.profit);
+    const maxProfit = Math.max(...profits);
+    const minProfit = Math.min(...profits);
+    const topRows = profitRows.filter((row) => row.profit === maxProfit);
+    const coldRows = profitRows.filter((row) => row.profit === minProfit);
+
+    if (profitRows.length === 1 || maxProfit === minProfit) {
+      if (maxProfit > 0) {
+        sharpest = makeAward('Top Performer', topRows);
+      } else if (minProfit < 0) {
+        coldStreak = makeAward('Cold Streak', coldRows);
+      }
+    } else {
+      sharpest = makeAward('Top Performer', topRows);
+      coldStreak = makeAward('Cold Streak', coldRows);
+    }
+  }
 
   return {
-    coldStreak: roiRows.sort((left, right) => left.roi - right.roi)[0]
-      ? { ...roiRows.sort((left, right) => left.roi - right.roi)[0], label: 'Cold Streak' }
-      : null,
-    lock: lockBet
-      ? {
-          bet: lockBet,
-          label: 'Pick of the Week',
-          profit: lockBet.profit ?? 0,
-          roi: lockBet.amount > 0 ? ((lockBet.profit ?? 0) / lockBet.amount) * 100 : 0,
-          user: usersById[lockBet.user_id] ?? null,
-        }
-      : null,
-    sharpest: roiRows.sort((left, right) => right.roi - left.roi)[0]
-      ? { ...roiRows.sort((left, right) => right.roi - left.roi)[0], label: 'Top Performer' }
-      : null,
+    coldStreak,
+    hasBets,
+    isFullySettled,
+    liveStandings,
+    lock: lockAward,
+    sharpest,
   };
 }
 
@@ -774,22 +1109,38 @@ export function useWeeklyAwards(leagueId: string | undefined, weekNumber: number
     enabled: Boolean(leagueId && weekNumber),
     queryFn: async (): Promise<WeeklyAwards> => {
       if (!leagueId || !weekNumber) {
-        return { coldStreak: null, lock: null, sharpest: null };
+        return {
+          coldStreak: null,
+          hasBets: false,
+          isFullySettled: false,
+          liveStandings: [],
+          lock: null,
+          sharpest: null,
+        };
       }
 
-      const [betsResult, membersResult] = await Promise.all([
+      const [betsResult, membersResult, standingsResult] = await Promise.all([
         supabase
           .from('bets')
           .select('*, bet_legs(*)')
           .eq('league_id', leagueId)
           .eq('week_number', weekNumber),
         supabase.from('league_members').select('*').eq('league_id', leagueId),
+        supabase
+          .from('standings')
+          .select('*')
+          .eq('league_id', leagueId)
+          .eq('week_number', weekNumber),
       ]);
       const bets = assertSupabaseResult(betsResult.data as BetWithLegs[] | null, betsResult.error);
       const members = assertSupabaseResult(membersResult.data as LeagueMemberRow[] | null, membersResult.error);
+      const standings = assertSupabaseResult(
+        standingsResult.data as StandingRow[] | null,
+        standingsResult.error,
+      );
       const usersById = indexUsers(await fetchUsersByIds(members.map((member) => member.user_id)));
 
-      return calculateWeeklyAwards(bets, usersById);
+      return calculateWeeklyAwards(bets, usersById, standings);
     },
     queryKey: profileKeys.awards(leagueId, weekNumber),
   });

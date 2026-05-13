@@ -15,6 +15,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { LockEffect } from '@/components/cosmetics';
+import { LiveBetStatusSummary, LiveLegScoreLine } from '@/components/picks/live-pick-status';
 import {
   AnimatedBar,
   AnimatedNumber,
@@ -34,6 +35,7 @@ import {
   StaggeredItem,
   SwipeableRow,
   TextInput,
+  WeekNavigator,
 } from '@/components/ui';
 import {
   LOCK_OF_THE_WEEK_MULTIPLIER,
@@ -49,6 +51,7 @@ import { useUserCosmetics } from '@/hooks/use-cosmetics';
 import { useShareBetToChat } from '@/hooks/use-league-chat';
 import { LOCAL_FLAG_KEYS, useLocalFlag } from '@/hooks/use-local-flags';
 import { useMyLeagues } from '@/hooks/use-leagues';
+import { useLiveScores } from '@/hooks/use-live-scores';
 import { useLeagueWeekRevealTime, useSyncLeagueWeekSlate, useUpcomingNflOdds } from '@/hooks/use-odds';
 import { useBetBoardAccess } from '@/hooks/use-season-pass';
 import {
@@ -73,7 +76,16 @@ import {
   formatProfit,
 } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
+import { evaluateLiveBetStatus } from '@/lib/live-pick-status';
 import type { OddsGame, OddsSelection } from '@/lib/odds-api';
+import {
+  formatBetLegLabel,
+  formatOddsSelectionLabel,
+  formatPickTitle,
+  getPickLegBaseLabel,
+  getPickLogoLabel,
+} from '@/lib/pick-labels';
+import { isBetLegLocked, isParentPickLocked } from '@/lib/pick-locking';
 import {
   areDirectlyContradictingPicks,
   findContradictingPick,
@@ -86,6 +98,7 @@ import type {
   BetType,
   EquippedCosmeticsByCategory,
   LeagueRow,
+  LiveGameStateRow,
   TeaserLegCount,
   TeaserPoints,
 } from '@/types/database';
@@ -169,6 +182,7 @@ const TEASER_POINT_OPTIONS: SegmentedOption<TeaserPoints>[] = [
 const QUICK_AMOUNTS = [5, 10, 20, MAX_SINGLE_BET];
 const LINEUP_COLLAPSED_HEIGHT = 104;
 const ODDS_BUTTON_GAP = 10;
+const REGULAR_SEASON_WEEKS = 14;
 
 type TourAnchor = 'top' | 'middle' | 'bottom';
 
@@ -217,15 +231,7 @@ function marketLabel(market: BetMarket) {
 }
 
 function getSelectionLabel(selection: OddsSelection) {
-  if (selection.market === 'spread' && selection.line !== null) {
-    return `${selection.selection} ${selection.line > 0 ? '+' : ''}${selection.line}`;
-  }
-
-  if (selection.market === 'over_under' && selection.line !== null) {
-    return `${selection.selection} ${selection.line}`;
-  }
-
-  return selection.selection;
+  return formatOddsSelectionLabel(selection);
 }
 
 function getOddsButtonLabel(selection: OddsSelection) {
@@ -292,11 +298,11 @@ function getLegSelectionKey(leg: Pick<SlipLeg, 'game_id' | 'market' | 'original_
 }
 
 function isPlacedLegLocked(leg: Pick<PlacedBet['bet_legs'][number], 'game_start_time' | 'locked'>) {
-  return leg.locked || new Date(leg.game_start_time).getTime() <= Date.now();
+  return isBetLegLocked(leg);
 }
 
 function isPlacedBetLocked(bet: PlacedBet) {
-  return bet.bet_legs.some((leg) => isPlacedLegLocked(leg));
+  return isParentPickLocked(bet);
 }
 
 function findOddsGame(oddsGames: OddsGame[], gameId: string) {
@@ -306,6 +312,7 @@ function findOddsGame(oddsGames: OddsGame[], gameId: string) {
 function makeEditablePlacedLeg(
   leg: PlacedBet['bet_legs'][number],
   oddsGame: OddsGame | undefined,
+  betType: BetType,
 ): EditingPlacedLeg {
   return {
     adjusted_line: leg.adjusted_line,
@@ -315,7 +322,7 @@ function makeEditablePlacedLeg(
     game_start_time: leg.game_start_time,
     homeTeam: oddsGame?.homeTeam ?? 'Game',
     id: leg.id,
-    label: leg.selection,
+    label: formatBetLegLabel(leg, { betType, includeTeaserMovement: false }),
     leg_odds: leg.leg_odds,
     locked: isPlacedLegLocked(leg),
     market: leg.market,
@@ -326,7 +333,9 @@ function makeEditablePlacedLeg(
 }
 
 function makeEditablePlacedLegs(bet: PlacedBet, oddsGames: OddsGame[]) {
-  return bet.bet_legs.map((leg) => makeEditablePlacedLeg(leg, findOddsGame(oddsGames, leg.game_id)));
+  return bet.bet_legs.map((leg) =>
+    makeEditablePlacedLeg(leg, findOddsGame(oddsGames, leg.game_id), bet.bet_type),
+  );
 }
 
 function makeEditedPlacedLeg(
@@ -697,7 +706,7 @@ function getPlacedBetConflictLegs(placedBets: PlacedBet[], editingBetId: string,
 }
 
 function useLockClock(enabled: boolean) {
-  const [, setNow] = useState(() => Date.now());
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     if (!enabled) {
@@ -707,6 +716,8 @@ function useLockClock(enabled: boolean) {
     const interval = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(interval);
   }, [enabled]);
+
+  return now;
 }
 
 function getDisplayedPotentialPayout(bet: Pick<SlipBet, 'is_lock' | 'potential_payout'>) {
@@ -727,6 +738,22 @@ function getDisplayedPlacedPayout(bet: Pick<PlacedBet, 'is_lock' | 'potential_pa
 
 function isCappedPlacedParlay(bet: Pick<PlacedBet, 'bet_type' | 'potential_payout'>) {
   return bet.bet_type === 'parlay' && bet.potential_payout >= PARLAY_PAYOUT_CAP;
+}
+
+function isSettledPick(result: PlacedBet['result']): result is Exclude<PlacedBet['result'], 'pending'> {
+  return result !== 'pending';
+}
+
+function getSettledReward(bet: Pick<PlacedBet, 'amount' | 'profit' | 'result'>) {
+  if (bet.result === 'loss') {
+    return 0;
+  }
+
+  if (bet.result === 'push') {
+    return bet.amount;
+  }
+
+  return bet.amount + (bet.profit ?? 0);
 }
 
 function getBetTypeLabel(type: BetType) {
@@ -838,7 +865,13 @@ function getValidationState(slipBets: SlipBet[]): ValidationState {
 // Header
 // ============================================================
 
-function BoardHeader({ league }: { league: LeagueRow | undefined }) {
+function BoardHeader({
+  league,
+  weekNumber,
+}: {
+  league: LeagueRow | undefined;
+  weekNumber: number | undefined;
+}) {
   return (
     <View>
       <View className="flex-row items-center gap-2">
@@ -846,7 +879,7 @@ function BoardHeader({ league }: { league: LeagueRow | undefined }) {
         <Text
           className="text-[11px] font-semibold uppercase text-electric-green"
           style={{ letterSpacing: 1.2 }}>
-          {league ? `Week ${league.current_week}` : 'Week —'}
+          {league && weekNumber ? `Week ${weekNumber}` : 'Week —'}
         </Text>
       </View>
       <Text
@@ -858,6 +891,27 @@ function BoardHeader({ league }: { league: LeagueRow | undefined }) {
         Stack straights, parlays, and teasers across the slate.
       </Text>
     </View>
+  );
+}
+
+function FutureWeekBoardPlaceholder({ weekNumber }: { weekNumber: number }) {
+  return (
+    <Card>
+      <View className="items-center gap-3 py-5">
+        <View className="h-14 w-14 items-center justify-center rounded-2xl border border-cyan-accent/30 bg-cyan-accent/10">
+          <Ionicons color={THEME_COLORS.cyanAccent} name="calendar-outline" size={24} />
+        </View>
+        <Text
+          className="text-center text-xl font-black uppercase text-white"
+          style={{ letterSpacing: -0.3 }}>
+          Odds Release Monday
+        </Text>
+        <Text className="text-center text-sm font-semibold leading-5 text-white/55">
+          Week {weekNumber} is not open yet. The lineup builder will unlock when
+          the slate is released.
+        </Text>
+      </View>
+    </Card>
   );
 }
 
@@ -1480,11 +1534,7 @@ function GameCard({
 // ============================================================
 
 function getSelectedTeamLogoName(leg: SlipLeg) {
-  if (leg.market === 'spread') {
-    return leg.selection.replace(/\s[+-]\d+(?:\.\d+)?$/, '');
-  }
-
-  return leg.selection;
+  return getPickLogoLabel(leg);
 }
 
 function BuilderLegRow({
@@ -1496,7 +1546,7 @@ function BuilderLegRow({
   onRemove?: (id: string) => void;
   teaserPoints?: TeaserPoints;
 }) {
-  const isLocked = new Date(leg.game_start_time).getTime() <= Date.now();
+  const isLocked = isBetLegLocked({ game_start_time: leg.game_start_time, locked: false });
   const accent = teaserPoints ? 'text-cyan-accent' : 'text-white/65';
   const isTotal = leg.market === 'over_under';
   const isOver = leg.selection.toLowerCase().startsWith('over');
@@ -3045,6 +3095,72 @@ function LockStatusPill() {
   );
 }
 
+type OutcomePillSize = 'sm' | 'md';
+
+const OUTCOME_PILL_SIZING: Record<
+  OutcomePillSize,
+  { icon: number; label: string; padding: string }
+> = {
+  sm: { icon: 10, label: 'text-[10px]', padding: 'px-2.5 py-1' },
+  md: { icon: 12, label: 'text-[10px]', padding: 'px-3 py-1.5' },
+};
+
+function SettledOutcomePill({
+  result,
+  size = 'md',
+}: {
+  result: Exclude<PlacedBet['result'], 'pending'>;
+  size?: OutcomePillSize;
+}) {
+  const sizing = OUTCOME_PILL_SIZING[size];
+  const config =
+    result === 'win'
+      ? {
+          bgClass: 'bg-electric-green/15',
+          borderClass: 'border-electric-green/50',
+          icon: 'checkmark-circle' as const,
+          iconColor: THEME_COLORS.electricGreen,
+          label: 'Win',
+          textClass: 'text-electric-green',
+        }
+      : result === 'loss'
+        ? {
+            bgClass: 'bg-coral-red/15',
+            borderClass: 'border-coral-red/50',
+            icon: 'close-circle' as const,
+            iconColor: THEME_COLORS.coralRed,
+            label: 'Loss',
+            textClass: 'text-coral-red',
+          }
+        : {
+            bgClass: 'bg-white/[0.06]',
+            borderClass: 'border-white/15',
+            icon: null,
+            iconColor: 'rgba(255,255,255,0.55)',
+            label: 'Push',
+            textClass: 'text-white/60',
+          };
+
+  return (
+    <View
+      className={cn(
+        'flex-row items-center gap-1 rounded-full border',
+        sizing.padding,
+        config.bgClass,
+        config.borderClass,
+      )}>
+      {config.icon ? (
+        <Ionicons color={config.iconColor} name={config.icon} size={sizing.icon} />
+      ) : null}
+      <Text
+        className={cn('font-black uppercase', sizing.label, config.textClass)}
+        style={{ letterSpacing: 1.4 }}>
+        {config.label}
+      </Text>
+    </View>
+  );
+}
+
 function EditActionButton() {
   return (
     <View className="flex-row items-center gap-1.5 rounded-full border border-electric-green/45 bg-electric-green/15 px-3 py-1.5">
@@ -3053,6 +3169,59 @@ function EditActionButton() {
         className="text-[10px] font-black uppercase text-electric-green"
         style={{ letterSpacing: 1.4 }}>
         Edit
+      </Text>
+    </View>
+  );
+}
+
+function ViewOnlyPill() {
+  return (
+    <View className="flex-row items-center gap-1 rounded-full border border-white/15 bg-white/[0.05] px-3 py-1.5">
+      <Ionicons color="rgba(255,255,255,0.62)" name="eye-outline" size={11} />
+      <Text
+        className="text-[10px] font-black uppercase text-white/60"
+        style={{ letterSpacing: 1.4 }}>
+        View
+      </Text>
+    </View>
+  );
+}
+
+function SettledRewardSummary({ bet }: { bet: PlacedBet }) {
+  if (!isSettledPick(bet.result)) {
+    return (
+      <Text
+        className={cn(
+          'text-sm font-black',
+          bet.is_lock ? 'text-gold' : 'text-electric-green',
+        )}>
+        Reward {formatCurrency(getDisplayedPlacedPayout(bet))}
+        {isCappedPlacedParlay(bet) ? ' (capped)' : ''}
+      </Text>
+    );
+  }
+
+  const realizedReward = getSettledReward(bet);
+  const profit = bet.profit ?? 0;
+
+  if (bet.result === 'push') {
+    return (
+      <Text className="text-right text-sm font-black text-white/65">
+        Outcome {formatCurrency(realizedReward)} · Push
+      </Text>
+    );
+  }
+
+  const outcomeWord = bet.result === 'win' ? 'profit' : 'loss';
+  const outcomeClass = bet.result === 'win' ? 'text-electric-green' : 'text-coral-red';
+
+  return (
+    <View className="flex-row flex-wrap justify-end">
+      <Text className="text-sm font-black text-white/65">
+        Outcome {formatCurrency(realizedReward)} ·{' '}
+      </Text>
+      <Text className={cn('text-sm font-black', outcomeClass)}>
+        {formatProfit(profit)} {outcomeWord}
       </Text>
     </View>
   );
@@ -3558,49 +3727,73 @@ function PlacedBetCard({
   cosmetics,
   highlighted,
   isLockHeadline,
+  liveScoresByGameId,
   onEdit,
   onShare,
   onSetPotw,
   potwSwapClosed,
   potwSwapPending,
+  readOnly,
   shareLoading,
 }: {
   bet: PlacedBet;
   cosmetics?: EquippedCosmeticsByCategory;
   highlighted: boolean;
   isLockHeadline: boolean;
+  liveScoresByGameId: Record<string, LiveGameStateRow | undefined>;
   onEdit: () => void;
   onShare: () => Promise<void>;
   onSetPotw: () => void;
   potwSwapClosed: boolean;
   potwSwapPending: boolean;
+  readOnly: boolean;
   shareLoading: boolean;
 }) {
   const isLocked = isPlacedBetLocked(bet);
+  const settledResult = isSettledPick(bet.result) ? bet.result : null;
+  const isSettled = Boolean(settledResult);
   const isLock = bet.is_lock;
-  const displayedReward = getDisplayedPlacedPayout(bet);
-  const cappedParlay = isCappedPlacedParlay(bet);
+  const liveStatus = evaluateLiveBetStatus(bet, liveScoresByGameId);
   const dim = !isLockHeadline && !isLock; // gently de-emphasize non-lock bets after headline
-  const showPotwStar = isLock || (!potwSwapClosed && !isLocked);
-  const canSetPotw = !isLock && !potwSwapClosed && !isLocked && !potwSwapPending;
+  const showPotwStar = !readOnly && !potwSwapClosed && !isLocked && !isSettled;
+  const canSetPotw =
+    !readOnly && !isLock && !potwSwapClosed && !isLocked && !isSettled && !potwSwapPending;
+  const settledAccent =
+    settledResult === 'win'
+      ? THEME_COLORS.electricGreen
+      : settledResult === 'loss'
+        ? THEME_COLORS.coralRed
+        : null;
+  const cardStyle = settledAccent
+    ? {
+        backgroundColor:
+          settledResult === 'win' ? 'rgba(0,255,135,0.07)' : 'rgba(255,71,87,0.07)',
+        borderColor:
+          settledResult === 'win' ? 'rgba(0,255,135,0.34)' : 'rgba(255,71,87,0.34)',
+        borderWidth: 1.5,
+        opacity: 1,
+        shadowColor: settledAccent,
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.18,
+        shadowRadius: 12,
+      }
+    : isLock && !isSettled
+      ? {
+          borderWidth: 2,
+          shadowColor: THEME_COLORS.gold,
+          shadowOffset: { width: 0, height: 8 },
+          shadowOpacity: 0.55,
+          shadowRadius: 18,
+          opacity: 1,
+        }
+      : { opacity: dim ? 0.78 : 1 };
   const card = (
     <View
       className={cn(
         'overflow-hidden rounded-2xl border bg-white/[0.04]',
-        isLock ? 'border-gold/70 bg-gold/[0.10]' : 'border-white/[0.08]',
+        isLock && !isSettled ? 'border-gold/70 bg-gold/[0.10]' : 'border-white/[0.08]',
       )}
-      style={
-        isLock
-          ? {
-              borderWidth: 2,
-              shadowColor: THEME_COLORS.gold,
-              shadowOffset: { width: 0, height: 8 },
-              shadowOpacity: 0.55,
-              shadowRadius: 18,
-              opacity: 1,
-            }
-          : { opacity: dim ? 0.78 : 1 }
-      }>
+      style={cardStyle}>
       {isLock ? (
         <View className="flex-row items-center justify-center gap-1.5 border-b border-gold/40 bg-gold/15 px-3 py-1.5">
           <Ionicons color={THEME_COLORS.gold} name="star" size={11} />
@@ -3630,32 +3823,44 @@ function PlacedBetCard({
               )}
               style={{ letterSpacing: -0.3 }}
               numberOfLines={2}>
-              {bet.bet_type === 'straight'
-                ? bet.bet_legs[0]?.selection ?? 'Straight pick'
-                : `${bet.bet_legs.length}-leg ${bet.bet_type}`}
+              {formatPickTitle(bet)}
             </Text>
+            <LiveBetStatusSummary status={liveStatus} />
           </View>
-          {isLocked ? <LockStatusPill /> : <EditActionButton />}
+          {settledResult ? (
+            <SettledOutcomePill result={settledResult} />
+          ) : readOnly ? (
+            <ViewOnlyPill />
+          ) : isLocked ? (
+            <LockStatusPill />
+          ) : (
+            <EditActionButton />
+          )}
         </View>
         {bet.bet_legs.map((leg) => {
-          const legLocked = isPlacedLegLocked(leg);
-          const showLegLockState = legLocked;
+          const settledLegResult = isSettledPick(leg.result) ? leg.result : null;
           return (
             <View className="rounded-2xl bg-white/[0.04] p-3" key={leg.id}>
               <View className="flex-row justify-between gap-3">
                 <View className="flex-1">
-                  <Text className="text-sm font-black text-white">{leg.selection}</Text>
+                  <Text className="text-sm font-black text-white">
+                    {formatBetLegLabel(leg, {
+                      betType: bet.bet_type,
+                      includeTeaserMovement: false,
+                    })}
+                  </Text>
                   <Text className="mt-1 text-[11px] font-semibold text-white/45">
                     {marketLabel(leg.market)} · {formatGameTime(leg.game_start_time)}
                   </Text>
                 </View>
-                {showLegLockState ? <LegLockPill label="Locked" locked={legLocked} /> : null}
+                {settledLegResult ? <SettledOutcomePill result={settledLegResult} size="sm" /> : null}
               </View>
               {bet.bet_type === 'teaser' ? (
                 <Text className="mt-2 text-[11px] font-black text-cyan-accent">
                   {formatLine(leg.original_line)} → {formatLine(leg.adjusted_line)}
                 </Text>
               ) : null}
+              <LiveLegScoreLine leg={leg} score={liveScoresByGameId[leg.game_id]} />
             </View>
           );
         })}
@@ -3666,15 +3871,8 @@ function PlacedBetCard({
             {formatAmericanOdds(bet.odds)} · {formatCurrency(bet.amount)}
           </Text>
           <View className="items-end">
-            <Text
-              className={cn(
-                'text-sm font-black',
-                isLock ? 'text-gold' : 'text-electric-green',
-              )}>
-              Reward {formatCurrency(displayedReward)}
-              {cappedParlay ? ' (capped)' : ''}
-            </Text>
-            {isLock ? (
+            <SettledRewardSummary bet={bet} />
+            {isLock && !isSettled ? (
               <Text
                 className="mt-0.5 text-[10px] font-semibold text-gold/85"
                 style={{ letterSpacing: 0.4 }}>
@@ -3695,7 +3893,7 @@ function PlacedBetCard({
     </View>
   );
 
-  const content = isLocked ? (
+  const content = readOnly || isLocked || isSettled ? (
     card
   ) : (
     <PressableScale
@@ -3728,7 +3926,9 @@ function PlacedBetsView({
   onSetPotw,
   potwSwapClosed,
   potwSwapPendingBetId,
+  readOnly,
   userId,
+  weekNumber,
 }: {
   bets: PlacedBet[];
   cosmetics?: EquippedCosmeticsByCategory;
@@ -3737,11 +3937,22 @@ function PlacedBetsView({
   onSetPotw: (bet: PlacedBet) => void;
   potwSwapClosed: boolean;
   potwSwapPendingBetId: string | null;
+  readOnly: boolean;
   userId: string | undefined;
+  weekNumber: number;
 }) {
   const shareBet = useShareBetToChat(userId);
   const totalAllocated = bets.reduce((sum, bet) => sum + bet.amount, 0);
-  const totalReward = bets.reduce((sum, bet) => sum + getDisplayedPlacedPayout(bet), 0);
+  const totalReward = bets.reduce(
+    (sum, bet) =>
+      sum + (isSettledPick(bet.result) ? getSettledReward(bet) : getDisplayedPlacedPayout(bet)),
+    0,
+  );
+  const liveScoreGameIds = useMemo(
+    () => bets.flatMap((bet) => bet.bet_legs.map((leg) => leg.game_id)),
+    [bets],
+  );
+  const liveScoresQuery = useLiveScores(liveScoreGameIds);
 
   // Surface Pick of the Week first, the rest follow.
   const orderedBets = useMemo(() => {
@@ -3767,20 +3978,29 @@ function PlacedBetsView({
       <Card tone="highlight">
         <View className="gap-3">
           <View className="flex-row items-center gap-2">
-            <Ionicons color={THEME_COLORS.electricGreen} name="lock-closed" size={14} />
+            <Ionicons
+              color={readOnly ? THEME_COLORS.cyanAccent : THEME_COLORS.electricGreen}
+              name={readOnly ? 'eye-outline' : 'lock-closed'}
+              size={14}
+            />
             <Text
-              className="text-[10px] font-black uppercase text-electric-green"
+              className={cn(
+                'text-[10px] font-black uppercase',
+                readOnly ? 'text-cyan-accent' : 'text-electric-green',
+              )}
               style={{ letterSpacing: 2.5 }}>
-              Card Submitted
+              {readOnly ? `Week ${weekNumber} Results` : 'Card Submitted'}
             </Text>
           </View>
           <Text
             className="text-2xl font-black uppercase text-white"
             style={{ letterSpacing: -0.4 }}>
-            This Week is Submitted
+            {readOnly ? 'Read-Only Lineup' : 'This Week is Submitted'}
           </Text>
           <Text className="text-sm font-semibold text-white/55">
-            Picks stay editable until their lock game starts. Pick of the Week can be moved until first kickoff.
+            {readOnly
+              ? 'Past weeks show final pick outcomes and cannot be edited.'
+              : 'Picks stay editable until their lock game starts. Pick of the Week can be moved until first kickoff.'}
           </Text>
           <View className="mt-2 flex-row items-center justify-between">
             <Text
@@ -3794,7 +4014,7 @@ function PlacedBetsView({
             <Text
               className="text-[10px] font-black uppercase text-white/45"
               style={{ letterSpacing: 1.5 }}>
-              Potential Reward
+              {readOnly ? 'Outcome' : 'Potential Reward'}
             </Text>
             <Text className="text-sm font-black text-electric-green">
               {formatCurrency(totalReward)}
@@ -3803,6 +4023,20 @@ function PlacedBetsView({
         </View>
       </Card>
 
+      {orderedBets.length === 0 ? (
+        <Card>
+          <View className="items-center gap-3 py-5">
+            <Ionicons color="rgba(255,255,255,0.45)" name="receipt-outline" size={26} />
+            <Text className="text-center text-lg font-black text-white">
+              No picks this week
+            </Text>
+            <Text className="text-center text-sm font-semibold text-white/50">
+              There is no submitted lineup for Week {weekNumber}.
+            </Text>
+          </View>
+        </Card>
+      ) : null}
+
       {orderedBets.map((bet, index) => (
         <PlacedBetCard
           bet={bet}
@@ -3810,11 +4044,13 @@ function PlacedBetsView({
           highlighted={highlightedPotwBetId === bet.id}
           isLockHeadline={index === 0 && bet.is_lock}
           key={bet.id}
+          liveScoresByGameId={liveScoresQuery.scoresByGameId}
           onEdit={() => onEdit(bet)}
           onShare={() => handleShare(bet)}
           onSetPotw={() => onSetPotw(bet)}
           potwSwapClosed={potwSwapClosed}
           potwSwapPending={potwSwapPendingBetId === bet.id}
+          readOnly={readOnly}
           shareLoading={shareBet.isPending}
         />
       ))}
@@ -3875,33 +4111,64 @@ export default function BetBoardScreen() {
   const leagueSummaries = leaguesQuery.data ?? [];
   const leagues = leagueSummaries.map((summary) => summary.league);
   const selectedLeague = leagues.find((league) => league.id === selectedLeagueId) ?? leagues[0];
+  const [selectedWeek, setSelectedWeek] = useState<number | undefined>();
+  const viewedWeek = selectedWeek ?? selectedLeague?.current_week;
+  const isPastWeek =
+    selectedLeague !== undefined && viewedWeek !== undefined && viewedWeek < selectedLeague.current_week;
+  const isFutureWeek =
+    selectedLeague !== undefined && viewedWeek !== undefined && viewedWeek > selectedLeague.current_week;
+  const isCurrentWeek = Boolean(
+    selectedLeague !== undefined && viewedWeek === selectedLeague.current_week,
+  );
   const accessQuery = useBetBoardAccess({
     leagueId: selectedLeague?.id,
     userId: user?.id,
-    weekNumber: selectedLeague?.current_week,
+    weekNumber: viewedWeek,
   });
-  const placedBetsQuery = usePlacedBets(selectedLeague?.id, user?.id, selectedLeague?.current_week);
-  const revealTimeQuery = useLeagueWeekRevealTime(selectedLeague?.id, selectedLeague?.current_week);
-  const submitBets = useSubmitBetsMutation(selectedLeague?.id, user?.id, selectedLeague?.current_week);
+  const placedBetsQuery = usePlacedBets(selectedLeague?.id, user?.id, viewedWeek);
+  const revealTimeQuery = useLeagueWeekRevealTime(selectedLeague?.id, viewedWeek);
+  const submitBets = useSubmitBetsMutation(selectedLeague?.id, user?.id, viewedWeek);
   const updatePlacedBet = useUpdatePlacedBetMutation(
     selectedLeague?.id,
     user?.id,
-    selectedLeague?.current_week,
+    viewedWeek,
   );
   const setPickOfWeek = useSetPickOfWeekMutation(
     selectedLeague?.id,
     user?.id,
-    selectedLeague?.current_week,
+    viewedWeek,
   );
   const placedBets = placedBetsQuery.data ?? [];
-  const isReadOnly = placedBets.length > 0;
+  const hasSubmittedLineup = placedBets.length > 0;
+  const isReadOnly = isPastWeek || hasSubmittedLineup;
+  const canBuildLineup = isCurrentWeek && !hasSubmittedLineup;
   const canAccessBetBoard = accessQuery.data ?? true;
   const potwSwapClosed = revealTimeQuery.data
     ? Date.now() >= new Date(revealTimeQuery.data).getTime()
     : false;
   const validation = useMemo(() => getValidationState(slipBets), [slipBets]);
-  useSyncLeagueWeekSlate(selectedLeague?.id, selectedLeague?.current_week, oddsQuery.data);
-  useLockClock(isReadOnly);
+  useSyncLeagueWeekSlate(
+    selectedLeague?.id,
+    canBuildLineup ? viewedWeek : undefined,
+    oddsQuery.data,
+  );
+  const lockClockNow = useLockClock(isReadOnly);
+
+  // Keep submitted cards stable: a previous focus/polling refetch depended on
+  // React Query result objects, causing a refetch/render loop that looked like
+  // runaway pull-to-refresh. Lock state advances locally from game_start_time;
+  // DB-side simulations update through the explicit RefreshControl gesture.
+
+  useEffect(() => {
+    if (!editingPlacedBet) {
+      return;
+    }
+
+    const refreshedBet = placedBets.find((bet) => bet.id === editingPlacedBet.id);
+    if (refreshedBet && isPlacedBetLocked(refreshedBet)) {
+      setEditingPlacedBet(null);
+    }
+  }, [editingPlacedBet, lockClockNow, placedBets]);
 
   const builderLegSelectionKeys = useMemo(() => {
     const keys = new Set<string>();
@@ -3920,6 +4187,12 @@ export default function BetBoardScreen() {
   }, [leagues, selectedLeagueId]);
 
   useEffect(() => {
+    if (selectedLeague) {
+      setSelectedWeek(selectedLeague.current_week);
+    }
+  }, [selectedLeague?.current_week, selectedLeague?.id]);
+
+  useEffect(() => {
     setSlipBets([]);
     setEditingSlipBet(null);
     setPendingStraightSelection(null);
@@ -3931,7 +4204,7 @@ export default function BetBoardScreen() {
     setHighlightedPotwBetId(null);
     setPickConflictMessage(null);
     setSelectionConflict(null);
-  }, [selectedLeagueId]);
+  }, [selectedLeagueId, viewedWeek]);
 
   useEffect(() => {
     if (!tourFlag.isLoading && !tourFlag.value && leagues.length > 0) {
@@ -4415,6 +4688,12 @@ export default function BetBoardScreen() {
   };
 
   const handleOpenPlacedBetEdit = (bet: PlacedBet) => {
+    if (!isCurrentWeek) {
+      haptics.warning();
+      Alert.alert('Read-only week', 'Past weeks can be reviewed but not edited.');
+      return;
+    }
+
     if (isPlacedBetLocked(bet)) {
       haptics.warning();
       Alert.alert('Pick locked', 'This pick is locked because one of its games has started.');
@@ -4438,6 +4717,10 @@ export default function BetBoardScreen() {
   };
 
   const handleSetPlacedPotw = async (bet: PlacedBet) => {
+    if (!isCurrentWeek) {
+      return;
+    }
+
     if (bet.is_lock || setPickOfWeek.isPending) {
       return;
     }
@@ -4498,21 +4781,38 @@ export default function BetBoardScreen() {
     );
   }
 
-  const sheetVisible = !isReadOnly;
+  const showPlacedBetsView = isPastWeek || hasSubmittedLineup;
+  const sheetVisible = canBuildLineup && canAccessBetBoard && !isFutureWeek;
   const slipBottomPadding = sheetVisible ? LINEUP_COLLAPSED_HEIGHT + 20 : 32;
+  const activeEditingPlacedBet = isCurrentWeek && editingPlacedBet
+    ? placedBets.find((bet) => bet.id === editingPlacedBet.id) ?? editingPlacedBet
+    : null;
 
   return (
     <View style={{ backgroundColor: THEME_COLORS.background, flex: 1 }}>
       <ScreenWrapper className="pb-0">
         <FlatList
           contentContainerStyle={{ paddingBottom: slipBottomPadding }}
-          data={isReadOnly || !canAccessBetBoard ? [] : oddsQuery.data ?? []}
+          data={canBuildLineup && canAccessBetBoard ? oddsQuery.data ?? [] : []}
           keyExtractor={(game) => game.id}
           ListHeaderComponent={
             <View className="gap-5 pb-5">
-              <BoardHeader league={selectedLeague} />
+              <BoardHeader league={selectedLeague} weekNumber={viewedWeek} />
 
-              {!isReadOnly ? (
+              {viewedWeek ? (
+                <View className="items-end">
+                  <WeekNavigator
+                    maxWeek={REGULAR_SEASON_WEEKS}
+                    onChange={(week) => {
+                      haptics.selection();
+                      setSelectedWeek(week);
+                    }}
+                    week={viewedWeek}
+                  />
+                </View>
+              ) : null}
+
+              {canBuildLineup ? (
                 <View className="gap-2">
                   <Text
                     className="text-[10px] font-black uppercase text-white/50"
@@ -4538,10 +4838,16 @@ export default function BetBoardScreen() {
                 selectedLeagueId={selectedLeague?.id}
               />
 
-              <BudgetTracker
-                placedBets={isReadOnly ? placedBets : undefined}
-                slipBets={slipBets}
-              />
+              {isFutureWeek && viewedWeek ? (
+                <FutureWeekBoardPlaceholder weekNumber={viewedWeek} />
+              ) : null}
+
+              {isCurrentWeek ? (
+                <BudgetTracker
+                  placedBets={hasSubmittedLineup ? placedBets : undefined}
+                  slipBets={slipBets}
+                />
+              ) : null}
 
               {pickConflictMessage ? (
                 <PickConflictNotice
@@ -4559,7 +4865,7 @@ export default function BetBoardScreen() {
                 />
               ) : null}
 
-              {!isReadOnly && !canAccessBetBoard ? (
+              {canBuildLineup && !canAccessBetBoard ? (
                 <Card tone="highlight">
                   <View className="items-center gap-3 py-3">
                     <Ionicons color={THEME_COLORS.gold} name="time" size={28} />
@@ -4574,7 +4880,7 @@ export default function BetBoardScreen() {
                 </Card>
               ) : null}
 
-              {!isReadOnly && canAccessBetBoard && mode === 'parlay' ? (
+              {canBuildLineup && canAccessBetBoard && mode === 'parlay' ? (
                 <ParlayBuilder
                   amountText={parlayAmount}
                   legs={parlayLegs}
@@ -4588,7 +4894,7 @@ export default function BetBoardScreen() {
                 />
               ) : null}
 
-              {!isReadOnly && canAccessBetBoard && mode === 'teaser' ? (
+              {canBuildLineup && canAccessBetBoard && mode === 'teaser' ? (
                 <TeaserBuilder
                   amountText={teaserAmount}
                   legs={teaserLegs}
@@ -4614,11 +4920,7 @@ export default function BetBoardScreen() {
                                   line: leg.original_line,
                                   market: leg.market,
                                   odds: leg.leg_odds,
-                                  selection: leg.selection.startsWith('Over')
-                                    ? 'Over'
-                                    : leg.selection.startsWith('Under')
-                                      ? 'Under'
-                                      : leg.selection,
+                                  selection: getPickLegBaseLabel(leg),
                                   shortName: leg.label,
                                 },
                                 points,
@@ -4631,7 +4933,7 @@ export default function BetBoardScreen() {
               ) : null}
 
               {placedBetsQuery.isLoading ? <OddsSkeletons /> : null}
-              {isReadOnly ? (
+              {showPlacedBetsView && viewedWeek ? (
                 <PlacedBetsView
                   bets={placedBets}
                   cosmetics={cosmeticsQuery.data?.equippedByCategory}
@@ -4640,11 +4942,13 @@ export default function BetBoardScreen() {
                   onSetPotw={handleSetPlacedPotw}
                   potwSwapClosed={potwSwapClosed}
                   potwSwapPendingBetId={setPickOfWeek.variables ?? null}
+                  readOnly={isPastWeek}
                   userId={user?.id}
+                  weekNumber={viewedWeek}
                 />
               ) : null}
 
-              {!isReadOnly && canAccessBetBoard && oddsQuery.isError ? (
+              {canBuildLineup && canAccessBetBoard && oddsQuery.isError ? (
                 <Card>
                   <View className="flex-row items-center gap-2">
                     <Ionicons color={THEME_COLORS.coralRed} name="alert-circle" size={16} />
@@ -4656,11 +4960,11 @@ export default function BetBoardScreen() {
                   </View>
                 </Card>
               ) : null}
-              {!isReadOnly && canAccessBetBoard && oddsQuery.isLoading ? <OddsSkeletons /> : null}
+              {canBuildLineup && canAccessBetBoard && oddsQuery.isLoading ? <OddsSkeletons /> : null}
             </View>
           }
           ListEmptyComponent={
-            !isReadOnly && canAccessBetBoard && !oddsQuery.isLoading && !oddsQuery.isError ? (
+            canBuildLineup && canAccessBetBoard && !oddsQuery.isLoading && !oddsQuery.isError ? (
               <Card>
                 <View className="items-center gap-3 py-4">
                   <View className="h-14 w-14 items-center justify-center rounded-full border border-electric-green/30 bg-electric-green/10">
@@ -4745,7 +5049,7 @@ export default function BetBoardScreen() {
       />
 
       <PostSubmitEditModal
-        bet={editingPlacedBet}
+        bet={activeEditingPlacedBet}
         isSaving={updatePlacedBet.isPending}
         oddsGames={oddsQuery.data ?? []}
         placedBets={placedBets}

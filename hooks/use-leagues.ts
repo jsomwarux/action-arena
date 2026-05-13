@@ -37,11 +37,13 @@ export type PublicLeagueSummary = {
 
 export type LeagueDetail = {
   currentUserMatchup: WeeklyMatchupRow | null;
+  currentWeekRevealAt: string | null;
   league: LeagueRow;
   matchups: WeeklyMatchupRow[];
   members: LeagueMemberRow[];
   profilesById: Record<string, UserRow>;
   seasonSnapshot: SeasonRow | null;
+  seasonFirstKickoffAt: string | null;
   standings: StandingRow[];
 };
 
@@ -195,13 +197,21 @@ export function useLeagueDetail(leagueId: string | undefined, userId: string | u
         .single();
       const leagueRow = assertSupabaseResult(league, leagueError);
 
-      const [membersResult, standingsResult, matchupsResult, seasonResult] = await Promise.all([
+      const [
+        membersResult,
+        standingsResult,
+        matchupsResult,
+        seasonResult,
+        revealTimeResult,
+        seasonFirstKickoffResult,
+      ] = await Promise.all([
         supabase.from('league_members').select('*').eq('league_id', leagueId).order('joined_at'),
         supabase
           .from('standings')
           .select('*')
           .eq('league_id', leagueId)
-          .eq('week_number', leagueRow.current_week)
+          .lte('week_number', leagueRow.current_week)
+          .order('week_number', { ascending: true })
           .order('rank'),
         supabase
           .from('weekly_matchups')
@@ -214,6 +224,17 @@ export function useLeagueDetail(leagueId: string | undefined, userId: string | u
           .eq('league_id', leagueId)
           .eq('season_year', leagueRow.season_year)
           .maybeSingle(),
+        supabase.rpc('league_week_reveal_time', {
+          p_league_id: leagueId,
+          p_week_number: leagueRow.current_week,
+        }),
+        supabase
+          .from('league_week_slate_games')
+          .select('commence_time')
+          .eq('league_id', leagueId)
+          .order('commence_time', { ascending: true })
+          .limit(1)
+          .maybeSingle(),
       ]);
 
       const members = assertSupabaseResult(membersResult.data, membersResult.error);
@@ -221,6 +242,12 @@ export function useLeagueDetail(leagueId: string | undefined, userId: string | u
       const matchups = assertSupabaseResult(matchupsResult.data, matchupsResult.error);
       if (seasonResult.error) {
         throw new Error(seasonResult.error.message);
+      }
+      if (revealTimeResult.error) {
+        throw new Error(revealTimeResult.error.message);
+      }
+      if (seasonFirstKickoffResult.error) {
+        throw new Error(seasonFirstKickoffResult.error.message);
       }
 
       const profileIds = uniqueValues([
@@ -241,11 +268,13 @@ export function useLeagueDetail(leagueId: string | undefined, userId: string | u
               matchup.week_number === leagueRow.current_week &&
               (matchup.home_user_id === userId || matchup.away_user_id === userId),
           ) ?? null,
+        currentWeekRevealAt: revealTimeResult.data ?? null,
         league: leagueRow,
         matchups,
         members,
         profilesById: indexUsers(profiles),
         seasonSnapshot: (seasonResult.data as SeasonRow | null) ?? null,
+        seasonFirstKickoffAt: seasonFirstKickoffResult.data?.commence_time ?? null,
         standings,
       };
     },

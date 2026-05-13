@@ -6,8 +6,16 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
+    "week:align": "node scripts/align-active-nfl-week.mjs",
+    "week:kickoff": "node scripts/simulate-week-kickoff.mjs",
+    "week:complete": "node scripts/simulate-week-completion.mjs",
     "settle:mock": "node scripts/settle-mock-results.mjs",
     "test:settlement": "supabase db query --linked -f scripts/test-settlement-scenarios.sql",
+    "test:simulation-propagation": "supabase db query --linked -f scripts/test-game-simulation-cross-league-propagation.sql",
+    "test:global-week": "supabase db query --linked -f scripts/test-global-week-sync-and-simulation.sql",
+    "test:weekly-resolution": "supabase db query --linked -f scripts/test-weekly-matchup-resolution.sql",
+    "test:profile-stats": "node scripts/test-profile-stats.mjs",
+    "test:leaderboard": "supabase db query --linked -f scripts/test-leaderboard-ranking.sql",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

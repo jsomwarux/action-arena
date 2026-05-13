@@ -31,6 +31,7 @@ import {
   NflTeamLogo,
   PressableScale,
   SkeletonLoader,
+  WeekNavigator,
 } from '@/components/ui';
 import { getCosmeticItem } from '@/constants/cosmetics';
 import { haptics } from '@/lib/haptics';
@@ -50,7 +51,12 @@ import {
   useGenerateScheduleMutation,
   useLeagueDetail,
 } from '@/hooks/use-leagues';
-import { type WeeklyAward, type WeeklyAwards, useWeeklyAwards } from '@/hooks/use-profile-stats';
+import {
+  type WeeklyAward,
+  type WeeklyAwards,
+  type WeeklyLiveStanding,
+  useWeeklyAwards,
+} from '@/hooks/use-profile-stats';
 import { cn } from '@/lib/cn';
 import {
   formatAmericanOdds,
@@ -61,7 +67,9 @@ import {
   formatSport,
   getProfitTone,
 } from '@/lib/format';
+import { formatBetLegLabel, formatPickTitle, getPickLogoLabel } from '@/lib/pick-labels';
 import type {
+  BetMarket,
   BetType,
   EquippedCosmeticsByCategory,
   Json,
@@ -79,6 +87,7 @@ const SCREEN_HORIZONTAL_PADDING = 40;
 const DETAIL_TAB_HEIGHT = 48;
 const DETAIL_TAB_HORIZONTAL_GAP = 10;
 const DETAIL_TAB_UNDERLINE_HEIGHT = 3;
+const REGULAR_SEASON_WEEKS = 14;
 const PLAYOFF_PLACEHOLDER_WEEKS: PlayoffPlaceholderWeek[] = [15, 16, 17];
 
 const TABS: { key: DetailTab; label: string }[] = [
@@ -100,6 +109,22 @@ function getAwayDisplayName(detail: LeagueDetail, matchup: WeeklyMatchupRow) {
   return matchup.away_user_id ? getDisplayName(detail, matchup.away_user_id) : 'Bye Week';
 }
 
+function getStandingsForWeek(detail: LeagueDetail, weekNumber: number) {
+  return detail.standings
+    .filter((standing) => standing.week_number === weekNumber)
+    .sort((left, right) => left.rank - right.rank);
+}
+
+function getUserMatchupForWeek(detail: LeagueDetail, userId: string, weekNumber: number) {
+  return (
+    detail.matchups.find(
+      (matchup) =>
+        matchup.week_number === weekNumber &&
+        (matchup.home_user_id === userId || matchup.away_user_id === userId),
+    ) ?? null
+  );
+}
+
 function getInitials(name: string) {
   return name
     .split(/\s+/)
@@ -118,6 +143,10 @@ function getShortTime(value: string) {
 
 function isRecord(value: Json): value is Record<string, Json> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isBetMarket(value: string): value is BetMarket {
+  return value === 'moneyline' || value === 'spread' || value === 'over_under';
 }
 
 function isSharedBetMetadata(value: Json): value is SharedBetMetadata {
@@ -172,6 +201,20 @@ function betTypeAccent(type: BetType) {
   return THEME_COLORS.electricGreen;
 }
 
+function titleCaseBetType(type: BetType) {
+  return type.charAt(0).toUpperCase() + type.slice(1);
+}
+
+function getPickSummary(bet: WeeklyAward['bet']) {
+  if (!bet) {
+    return 'Pick pending';
+  }
+
+  return bet.bet_type === 'straight'
+    ? `Straight · ${formatPickTitle(bet)}`
+    : `${bet.bet_legs.length}-Leg ${titleCaseBetType(bet.bet_type)}`;
+}
+
 function rankAccent(rank: number): { bg: string; ring: string; text: string } {
   if (rank === 1) {
     return { bg: 'bg-gold/15', ring: 'border-gold/60', text: 'text-gold' };
@@ -199,13 +242,15 @@ function playoffStatusForStanding(
 
   const playoffSpots = Math.min(8, detail.standings.length);
 
-  if (detail.league.current_week > 14) {
+  const viewedWeek = standing.week_number;
+
+  if (viewedWeek > 14) {
     return standing.rank <= playoffSpots ? 'clinched' : 'eliminated';
   }
 
-  const remainingWeeks = Math.max(0, 14 - detail.league.current_week);
+  const remainingWeeks = Math.max(0, 14 - viewedWeek);
 
-  if (detail.league.current_week < 8) {
+  if (viewedWeek < 8) {
     return null;
   }
 
@@ -309,11 +354,15 @@ function FightCard({
   cosmeticsByUserId,
   detail,
   matchup,
+  weekNumber,
+  weekStatus,
   userId,
 }: {
   cosmeticsByUserId: Record<string, EquippedCosmeticsByCategory>;
   detail: LeagueDetail;
   matchup: WeeklyMatchupRow;
+  weekNumber: number;
+  weekStatus: 'current' | 'future' | 'past';
   userId: string;
 }) {
   const homeName = getDisplayName(detail, matchup.home_user_id);
@@ -322,6 +371,15 @@ function FightCard({
   const awayProfit = matchup.away_profit;
   const homeIsUser = matchup.home_user_id === userId;
   const awayIsUser = matchup.away_user_id === userId;
+  const eyebrow =
+    weekStatus === 'current' ? 'This Week' : weekStatus === 'future' ? 'Upcoming' : 'Completed';
+  const title =
+    weekStatus === 'current'
+      ? 'Your Matchup'
+      : weekStatus === 'future'
+        ? 'Week Preview'
+        : 'Week Recap';
+  const badgeTone = weekStatus === 'future' ? 'cyan' : weekStatus === 'past' ? 'gold' : 'green';
 
   return (
     <Card tone="highlight">
@@ -331,15 +389,15 @@ function FightCard({
             <Text
               className="text-[10px] font-black uppercase text-electric-green"
               style={{ letterSpacing: 2.5 }}>
-              This Week
+              {eyebrow}
             </Text>
             <Text
               className="mt-1 text-2xl font-black uppercase text-white"
               style={{ letterSpacing: -0.4 }}>
-              Your Matchup
+              {title}
             </Text>
           </View>
-          <Badge label={`Week ${detail.league.current_week}`} tone="green" />
+          <Badge label={`Week ${weekNumber}`} tone={badgeTone} />
         </View>
 
         <View className="flex-row items-center">
@@ -426,8 +484,15 @@ function FightCard({
   );
 }
 
-function InviteCodeCard({ detail }: { detail: LeagueDetail }) {
+function InviteCodeCard({
+  detail,
+  seasonInProgress,
+}: {
+  detail: LeagueDetail;
+  seasonInProgress: boolean;
+}) {
   const [copied, setCopied] = useState(false);
+  const isLeagueFull = detail.members.length >= detail.league.max_members;
 
   useEffect(() => {
     if (!copied) return;
@@ -439,6 +504,14 @@ function InviteCodeCard({ detail }: { detail: LeagueDetail }) {
     await Clipboard.setStringAsync(detail.league.invite_code);
     setCopied(true);
   };
+
+  if (seasonInProgress) {
+    return null;
+  }
+
+  if (isLeagueFull) {
+    return null;
+  }
 
   return (
     <Card>
@@ -504,13 +577,20 @@ function InviteCodeCard({ detail }: { detail: LeagueDetail }) {
 }
 
 function AwardCard({ award }: { award: WeeklyAward }) {
+  const tiedUsers = award.users.length > 1;
+  const displayName = tiedUsers
+    ? award.users.length <= 2
+      ? award.users.map((user) => user.display_name).join(' + ')
+      : `${award.users.length} tied`
+    : award.user?.display_name ?? 'No winner yet';
+
   return (
     <View className="flex-1 rounded-2xl border border-gold/25 bg-gold/[0.06] p-3">
       <Text className="text-[10px] font-black uppercase text-gold" style={{ letterSpacing: 1.4 }}>
         {award.label}
       </Text>
       <Text className="mt-2 text-sm font-black text-white" numberOfLines={1}>
-        {award.user?.display_name ?? 'No winner yet'}
+        {displayName}
       </Text>
       <Text className={cn('mt-1 text-sm font-black', getProfitTone(award.profit))}>
         {formatProfit(award.profit)}
@@ -519,21 +599,78 @@ function AwardCard({ award }: { award: WeeklyAward }) {
   );
 }
 
-function WeeklyAwardsCard({ awards }: { awards: WeeklyAwards | undefined }) {
-  if (!awards || (!awards.sharpest && !awards.coldStreak && !awards.lock)) {
+function LiveStandingRow({ row }: { row: WeeklyLiveStanding }) {
+  return (
+    <View className="flex-row items-center justify-between gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.035] px-3 py-2.5">
+      <View className="flex-1">
+        <Text className="text-sm font-black text-white" numberOfLines={1}>
+          {row.user?.display_name ?? 'Unknown Player'}
+        </Text>
+        <Text className="mt-0.5 text-[11px] font-semibold text-white/45">
+          {row.settledPicks}/{row.pickCount} picks settled
+          {row.pendingPicks > 0 ? ` · ${row.pendingPicks} pending` : ''}
+        </Text>
+      </View>
+      <Text className={cn('text-sm font-black', getProfitTone(row.profit))}>
+        {formatProfit(row.profit)}
+      </Text>
+    </View>
+  );
+}
+
+function WeeklyAwardsCard({
+  awards,
+  weekNumber,
+}: {
+  awards: WeeklyAwards | undefined;
+  weekNumber: number;
+}) {
+  if (!awards) {
     return null;
   }
+
+  const noActivity = !awards.hasBets && awards.liveStandings.length === 0 && !awards.lock;
+  const inProgress = !awards.isFullySettled;
+  const hasFinalAwards = Boolean(awards.sharpest || awards.coldStreak);
 
   return (
     <Card>
       <View className="gap-4">
-        <Text className="text-[10px] font-black uppercase text-gold" style={{ letterSpacing: 2 }}>
-          Weekly Awards
-        </Text>
-        <View className="flex-row gap-2">
-          {awards.sharpest ? <AwardCard award={awards.sharpest} /> : null}
-          {awards.coldStreak ? <AwardCard award={awards.coldStreak} /> : null}
+        <View className="flex-row items-center justify-between gap-3">
+          <Text
+            className={cn(
+              'text-[10px] font-black uppercase',
+              inProgress ? 'text-electric-green' : 'text-gold',
+            )}
+            style={{ letterSpacing: 2 }}>
+            {inProgress ? `Week ${weekNumber} Standings` : 'Weekly Awards'}
+          </Text>
+          <Badge label={inProgress ? 'In Progress' : 'Final'} tone={inProgress ? 'green' : 'gold'} />
         </View>
+        {noActivity ? (
+          <View className="rounded-2xl border border-white/[0.08] bg-white/[0.035] p-3">
+            <Text className="text-sm font-semibold text-white/55">
+              No picks have been recorded for Week {weekNumber} yet.
+            </Text>
+          </View>
+        ) : inProgress ? (
+          <View className="gap-2">
+            {awards.liveStandings.map((row) => (
+              <LiveStandingRow key={row.userId} row={row} />
+            ))}
+          </View>
+        ) : hasFinalAwards ? (
+          <View className="flex-row gap-2">
+            {awards.sharpest ? <AwardCard award={awards.sharpest} /> : null}
+            {awards.coldStreak ? <AwardCard award={awards.coldStreak} /> : null}
+          </View>
+        ) : (
+          <View className="rounded-2xl border border-white/[0.08] bg-white/[0.035] p-3">
+            <Text className="text-sm font-semibold text-white/55">
+              No weekly awards were assigned for an even week.
+            </Text>
+          </View>
+        )}
         {awards.lock ? (
           <View className="rounded-2xl border border-electric-green/25 bg-electric-green/[0.06] p-3">
             <Text className="text-[10px] font-black uppercase text-electric-green" style={{ letterSpacing: 1.4 }}>
@@ -541,10 +678,78 @@ function WeeklyAwardsCard({ awards }: { awards: WeeklyAwards | undefined }) {
             </Text>
             <Text className="mt-2 text-sm font-black text-white">
               {awards.lock.user?.display_name ?? 'No winner yet'} ·{' '}
-              {awards.lock.bet?.bet_legs[0]?.selection ?? 'Pick'}
+              {getPickSummary(awards.lock.bet)}
             </Text>
+            {awards.lock.bet && awards.lock.bet.bet_legs.length > 1 ? (
+              <View className="mt-3 gap-1.5">
+                {awards.lock.bet.bet_legs.map((leg, index) => (
+                  <View
+                    className="flex-row items-center justify-between gap-2 rounded-xl border border-white/[0.08] bg-arena-bg/35 px-2.5 py-2"
+                    key={leg.id}>
+                    <Text className="flex-1 text-[11px] font-semibold text-white/70" numberOfLines={1}>
+                      {index + 1}. {formatBetLegLabel(leg, { betType: awards.lock?.bet?.bet_type })}
+                    </Text>
+                    <Text className={cn('text-[10px] font-black uppercase', getProfitTone(leg.result === 'win' ? 1 : leg.result === 'loss' ? -1 : 0))}>
+                      {leg.result}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
           </View>
         ) : null}
+      </View>
+    </Card>
+  );
+}
+
+function FutureWeekAwardsCard({ weekNumber }: { weekNumber: number }) {
+  return (
+    <Card>
+      <View className="items-center gap-3 py-4">
+        <View className="h-12 w-12 items-center justify-center rounded-full border border-cyan-accent/35 bg-cyan-accent/10">
+          <Ionicons color={THEME_COLORS.cyanAccent} name="time" size={20} />
+        </View>
+        <View className="items-center gap-1">
+          <Text
+            className="text-center text-lg font-black uppercase text-white"
+            style={{ letterSpacing: -0.2 }}>
+            Week {weekNumber} Awards Pending
+          </Text>
+          <Text className="text-center text-sm font-semibold leading-5 text-white/55">
+            Top Performer, Cold Streak, and Pick of the Week will unlock after the week settles.
+          </Text>
+        </View>
+      </View>
+    </Card>
+  );
+}
+
+function FutureWeekPreviewCard({
+  hasMatchup,
+  weekNumber,
+}: {
+  hasMatchup: boolean;
+  weekNumber: number;
+}) {
+  return (
+    <Card>
+      <View className="items-center gap-3 py-4">
+        <View className="h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-white/[0.04]">
+          <Ionicons color="rgba(255,255,255,0.62)" name={hasMatchup ? 'calendar' : 'git-branch'} size={20} />
+        </View>
+        <View className="items-center gap-1">
+          <Text
+            className="text-center text-lg font-black uppercase text-white"
+            style={{ letterSpacing: -0.2 }}>
+            {hasMatchup ? `Week ${weekNumber} Preview` : `Week ${weekNumber} Schedule Pending`}
+          </Text>
+          <Text className="text-center text-sm font-semibold leading-5 text-white/55">
+            {hasMatchup
+              ? 'This matchup is scheduled. Picks, scores, and awards will appear once the week opens.'
+              : 'The matchup card will appear here once the league schedule is generated.'}
+          </Text>
+        </View>
       </View>
     </Card>
   );
@@ -775,21 +980,44 @@ function SeasonAwardsCard({
 function StandingsBoard({
   cosmeticsByUserId,
   detail,
+  selectedWeekNumber,
   userId,
 }: {
   cosmeticsByUserId: Record<string, EquippedCosmeticsByCategory>;
   detail: LeagueDetail;
+  selectedWeekNumber: number;
   userId: string;
 }) {
   const router = useRouter();
   const isH2H = detail.league.type === 'h2h';
 
   if (detail.standings.length === 0) {
+    const isFutureWeek = selectedWeekNumber > detail.league.current_week;
+    const isPastWeek = selectedWeekNumber < detail.league.current_week;
+
     return (
       <Card>
-        <Text className="text-base font-semibold text-white/55">
-          Standings will appear once members are seeded.
-        </Text>
+        <View className="items-center gap-3 py-4">
+          <View className="h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-white/[0.04]">
+            <Ionicons color="rgba(255,255,255,0.62)" name="podium" size={20} />
+          </View>
+          <Text
+            className="text-center text-lg font-black uppercase text-white"
+            style={{ letterSpacing: -0.2 }}>
+            {isFutureWeek
+              ? `Week ${selectedWeekNumber} Standings Pending`
+              : isPastWeek
+                ? `No Week ${selectedWeekNumber} Snapshot`
+                : 'Standings Coming Soon'}
+          </Text>
+          <Text className="text-center text-sm font-semibold leading-5 text-white/55">
+            {isFutureWeek
+              ? 'Cumulative standings will update here once that week is played.'
+              : isPastWeek
+                ? 'This league does not have a saved standings row for that completed week yet.'
+                : 'Standings will appear once members are seeded.'}
+          </Text>
+        </View>
       </Card>
     );
   }
@@ -797,6 +1025,18 @@ function StandingsBoard({
   return (
     <Card padded={false}>
       <View>
+        <View className="flex-row items-center justify-between gap-3 px-5 pt-5">
+          <Text
+            className="text-[10px] font-black uppercase text-electric-green"
+            style={{ letterSpacing: 2 }}>
+            Standings Through Week {selectedWeekNumber}
+          </Text>
+          {selectedWeekNumber === detail.league.current_week ? (
+            <Badge label="Live" tone="green" />
+          ) : (
+            <Badge label="Snapshot" tone="gold" />
+          )}
+        </View>
         <View className="flex-row items-center gap-3 px-5 pb-3 pt-5">
           <Text
             className="w-12 text-[10px] font-black uppercase text-white/40"
@@ -1563,23 +1803,34 @@ function SharedBetCard({
         </View>
 
         <View className="mt-3 gap-1.5">
-          {metadata.legs.map((leg, index) => (
-            <View key={`${leg.selection}-${index}`} className="flex-row items-center justify-between gap-2">
-              <View className="flex-1 flex-row items-center gap-2">
-                {leg.market !== 'over_under' ? (
-                  <NflTeamLogo size={20} teamName={leg.selection} />
-                ) : null}
-                <Text className="flex-1 text-xs font-semibold text-white/75" numberOfLines={1}>
-                  {metadata.betType === 'teaser' && leg.originalLine !== null && leg.adjustedLine !== null
-                    ? `${leg.selection} ${leg.originalLine} → ${leg.adjustedLine}`
-                    : leg.selection}
+          {metadata.legs.map((leg, index) => {
+            if (!isBetMarket(leg.market)) {
+              return null;
+            }
+
+            const labelLeg = {
+              adjusted_line: leg.adjustedLine,
+              market: leg.market,
+              original_line: leg.originalLine,
+              selection: leg.selection,
+            } as const;
+
+            return (
+              <View key={`${leg.selection}-${index}`} className="flex-row items-center justify-between gap-2">
+                <View className="flex-1 flex-row items-center gap-2">
+                  {leg.market !== 'over_under' ? (
+                    <NflTeamLogo size={20} teamName={getPickLogoLabel(labelLeg)} />
+                  ) : null}
+                  <Text className="flex-1 text-xs font-semibold text-white/75" numberOfLines={1}>
+                    {formatBetLegLabel(labelLeg, { betType: metadata.betType })}
+                  </Text>
+                </View>
+                <Text className="text-[10px] font-black uppercase text-white/45">
+                  {formatAmericanOdds(leg.odds)}
                 </Text>
               </View>
-              <Text className="text-[10px] font-black uppercase text-white/45">
-                {formatAmericanOdds(leg.odds)}
-              </Text>
-            </View>
-          ))}
+            );
+          })}
         </View>
 
         <View className="mt-3 flex-row items-center justify-between border-t border-white/[0.08] pt-3">
@@ -2036,6 +2287,7 @@ function TabContent({
   cosmeticsByUserId,
   detail,
   onStartSeason,
+  selectedWeekNumber,
   startSeasonError,
   startingSeason,
   tab,
@@ -2045,6 +2297,7 @@ function TabContent({
   cosmeticsByUserId: Record<string, EquippedCosmeticsByCategory>;
   detail: LeagueDetail;
   onStartSeason: () => void;
+  selectedWeekNumber: number;
   startSeasonError?: string;
   startingSeason: boolean;
   tab: DetailTab;
@@ -2053,7 +2306,12 @@ function TabContent({
   return (
     <View key={tab}>
       {tab === 'standings' ? (
-        <StandingsBoard cosmeticsByUserId={cosmeticsByUserId} detail={detail} userId={userId} />
+        <StandingsBoard
+          cosmeticsByUserId={cosmeticsByUserId}
+          detail={detail}
+          selectedWeekNumber={selectedWeekNumber}
+          userId={userId}
+        />
       ) : null}
       {tab === 'schedule' ? (
         <ScheduleList
@@ -2134,10 +2392,17 @@ export default function LeagueDetailScreen() {
   const { user } = useAuth();
   const detailQuery = useLeagueDetail(resolvedLeagueId, user?.id);
   const generateSchedule = useGenerateScheduleMutation(user?.id);
-  const awardsQuery = useWeeklyAwards(resolvedLeagueId, detailQuery.data?.league.current_week);
+  const [selectedWeek, setSelectedWeek] = useState<number | undefined>();
+  const selectedWeekNumber = selectedWeek ?? detailQuery.data?.league.current_week ?? 1;
+  const selectedWeekAwardsNumber =
+    detailQuery.data && selectedWeekNumber <= detailQuery.data.league.current_week
+      ? selectedWeekNumber
+      : undefined;
+  const awardsQuery = useWeeklyAwards(resolvedLeagueId, selectedWeekAwardsNumber);
   const detailRefetchRef = useRef(detailQuery.refetch);
   const awardsRefetchRef = useRef(awardsQuery.refetch);
   const fullLeagueFallbackAttempts = useRef<Set<string>>(new Set());
+  const selectedWeekLeagueRef = useRef<string | undefined>(undefined);
   const [activeTab, setActiveTab] = useState<DetailTab>('standings');
   const cosmeticUserIds = useMemo(
     () =>
@@ -2159,6 +2424,22 @@ export default function LeagueDetailScreen() {
       setActiveTab('chat');
     }
   }, [resolvedInitialTab]);
+
+  useEffect(() => {
+    const league = detailQuery.data?.league;
+
+    if (!league) {
+      return;
+    }
+
+    if (selectedWeekLeagueRef.current !== league.id) {
+      selectedWeekLeagueRef.current = league.id;
+      setSelectedWeek(league.current_week);
+      return;
+    }
+
+    setSelectedWeek((existingWeek) => existingWeek ?? league.current_week);
+  }, [detailQuery.data?.league.current_week, detailQuery.data?.league.id]);
 
   useEffect(() => {
     detailRefetchRef.current = detailQuery.refetch;
@@ -2222,14 +2503,29 @@ export default function LeagueDetailScreen() {
 
   const detail = detailQuery.data;
   const userId = user.id;
-  const currentUserMatchup = detail.currentUserMatchup;
+  const selectedStandings = getStandingsForWeek(detail, selectedWeekNumber);
+  const selectedDetail: LeagueDetail = {
+    ...detail,
+    currentUserMatchup: getUserMatchupForWeek(detail, userId, selectedWeekNumber),
+    standings: selectedStandings,
+  };
+  const currentUserMatchup = selectedDetail.currentUserMatchup;
   const cosmeticsByUserId = cosmeticsQuery.data ?? {};
-  const isLeagueFull = detail.members.length >= detail.league.max_members;
+  const isCurrentWeek = selectedWeekNumber === detail.league.current_week;
+  const isPastWeek = selectedWeekNumber < detail.league.current_week;
+  const isFutureWeek = selectedWeekNumber > detail.league.current_week;
+  const seasonFirstKickoffTime = detail.seasonFirstKickoffAt
+    ? new Date(detail.seasonFirstKickoffAt).getTime()
+    : null;
+  const seasonInProgress =
+    seasonFirstKickoffTime !== null &&
+    !Number.isNaN(seasonFirstKickoffTime) &&
+    Date.now() >= seasonFirstKickoffTime;
   const canStartSeason =
     detail.league.type === 'h2h' &&
     detail.league.commissioner_id === userId &&
     detail.members.length >= 2 &&
-    detail.league.status === 'drafting' &&
+    ['drafting', 'active'].includes(detail.league.status) &&
     detail.matchups.length === 0;
   const handleStartSeason = () => {
     generateSchedule.mutate(detail.league.id);
@@ -2243,16 +2539,36 @@ export default function LeagueDetailScreen() {
         refreshControl={
           <RefreshControl
             tintColor={THEME_COLORS.electricGreen}
-            refreshing={detailQuery.isRefetching}
-            onRefresh={detailQuery.refetch}
+            refreshing={detailQuery.isRefetching || awardsQuery.isRefetching}
+            onRefresh={() => {
+              void detailQuery.refetch();
+              void awardsQuery.refetch();
+            }}
           />
         }
         showsVerticalScrollIndicator={false}>
         <HeroHeader detail={detail} />
-        {!isLeagueFull ? <InviteCodeCard detail={detail} /> : null}
+        <View className="items-end">
+          <WeekNavigator
+            maxWeek={REGULAR_SEASON_WEEKS}
+            onChange={(week) => {
+              haptics.selection();
+              setSelectedWeek(week);
+            }}
+            week={selectedWeekNumber}
+          />
+        </View>
+        <InviteCodeCard detail={detail} seasonInProgress={seasonInProgress} />
 
         <SeasonAwardsCard cosmeticsByUserId={cosmeticsByUserId} detail={detail} />
-        {awardsQuery.data ? <WeeklyAwardsCard awards={awardsQuery.data} /> : null}
+        {isFutureWeek ? (
+          <FutureWeekAwardsCard weekNumber={selectedWeekNumber} />
+        ) : awardsQuery.data ? (
+          <WeeklyAwardsCard
+            awards={awardsQuery.data}
+            weekNumber={selectedWeekNumber}
+          />
+        ) : null}
 
         {detail.league.type === 'h2h' && currentUserMatchup ? (
           <PressableScale
@@ -2264,19 +2580,24 @@ export default function LeagueDetailScreen() {
             }>
             <FightCard
               cosmeticsByUserId={cosmeticsByUserId}
-              detail={detail}
+              detail={selectedDetail}
               matchup={currentUserMatchup}
+              weekNumber={selectedWeekNumber}
+              weekStatus={isCurrentWeek ? 'current' : isPastWeek ? 'past' : 'future'}
               userId={userId}
             />
           </PressableScale>
+        ) : isFutureWeek ? (
+          <FutureWeekPreviewCard hasMatchup={false} weekNumber={selectedWeekNumber} />
         ) : null}
 
         <TabSwitcher activeTab={activeTab} onChange={setActiveTab} />
         <TabContent
           canStartSeason={canStartSeason}
           cosmeticsByUserId={cosmeticsByUserId}
-          detail={detail}
+          detail={selectedDetail}
           onStartSeason={handleStartSeason}
+          selectedWeekNumber={selectedWeekNumber}
           startSeasonError={generateSchedule.error?.message}
           startingSeason={generateSchedule.isPending}
           tab={activeTab}

@@ -200,6 +200,41 @@ begin
 end;
 $$;
 
+create or replace function pg_temp.assert_leg_eval(
+  p_name text,
+  p_market text,
+  p_selection text,
+  p_adjusted_line numeric,
+  p_home_score integer,
+  p_away_score integer,
+  p_expected_result public.bet_result,
+  p_home_team text default 'Home Team',
+  p_away_team text default 'Away Team'
+)
+returns void
+language plpgsql
+as $$
+declare
+  actual_result public.bet_result;
+begin
+  actual_result := public.evaluate_bet_leg(
+    p_market::public.bet_market,
+    p_selection,
+    p_adjusted_line,
+    p_home_team,
+    p_away_team,
+    p_home_score,
+    p_away_score
+  );
+
+  perform pg_temp.record_result(
+    p_name,
+    actual_result = p_expected_result,
+    format('expected %s, got %s', p_expected_result, coalesce(actual_result::text, 'null'))
+  );
+end;
+$$;
+
 create or replace function pg_temp.assert_matchup(
   p_name text,
   p_matchup_id uuid,
@@ -301,6 +336,76 @@ select pg_temp.add_score('settle_cap_1', 30, 10);
 select pg_temp.add_score('settle_cap_2', 31, 10);
 select pg_temp.add_score('settle_cap_3', 32, 10);
 select pg_temp.add_score('settle_cap_4', 33, 10);
+select pg_temp.add_score('settle_half_spread_win', 31, 21);
+select pg_temp.add_score('settle_half_spread_loss', 32, 21);
+select pg_temp.add_score('settle_half_total_loss', 24, 21);
+select pg_temp.add_score('settle_whole_total_push', 24, 23);
+
+select pg_temp.assert_leg_eval(
+  'half-point away spread close cover is win',
+  'spread',
+  'Away Team +10.5',
+  10.5,
+  31,
+  21,
+  'win'
+);
+select pg_temp.assert_leg_eval(
+  'half-point away spread close miss is loss',
+  'spread',
+  'Away Team +10.5',
+  10.5,
+  32,
+  21,
+  'loss'
+);
+select pg_temp.assert_leg_eval(
+  'whole-number spread exact margin is push',
+  'spread',
+  'Away Team +10',
+  10,
+  31,
+  21,
+  'push'
+);
+select pg_temp.assert_leg_eval(
+  'Titans +10.5 lost by 17 is loss',
+  'spread',
+  'Tennessee Titans +10.5',
+  10.5,
+  31,
+  14,
+  'loss',
+  'Houston Texans',
+  'Tennessee Titans'
+);
+select pg_temp.assert_leg_eval(
+  'half-point over total cannot push',
+  'over_under',
+  'Over 47.5',
+  47.5,
+  24,
+  23,
+  'loss'
+);
+select pg_temp.assert_leg_eval(
+  'half-point under total cannot push',
+  'over_under',
+  'Under 47.5',
+  47.5,
+  24,
+  23,
+  'win'
+);
+select pg_temp.assert_leg_eval(
+  'whole-number total exact score is push',
+  'over_under',
+  'Over 47',
+  47,
+  24,
+  23,
+  'push'
+);
 
 insert into public.leagues (
   id,
@@ -357,6 +462,18 @@ select pg_temp.add_leg('straight_loss', 'settle_home_win', 'moneyline', 'Away Te
 
 select pg_temp.add_bet('straight_push', '00000000-0000-0000-0000-000000002001'::uuid, pg_temp.test_user(1), 'straight', 10, -110);
 select pg_temp.add_leg('straight_push', 'settle_spread_total_push', 'spread', 'Away Team +3', 3, 3, -110);
+
+select pg_temp.add_bet('straight_half_spread_win', '00000000-0000-0000-0000-000000002001'::uuid, pg_temp.test_user(1), 'straight', 20, -110);
+select pg_temp.add_leg('straight_half_spread_win', 'settle_half_spread_win', 'spread', 'Away Team +10.5', 10.5, 10.5, -110);
+
+select pg_temp.add_bet('straight_half_spread_loss', '00000000-0000-0000-0000-000000002001'::uuid, pg_temp.test_user(1), 'straight', 20, -110);
+select pg_temp.add_leg('straight_half_spread_loss', 'settle_half_spread_loss', 'spread', 'Away Team +10.5', 10.5, 10.5, -110);
+
+select pg_temp.add_bet('straight_half_total_loss', '00000000-0000-0000-0000-000000002001'::uuid, pg_temp.test_user(1), 'straight', 20, -110);
+select pg_temp.add_leg('straight_half_total_loss', 'settle_half_total_loss', 'over_under', 'Under 44.5', 44.5, 44.5, -110);
+
+select pg_temp.add_bet('straight_whole_total_push', '00000000-0000-0000-0000-000000002001'::uuid, pg_temp.test_user(1), 'straight', 20, -110);
+select pg_temp.add_leg('straight_whole_total_push', 'settle_whole_total_push', 'over_under', 'Over 47', 47, 47, -110);
 
 select pg_temp.add_bet('lock_win', '00000000-0000-0000-0000-000000002001'::uuid, pg_temp.test_user(1), 'straight', 10, 100, null, true);
 select pg_temp.add_leg('lock_win', 'settle_home_win', 'moneyline', 'Home Team', null, null, 100);
@@ -461,6 +578,10 @@ select public.settle_completed_scores(
 select pg_temp.assert_bet('straight bet win', 'straight_win', 'win', 10);
 select pg_temp.assert_bet('straight bet loss', 'straight_loss', 'loss', -10);
 select pg_temp.assert_bet('straight bet push', 'straight_push', 'push', 0);
+select pg_temp.assert_bet('settled half-point spread cover is win', 'straight_half_spread_win', 'win', 18.18);
+select pg_temp.assert_bet('settled half-point spread miss is loss', 'straight_half_spread_loss', 'loss', -20);
+select pg_temp.assert_bet('settled half-point total miss is loss', 'straight_half_total_loss', 'loss', -20);
+select pg_temp.assert_bet('settled whole-number total exact score is push', 'straight_whole_total_push', 'push', 0);
 select pg_temp.assert_bet('lock multiplier on win', 'lock_win', 'win', 15);
 select pg_temp.assert_bet('lock multiplier on loss', 'lock_loss', 'loss', -15);
 select pg_temp.assert_bet('parlay all-win', 'parlay_all_win', 'win', 60);
@@ -551,12 +672,12 @@ select pg_temp.assert_standing(
   'cumulative league rank no-pick player',
   '00000000-0000-0000-0000-000000002002'::uuid,
   pg_temp.test_user(3),
+  -100,
+  -100,
   0,
   0,
   0,
-  0,
-  0,
-  2
+  3
 );
 select pg_temp.assert_standing(
   'cumulative league rank loser',
@@ -567,20 +688,20 @@ select pg_temp.assert_standing(
   0,
   0,
   0,
-  3
+  2
 );
 select pg_temp.record_result(
-  'player who did not place picks gets $0 profit',
+  'player who did not place picks gets -100 profit',
   exists (
     select 1
     from public.standings
     where league_id = '00000000-0000-0000-0000-000000002002'::uuid
       and user_id = pg_temp.test_user(3)
       and week_number = 1
-      and weekly_profit = 0
-      and total_profit = 0
+      and weekly_profit = -100
+      and total_profit = -100
   ),
-  'expected no-pick cumulative member to have 0 weekly and total profit'
+  'expected no-pick cumulative member to have -100 weekly and total profit'
 );
 
 select jsonb_build_object(

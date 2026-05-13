@@ -38,6 +38,16 @@ No web version — mobile only for now.
 - push_token (string, nullable)
 - created_at
 
+### games
+- game_id (text, PK — from Odds API)
+- sport: 'nfl' | 'nba' | 'mlb'
+- season_year (int, nullable)
+- week_number (int, nullable)
+- commence_time (timestamp — canonical global kickoff time)
+- away_team, home_team
+- created_at, updated_at
+- NFL games are global events. Simulations and live-score sync must update this canonical row by `game_id`, and DB triggers fan the kickoff time out to every league slate and placed leg that references the game.
+
 ### leagues
 - id (uuid, PK)
 - name, description
@@ -54,6 +64,13 @@ No web version — mobile only for now.
 - status: 'drafting' | 'active' | 'playoffs' | 'complete'
 - settings (jsonb — for premium custom overrides of budget/bet rules)
 - created_at
+
+### global_sport_weeks
+- sport
+- season_year
+- current_week
+- updated_at, updated_by
+- Source of truth for the shared NFL week. For NFL leagues, `leagues.current_week` is a compatibility mirror of this row, not an independently owned value.
 
 ### league_members
 - id (uuid, PK)
@@ -73,6 +90,16 @@ No web version — mobile only for now.
 - winner_id (FK users, nullable)
 - is_playoff (boolean)
 - is_championship (boolean)
+
+### league_week_slate_games
+- id (uuid, PK)
+- league_id (FK leagues)
+- week_number (int)
+- game_id (FK/canonical reference to games.game_id)
+- commence_time (timestamp — denormalized compatibility copy from games.commence_time)
+- away_team, home_team
+- created_at, updated_at
+- Unique (league_id, week_number, game_id). Do not simulate game starts by updating only one league's row; update the canonical `games` row or use the global fan-out simulation SQL.
 
 ### bets
 - id (uuid, PK)
@@ -200,6 +227,7 @@ A special parlay where the player buys extra points on spreads and/or totals. Al
 - Decimal to American: decimal >= 2.0 → (decimal - 1) × 100, decimal < 2.0 → -100 / (decimal - 1)
 
 ## Core Business Rules
+- Every NFL league shares one global current week for a given season year. This mirrors the real NFL calendar: if the global week is Week 2, a newly created league is Week 2 immediately; it does not start at Week 1 and catch up later. League `status` values such as `drafting` must never influence the displayed or stored current week. The only exception is an explicitly flagged test fixture, currently App Review Demo League. Never update one league's `current_week` directly. Use `public.set_global_sport_week`, `public.align_nfl_leagues_to_week`, or the global week simulation tools so the database updates every non-fixture league atomically.
 - Weekly budget: $100 (configurable per league for premium users)
 - Minimum bets per week: 5 (each straight bet, parlay, or teaser counts as 1 bet)
 - Maximum single bet: $35 (applies to straights, parlays, and teasers equally)
@@ -240,3 +268,39 @@ A special parlay where the player buys extra points on spreads and/or totals. Al
 - **Empty states:** Every screen that could be empty gets a helpful illustration/message and a clear CTA.
 - **Loading states:** Skeleton loaders everywhere. Never show a blank screen while data loads.
 - **Bet type visual language:** Straight bets use the default green/red scheme. Parlays always carry the amber accent (badges, borders, backgrounds). Teasers always carry the cyan accent. This color coding should be consistent across every screen — bet board, bet slip, bet history, matchup detail, profile stats.
+
+## Global Week Operations
+
+The database enforces the NFL week invariant with a trigger on `leagues`: direct attempts to advance only one NFL league fail. `global_sport_weeks` owns the canonical week, and NFL league rows mirror it for existing app queries. There is no gameplay drafting phase that lags behind real-world game time; a league with zero picks, one member, or a just-created row still follows the same global week.
+
+### Alignment Tool
+Use this only after reviewing the target week and the affected leagues:
+
+```sh
+npm run week:align -- --week 1 --dry-run
+npm run week:align -- --week 1
+```
+
+The alignment tool moves every NFL league in the target season to the chosen week, except explicitly flagged test fixtures. When moving leagues backward, it removes future-week bets, standings, generated matchups, slate rows, future-week notification artifacts, and future-week system chat artifacts for those leagues. Pass `--keep-future-artifacts` only when you intentionally want to keep generated future schedules/slates.
+
+If a special demo league, such as App Review Demo League, needs to preserve later-week state, it must be explicitly flagged in settings with both `global_week_exempt = true` and `global_week_test_fixture = true`. These fixture rows are skipped by global week alignment, kickoff, and completion tools. Do not add global-week exemptions for normal gameplay leagues.
+
+### Simulation Tools
+Use the global simulation tools for week-level testing across multiple leagues:
+
+```sh
+npm run week:kickoff -- --week 1
+npm run week:complete -- --week 1 --defaults
+```
+
+`week:kickoff` marks every known game in the week as in progress across every non-fixture NFL league, updates canonical `games`, fans kickoff times out to league slate rows and placed legs, writes `live_game_states`, and locks all legs whose games have started.
+
+`week:complete` requires a score for every known game in that week, writes final live-game state, settles every pick across every non-fixture NFL league, resolves standings, and advances the global NFL week for all non-fixture leagues together. Inline scores use `game_id=HOME-AWAY`, or pass `--scores ./scores.json` with objects like `{ "id": "mock_nfl_w01_dal_phi", "home_score": 27, "away_score": 24 }`.
+
+The older per-game helper still exists for narrow settlement checks:
+
+```sh
+npm run settle:mock -- --defaults
+```
+
+Use it only when testing one-off score settlement. For anything involving league week advancement, kickoff/lock behavior, reveal timing, or cross-league consistency, use the global week tools.

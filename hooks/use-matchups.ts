@@ -58,6 +58,11 @@ export type HomeDashboard = {
 const matchupKeys = {
   detail: (matchupId: string | undefined) => ['matchups', 'detail', matchupId] as const,
   home: (userId: string | undefined) => ['home-dashboard', userId] as const,
+  userWeek: (
+    leagueId: string | undefined,
+    userId: string | undefined,
+    weekNumber: number | undefined,
+  ) => ['matchups', 'user-week', leagueId, userId, weekNumber] as const,
 };
 
 function assertSupabaseResult<T>(data: T | null, error: { message: string } | null) {
@@ -171,6 +176,36 @@ export function useMatchupDetail(matchupId: string | undefined) {
   });
 }
 
+export function useUserWeekMatchup(
+  leagueId: string | undefined,
+  userId: string | undefined,
+  weekNumber: number | undefined,
+) {
+  return useQuery({
+    enabled: Boolean(leagueId && userId && weekNumber),
+    queryFn: async (): Promise<WeeklyMatchupRow | null> => {
+      if (!leagueId || !userId || !weekNumber) {
+        return null;
+      }
+
+      const { data, error } = await supabase
+        .from('weekly_matchups')
+        .select('*')
+        .eq('league_id', leagueId)
+        .eq('week_number', weekNumber)
+        .or(`home_user_id.eq.${userId},away_user_id.eq.${userId}`)
+        .maybeSingle();
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      return (data as WeeklyMatchupRow | null) ?? null;
+    },
+    queryKey: matchupKeys.userWeek(leagueId, userId, weekNumber),
+  });
+}
+
 export function useHomeDashboard(userId: string | undefined) {
   return useQuery({
     enabled: Boolean(userId),
@@ -212,7 +247,6 @@ export function useHomeDashboard(userId: string | undefined) {
           .from('standings')
           .select('*')
           .in('league_id', leagueIds)
-          .eq('user_id', userId)
           .in('week_number', weekNumbers),
         supabase
           .from('weekly_matchups')
@@ -259,6 +293,7 @@ export function useHomeDashboard(userId: string | undefined) {
           .map((league) => {
             const currentWeek = league.current_week;
             const lastWeek = Math.max(1, currentWeek - 1);
+            const awardsWeek = currentWeek > 1 ? lastWeek : currentWeek;
             const currentMatchup =
               matchups.find(
                 (matchup) =>
@@ -289,9 +324,12 @@ export function useHomeDashboard(userId: string | undefined) {
               thisWeekBets,
               weeklyAwards: calculateWeeklyAwards(
                 leagueBets.filter(
-                  (bet) => bet.league_id === league.id && bet.week_number === currentWeek,
+                  (bet) => bet.league_id === league.id && bet.week_number === awardsWeek,
                 ),
                 usersById,
+                standings.filter(
+                  (standing) => standing.league_id === league.id && standing.week_number === awardsWeek,
+                ),
               ),
               weeklyProfit: sumSettledProfit(thisWeekBets),
             };

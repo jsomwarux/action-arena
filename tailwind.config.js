@@ -15,6 +15,8 @@ module.exports = {
         'amber-accent': '#FFA502',
         'arena-bg': '#0A0E1A',
         'arena-surface': '#111827',
+        bronze: '#CD7F32',
+        'bronze-text': '#E8A268',
         'coral-red': '#FF4757',
         'cyan-accent': '#18DCFF',
         'electric-green': '#00FF87',
