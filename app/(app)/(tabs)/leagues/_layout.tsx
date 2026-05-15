@@ -1,6 +1,5 @@
 import { Stack } from 'expo-router';
 
-import { BackButton } from '@/components/ui/back-button';
 import { THEME_COLORS } from '@/constants/theme';
 
 export default function LeaguesStackLayout() {
@@ -18,13 +17,9 @@ export default function LeaguesStackLayout() {
         },
       }}>
       <Stack.Screen name="index" options={{ headerShown: false, title: 'Leagues' }} />
-      <Stack.Screen
-        name="[leagueId]"
-        options={{
-          headerLeft: () => <BackButton fallbackHref="/leagues" />,
-          title: 'League Detail',
-        }}
-      />
+      {/* League Detail renders its own in-content back button, so the native
+          header is hidden to reclaim the vertical space it used to consume. */}
+      <Stack.Screen name="[leagueId]" options={{ headerShown: false }} />
     </Stack>
   );
 }

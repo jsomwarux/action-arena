@@ -1,6 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Constants from 'expo-constants';
-import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { useEffect } from 'react';
@@ -156,10 +155,6 @@ async function registerForPushToken() {
     });
   }
 
-  if (!Device.isDevice) {
-    return null;
-  }
-
   const existing = await Notifications.getPermissionsAsync();
   const finalStatus =
     existing.status === 'granted'
@@ -171,6 +166,8 @@ async function registerForPushToken() {
   }
 
   const projectId = getProjectId();
+  // Supported iOS simulator/dev-build setups can register Expo push tokens too.
+  // Unsupported runtimes throw here and are handled by the caller.
   const token = projectId
     ? await Notifications.getExpoPushTokenAsync({ projectId })
     : await Notifications.getExpoPushTokenAsync();

@@ -578,13 +578,31 @@ begin
     latest_week := league_record.current_week;
   end if;
 
-  select s.user_id
-  into champion_id
-  from public.standings s
-  where s.league_id = p_league_id
-    and s.week_number = latest_week
-  order by s.rank asc, s.total_profit desc, s.wins desc, s.user_id
-  limit 1;
+  if league_record.type = 'h2h' then
+    -- H2H playoff leagues crown the championship matchup winner, not the
+    -- highest final standings row. Smaller brackets may flag a championship
+    -- before Week 17, so use the latest resolved championship matchup.
+    select wm.winner_id
+    into champion_id
+    from public.weekly_matchups wm
+    where wm.league_id = p_league_id
+      and wm.is_championship = true
+      and wm.winner_id is not null
+    order by wm.week_number desc, wm.id
+    limit 1;
+  end if;
+
+  if champion_id is null then
+    -- Cumulative leagues and any season format without a resolved
+    -- championship matchup use the standings leader as the champion.
+    select s.user_id
+    into champion_id
+    from public.standings s
+    where s.league_id = p_league_id
+      and s.week_number = latest_week
+    order by s.rank asc, s.total_profit desc, s.wins desc, s.user_id
+    limit 1;
+  end if;
 
   select coalesce(
     jsonb_agg(
