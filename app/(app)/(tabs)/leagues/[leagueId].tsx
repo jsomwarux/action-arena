@@ -13,7 +13,6 @@ import {
   ScrollView,
   Text,
   TextInput as NativeTextInput,
-  useWindowDimensions,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -82,11 +81,12 @@ import type {
 type DetailTab = 'standings' | 'schedule' | 'members' | 'chat';
 type PlayoffPlaceholderWeek = 15 | 16 | 17;
 type PlayoffStatus = 'clinched' | 'eliminated' | null;
+type StandingsSnapshot = {
+  standings: StandingRow[];
+  weekNumber: number | null;
+};
 
-const SCREEN_HORIZONTAL_PADDING = 40;
-const DETAIL_TAB_HEIGHT = 48;
-const DETAIL_TAB_HORIZONTAL_GAP = 10;
-const DETAIL_TAB_UNDERLINE_HEIGHT = 3;
+const TAB_INDICATOR_HEIGHT = 3;
 const REGULAR_SEASON_WEEKS = 14;
 const PLAYOFF_PLACEHOLDER_WEEKS: PlayoffPlaceholderWeek[] = [15, 16, 17];
 
@@ -109,10 +109,39 @@ function getAwayDisplayName(detail: LeagueDetail, matchup: WeeklyMatchupRow) {
   return matchup.away_user_id ? getDisplayName(detail, matchup.away_user_id) : 'Bye Week';
 }
 
-function getStandingsForWeek(detail: LeagueDetail, weekNumber: number) {
-  return detail.standings
-    .filter((standing) => standing.week_number === weekNumber)
-    .sort((left, right) => left.rank - right.rank);
+function getStandingsSnapshotForWeek(detail: LeagueDetail, weekNumber: number): StandingsSnapshot {
+  const snapshotWeekNumber = detail.standings.reduce<number | null>((latestWeek, standing) => {
+    if (standing.week_number > weekNumber) {
+      return latestWeek;
+    }
+
+    if (latestWeek === null || standing.week_number > latestWeek) {
+      return standing.week_number;
+    }
+
+    return latestWeek;
+  }, null);
+
+  if (snapshotWeekNumber === null) {
+    return { standings: [], weekNumber: null };
+  }
+
+  return {
+    standings: detail.standings
+      .filter((standing) => standing.week_number === snapshotWeekNumber)
+      .sort((left, right) => {
+        if (left.rank !== right.rank) {
+          return left.rank - right.rank;
+        }
+
+        if (left.total_profit !== right.total_profit) {
+          return right.total_profit - left.total_profit;
+        }
+
+        return left.user_id.localeCompare(right.user_id);
+      }),
+    weekNumber: snapshotWeekNumber,
+  };
 }
 
 function getUserMatchupForWeek(detail: LeagueDetail, userId: string, weekNumber: number) {
@@ -297,10 +326,35 @@ function PlayoffStatusIcon({ status }: { status: PlayoffStatus }) {
   );
 }
 
+function DetailBackButton() {
+  const router = useRouter();
+  const goBack = () => {
+    haptics.selection();
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+    router.replace('/leagues');
+  };
+
+  return (
+    <PressableScale
+      accessibilityLabel="Go back"
+      accessibilityRole="button"
+      onPress={goBack}
+      pressedScale={0.94}>
+      <View className="h-10 w-10 items-center justify-center rounded-full border border-white/12 bg-white/[0.05]">
+        <Ionicons color={THEME_COLORS.electricGreen} name="chevron-back" size={20} />
+      </View>
+    </PressableScale>
+  );
+}
+
 function DetailSkeleton() {
   return (
     <SafeAreaView className="flex-1 bg-arena-bg">
       <View className="gap-5 px-5 py-6">
+        <DetailBackButton />
         <SkeletonLoader height={34} width="70%" />
         <SkeletonLoader height={18} width="50%" />
         {[0, 1, 2].map((item) => (
@@ -980,12 +1034,16 @@ function SeasonAwardsCard({
 function StandingsBoard({
   cosmeticsByUserId,
   detail,
+  hasSeasonStandings,
   selectedWeekNumber,
+  standingsWeekNumber,
   userId,
 }: {
   cosmeticsByUserId: Record<string, EquippedCosmeticsByCategory>;
   detail: LeagueDetail;
+  hasSeasonStandings: boolean;
   selectedWeekNumber: number;
+  standingsWeekNumber: number | null;
   userId: string;
 }) {
   const router = useRouter();
@@ -994,6 +1052,16 @@ function StandingsBoard({
   if (detail.standings.length === 0) {
     const isFutureWeek = selectedWeekNumber > detail.league.current_week;
     const isPastWeek = selectedWeekNumber < detail.league.current_week;
+    const title = hasSeasonStandings
+      ? isFutureWeek
+        ? `Week ${selectedWeekNumber} Standings Pending`
+        : `No Week ${selectedWeekNumber} Snapshot`
+      : 'Standings Coming Soon';
+    const description = hasSeasonStandings
+      ? isPastWeek
+        ? 'This league does not have a saved standings row for that completed week yet.'
+        : 'Cumulative standings will update here once this week is played.'
+      : 'Season standings will appear once the first week is settled.';
 
     return (
       <Card>
@@ -1004,23 +1072,23 @@ function StandingsBoard({
           <Text
             className="text-center text-lg font-black uppercase text-white"
             style={{ letterSpacing: -0.2 }}>
-            {isFutureWeek
-              ? `Week ${selectedWeekNumber} Standings Pending`
-              : isPastWeek
-                ? `No Week ${selectedWeekNumber} Snapshot`
-                : 'Standings Coming Soon'}
+            {title}
           </Text>
           <Text className="text-center text-sm font-semibold leading-5 text-white/55">
-            {isFutureWeek
-              ? 'Cumulative standings will update here once that week is played.'
-              : isPastWeek
-                ? 'This league does not have a saved standings row for that completed week yet.'
-                : 'Standings will appear once members are seeded.'}
+            {description}
           </Text>
         </View>
       </Card>
     );
   }
+
+  const resolvedStandingsWeekNumber = standingsWeekNumber ?? selectedWeekNumber;
+  const badgeLabel =
+    resolvedStandingsWeekNumber === selectedWeekNumber
+      ? selectedWeekNumber === detail.league.current_week
+        ? 'Live'
+        : 'Snapshot'
+      : 'Latest';
 
   return (
     <Card padded={false}>
@@ -1029,13 +1097,9 @@ function StandingsBoard({
           <Text
             className="text-[10px] font-black uppercase text-electric-green"
             style={{ letterSpacing: 2 }}>
-            Standings Through Week {selectedWeekNumber}
+            Standings Through Week {resolvedStandingsWeekNumber}
           </Text>
-          {selectedWeekNumber === detail.league.current_week ? (
-            <Badge label="Live" tone="green" />
-          ) : (
-            <Badge label="Snapshot" tone="gold" />
-          )}
+          <Badge label={badgeLabel} tone={badgeLabel === 'Snapshot' ? 'gold' : 'green'} />
         </View>
         <View className="flex-row items-center gap-3 px-5 pb-3 pt-5">
           <Text
@@ -1121,7 +1185,11 @@ function StandingsBoard({
                     <PlayoffStatusIcon status={playoffStatus} />
                   </View>
                   <Text className="mt-1 text-[11px] font-semibold text-white/45">
-                    Weekly {formatProfit(standing.weekly_profit)}
+                    {isH2H
+                      ? `Season ${formatProfit(standing.total_profit)} · Week ${
+                          standing.week_number
+                        } ${formatProfit(standing.weekly_profit)}`
+                      : `Week ${standing.week_number} ${formatProfit(standing.weekly_profit)}`}
                   </Text>
                 </View>
                 <View className="flex-row items-center gap-2">
@@ -1768,9 +1836,12 @@ function SharedBetCard({
   return (
     <PressableScale>
       <LockEffect cosmetics={cosmetics} compact>
+        {/* `w-full` keeps the card pinned to the chat bubble's content width.
+            Every inner row below is built to wrap or truncate within that
+            width, so nothing can extend past the card's border. */}
         <View
           className={cn(
-            'mt-2 rounded-2xl border bg-arena-bg/50 p-3',
+            'mt-2 w-full rounded-2xl border bg-arena-bg/50 p-3',
             isLock ? 'bg-gold/[0.07]' : null,
           )}
           style={{
@@ -1780,69 +1851,88 @@ function SharedBetCard({
             shadowOpacity: isLock ? 0.3 : 0,
             shadowRadius: isLock ? 10 : 0,
           }}>
-        <View className="flex-row items-center justify-between gap-3">
-          <View className="flex-row items-center gap-2">
-            <Badge betType={metadata.betType} />
-            {isLock ? (
-              <View className="flex-row items-center gap-1 rounded-full border border-gold/55 bg-gold/15 px-2 py-0.5">
-                <Ionicons color={THEME_COLORS.gold} name="star" size={10} />
-                <Text className="text-[9px] font-black uppercase text-gold" style={{ letterSpacing: 1 }}>
-                  Pick of the Week 1.5x
-                </Text>
-              </View>
-            ) : null}
-            <Text
-              className="text-[10px] font-black uppercase text-white/45"
-              style={{ letterSpacing: 1.4 }}>
-              Week {metadata.weekNumber}
-            </Text>
-          </View>
-          <Text className="text-xs font-black" style={{ color: accent }}>
-            {formatAmericanOdds(metadata.odds)}
-          </Text>
-        </View>
-
-        <View className="mt-3 gap-1.5">
-          {metadata.legs.map((leg, index) => {
-            if (!isBetMarket(leg.market)) {
-              return null;
-            }
-
-            const labelLeg = {
-              adjusted_line: leg.adjustedLine,
-              market: leg.market,
-              original_line: leg.originalLine,
-              selection: leg.selection,
-            } as const;
-
-            return (
-              <View key={`${leg.selection}-${index}`} className="flex-row items-center justify-between gap-2">
-                <View className="flex-1 flex-row items-center gap-2">
-                  {leg.market !== 'over_under' ? (
-                    <NflTeamLogo size={20} teamName={getPickLogoLabel(labelLeg)} />
-                  ) : null}
-                  <Text className="flex-1 text-xs font-semibold text-white/75" numberOfLines={1}>
-                    {formatBetLegLabel(labelLeg, { betType: metadata.betType })}
+          {/* Header: badges/pills on the left share the row with the odds on
+              the right. The left group is `flex-1` + `flex-wrap`, so when the
+              TEASER pill, POTW pill and week label can't sit side by side they
+              wrap onto new lines instead of pushing past the card edge.
+              `items-start` keeps the odds aligned to the first line. */}
+          <View className="flex-row items-start justify-between gap-2">
+            <View className="flex-1 flex-row flex-wrap items-center gap-2">
+              <Badge betType={metadata.betType} />
+              {isLock ? (
+                <View className="max-w-full shrink flex-row items-center gap-1 rounded-full border border-gold/55 bg-gold/15 px-2 py-0.5">
+                  <Ionicons color={THEME_COLORS.gold} name="star" size={10} />
+                  <Text
+                    className="shrink text-[9px] font-black uppercase text-gold"
+                    numberOfLines={1}
+                    style={{ letterSpacing: 1 }}>
+                    Pick of the Week 1.5x
                   </Text>
                 </View>
-                <Text className="text-[10px] font-black uppercase text-white/45">
-                  {formatAmericanOdds(leg.odds)}
-                </Text>
-              </View>
-            );
-          })}
-        </View>
+              ) : null}
+              <Text
+                className="text-[10px] font-black uppercase text-white/45"
+                style={{ letterSpacing: 1.4 }}>
+                Week {metadata.weekNumber}
+              </Text>
+            </View>
+            <Text className="shrink-0 text-xs font-black" style={{ color: accent }}>
+              {formatAmericanOdds(metadata.odds)}
+            </Text>
+          </View>
 
-        <View className="mt-3 flex-row items-center justify-between border-t border-white/[0.08] pt-3">
-          <Text
-            className="text-[10px] font-black uppercase text-white/45"
-            style={{ letterSpacing: 1.4 }}>
-            {formatCurrency(metadata.amount)} played
-          </Text>
-          <Text className="text-xs font-black text-electric-green">
-            Reward {formatCurrency(metadata.potentialReward)}
-          </Text>
-        </View>
+          {/* Legs: each row reserves a fixed slot for the odds on the right and
+              gives the team logo + label the remaining `flex-1` space. The
+              label truncates with an ellipsis so long lines (e.g. teaser line
+              shifts) never widen the row. */}
+          <View className="mt-3 gap-1.5">
+            {metadata.legs.map((leg, index) => {
+              if (!isBetMarket(leg.market)) {
+                return null;
+              }
+
+              const labelLeg = {
+                adjusted_line: leg.adjustedLine,
+                market: leg.market,
+                original_line: leg.originalLine,
+                selection: leg.selection,
+              } as const;
+
+              return (
+                <View
+                  key={`${leg.selection}-${index}`}
+                  className="flex-row items-center justify-between gap-2">
+                  <View className="min-w-0 flex-1 flex-row items-center gap-2">
+                    {leg.market !== 'over_under' ? (
+                      <NflTeamLogo size={20} teamName={getPickLogoLabel(labelLeg)} />
+                    ) : null}
+                    <Text
+                      className="min-w-0 flex-1 text-xs font-semibold text-white/75"
+                      numberOfLines={1}>
+                      {formatBetLegLabel(labelLeg, { betType: metadata.betType })}
+                    </Text>
+                  </View>
+                  <Text className="shrink-0 text-[10px] font-black uppercase text-white/45">
+                    {formatAmericanOdds(leg.odds)}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+
+          {/* Footer: the coins-played label can shrink/truncate so the reward
+              total on the right always stays inside the card. */}
+          <View className="mt-3 flex-row items-center justify-between gap-2 border-t border-white/[0.08] pt-3">
+            <Text
+              className="min-w-0 shrink text-[10px] font-black uppercase text-white/45"
+              numberOfLines={1}
+              style={{ letterSpacing: 1.4 }}>
+              {formatCurrency(metadata.amount)} played
+            </Text>
+            <Text className="shrink-0 text-xs font-black text-electric-green">
+              Reward {formatCurrency(metadata.potentialReward)}
+            </Text>
+          </View>
         </View>
       </LockEffect>
     </PressableScale>
@@ -2175,109 +2265,84 @@ function TabSwitcher({
   activeTab: DetailTab;
   onChange: (tab: DetailTab) => void;
 }) {
-  const { width } = useWindowDimensions();
-  const tabBarWidth = Math.max(0, width - SCREEN_HORIZONTAL_PADDING);
-  const tabWidth = tabBarWidth / TABS.length;
-  const labelWidth = Math.max(0, tabWidth - DETAIL_TAB_HORIZONTAL_GAP * 2);
-
+  // A plain flexbox row: four equal-flex tabs, each owning exactly a quarter of
+  // the width. The indicator is a real child of its tab — it stretches to the
+  // label's text width and sits directly beneath it, so there is nothing to
+  // measure, offset, or "chase" when the active tab changes.
   return (
     <View
       style={{
-        alignSelf: 'center',
+        alignSelf: 'stretch',
         borderBottomColor: 'rgba(255,255,255,0.08)',
         borderBottomWidth: 1,
-        width: tabBarWidth,
+        flexDirection: 'row',
+        width: '100%',
       }}>
-      <View
-        style={{
-          flexDirection: 'row',
-          height: DETAIL_TAB_HEIGHT,
-          width: tabBarWidth,
-        }}>
-        {TABS.map((tab) => {
-          const isActive = activeTab === tab.key;
-          const isLastTab = tab.key === TABS[TABS.length - 1]?.key;
-          const underlineWidth = Math.min(
-            labelWidth,
-            Math.max(28, tab.label.length * 6.4),
-          );
-          const underlineLeft = (tabWidth - underlineWidth) / 2;
+      {TABS.map((tab) => {
+        const isActive = activeTab === tab.key;
 
-          return (
+        return (
+          <View
+            key={tab.key}
+            style={{
+              flex: 1,
+              flexBasis: 0,
+              minWidth: 0,
+            }}>
             <Pressable
               accessibilityRole="tab"
               accessibilityState={{ selected: isActive }}
               hitSlop={8}
-              key={tab.key}
               onPress={() => onChange(tab.key)}
               style={({ pressed }) => ({
                 alignItems: 'center',
-                height: DETAIL_TAB_HEIGHT,
                 justifyContent: 'center',
+                minWidth: 0,
                 opacity: pressed ? 0.68 : 1,
-                overflow: 'hidden',
-                paddingHorizontal: DETAIL_TAB_HORIZONTAL_GAP,
-                position: 'relative',
-                width: tabWidth,
+                // Horizontal padding reserves breathing room inside each quarter
+                // so neighbouring labels always have a clear gap and never touch.
+                paddingHorizontal: 6,
+                paddingVertical: 12,
+                width: '100%',
               })}>
-              <Text
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.68}
-                style={{
-                  color: isActive ? THEME_COLORS.electricGreen : 'rgba(255,255,255,0.55)',
-                  fontSize: 9,
-                  fontWeight: '900',
-                  letterSpacing: 0,
-                  maxWidth: labelWidth,
-                  textAlign: 'center',
-                  textTransform: 'uppercase',
-                  width: labelWidth,
-                }}>
-                {tab.label}
-              </Text>
-              <View
-                style={
-                  isActive
-                    ? {
-                        backgroundColor: THEME_COLORS.electricGreen,
-                        borderRadius: DETAIL_TAB_UNDERLINE_HEIGHT,
-                        bottom: 0,
-                        height: DETAIL_TAB_UNDERLINE_HEIGHT,
-                        left: underlineLeft,
-                        position: 'absolute',
-                        shadowColor: THEME_COLORS.electricGreen,
-                        shadowOffset: { width: 0, height: 0 },
-                        shadowOpacity: 0.55,
-                        shadowRadius: 8,
-                        width: underlineWidth,
-                      }
-                    : {
-                        backgroundColor: 'transparent',
-                        bottom: 0,
-                        height: DETAIL_TAB_UNDERLINE_HEIGHT,
-                        left: underlineLeft,
-                        position: 'absolute',
-                        width: underlineWidth,
-                      }
-                }
-              />
-              {!isLastTab ? (
-                <View
-                  pointerEvents="none"
+              {/* This column shrinks to the label's intrinsic text width; the
+                  indicator below it stretches to match that exact width. */}
+              <View style={{ alignItems: 'center' }}>
+                <Text
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.8}
+                  numberOfLines={1}
                   style={{
-                    backgroundColor: 'rgba(255,255,255,0.08)',
-                    height: 18,
-                    position: 'absolute',
-                    right: 0,
-                    width: 1,
+                    color: isActive ? THEME_COLORS.electricGreen : 'rgba(255,255,255,0.55)',
+                    fontSize: 10,
+                    fontWeight: '900',
+                    letterSpacing: 0.2,
+                    textTransform: 'uppercase',
+                  }}>
+                  {tab.label}
+                </Text>
+                <View
+                  style={{
+                    alignSelf: 'stretch',
+                    backgroundColor: isActive ? THEME_COLORS.electricGreen : 'transparent',
+                    borderRadius: TAB_INDICATOR_HEIGHT,
+                    height: TAB_INDICATOR_HEIGHT,
+                    marginTop: 8,
+                    ...(isActive
+                      ? {
+                          shadowColor: THEME_COLORS.electricGreen,
+                          shadowOffset: { width: 0, height: 0 },
+                          shadowOpacity: 0.55,
+                          shadowRadius: 8,
+                        }
+                      : null),
                   }}
                 />
-              ) : null}
+              </View>
             </Pressable>
-          );
-        })}
-      </View>
+          </View>
+        );
+      })}
     </View>
   );
 }
@@ -2286,8 +2351,10 @@ function TabContent({
   canStartSeason,
   cosmeticsByUserId,
   detail,
+  hasSeasonStandings,
   onStartSeason,
   selectedWeekNumber,
+  standingsWeekNumber,
   startSeasonError,
   startingSeason,
   tab,
@@ -2296,8 +2363,10 @@ function TabContent({
   canStartSeason: boolean;
   cosmeticsByUserId: Record<string, EquippedCosmeticsByCategory>;
   detail: LeagueDetail;
+  hasSeasonStandings: boolean;
   onStartSeason: () => void;
   selectedWeekNumber: number;
+  standingsWeekNumber: number | null;
   startSeasonError?: string;
   startingSeason: boolean;
   tab: DetailTab;
@@ -2309,7 +2378,9 @@ function TabContent({
         <StandingsBoard
           cosmeticsByUserId={cosmeticsByUserId}
           detail={detail}
+          hasSeasonStandings={hasSeasonStandings}
           selectedWeekNumber={selectedWeekNumber}
+          standingsWeekNumber={standingsWeekNumber}
           userId={userId}
         />
       ) : null}
@@ -2484,6 +2555,9 @@ export default function LeagueDetailScreen() {
   if (!detailQuery.data || !user) {
     return (
       <SafeAreaView className="flex-1 bg-arena-bg">
+        <View className="px-5 pt-2">
+          <DetailBackButton />
+        </View>
         <View className="flex-1 items-center justify-center px-5">
           <View className="h-16 w-16 items-center justify-center rounded-full border border-coral-red/40 bg-coral-red/10">
             <Ionicons color={THEME_COLORS.coralRed} name="alert" size={28} />
@@ -2503,11 +2577,11 @@ export default function LeagueDetailScreen() {
 
   const detail = detailQuery.data;
   const userId = user.id;
-  const selectedStandings = getStandingsForWeek(detail, selectedWeekNumber);
+  const selectedStandingsSnapshot = getStandingsSnapshotForWeek(detail, selectedWeekNumber);
   const selectedDetail: LeagueDetail = {
     ...detail,
     currentUserMatchup: getUserMatchupForWeek(detail, userId, selectedWeekNumber),
-    standings: selectedStandings,
+    standings: selectedStandingsSnapshot.standings,
   };
   const currentUserMatchup = selectedDetail.currentUserMatchup;
   const cosmeticsByUserId = cosmeticsQuery.data ?? {};
@@ -2535,7 +2609,7 @@ export default function LeagueDetailScreen() {
     <SafeAreaView className="flex-1 bg-arena-bg">
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ gap: 18, padding: 20, paddingBottom: 36 }}
+        contentContainerStyle={{ gap: 16, padding: 20, paddingBottom: 36 }}
         refreshControl={
           <RefreshControl
             tintColor={THEME_COLORS.electricGreen}
@@ -2547,28 +2621,27 @@ export default function LeagueDetailScreen() {
           />
         }
         showsVerticalScrollIndicator={false}>
-        <HeroHeader detail={detail} />
-        <View className="items-end">
-          <WeekNavigator
-            maxWeek={REGULAR_SEASON_WEEKS}
-            onChange={(week) => {
-              haptics.selection();
-              setSelectedWeek(week);
-            }}
-            week={selectedWeekNumber}
-          />
+        <View className="flex-row">
+          <DetailBackButton />
         </View>
-        <InviteCodeCard detail={detail} seasonInProgress={seasonInProgress} />
 
+        {/* Identity: who/what this league is, plus the week being viewed. */}
+        <View className="gap-3">
+          <HeroHeader detail={detail} />
+          <View className="items-end">
+            <WeekNavigator
+              maxWeek={REGULAR_SEASON_WEEKS}
+              onChange={(week) => {
+                haptics.selection();
+                setSelectedWeek(week);
+              }}
+              week={selectedWeekNumber}
+            />
+          </View>
+        </View>
+
+        <InviteCodeCard detail={detail} seasonInProgress={seasonInProgress} />
         <SeasonAwardsCard cosmeticsByUserId={cosmeticsByUserId} detail={detail} />
-        {isFutureWeek ? (
-          <FutureWeekAwardsCard weekNumber={selectedWeekNumber} />
-        ) : awardsQuery.data ? (
-          <WeeklyAwardsCard
-            awards={awardsQuery.data}
-            weekNumber={selectedWeekNumber}
-          />
-        ) : null}
 
         {detail.league.type === 'h2h' && currentUserMatchup ? (
           <PressableScale
@@ -2591,18 +2664,30 @@ export default function LeagueDetailScreen() {
           <FutureWeekPreviewCard hasMatchup={false} weekNumber={selectedWeekNumber} />
         ) : null}
 
-        <TabSwitcher activeTab={activeTab} onChange={setActiveTab} />
-        <TabContent
-          canStartSeason={canStartSeason}
-          cosmeticsByUserId={cosmeticsByUserId}
-          detail={selectedDetail}
-          onStartSeason={handleStartSeason}
-          selectedWeekNumber={selectedWeekNumber}
-          startSeasonError={generateSchedule.error?.message}
-          startingSeason={generateSchedule.isPending}
-          tab={activeTab}
-          userId={userId}
-        />
+        {/* Standings hub: the current-week snapshot, the section tabs, and the
+            season standings sit in one tightly-spaced group so they read as a
+            single standings experience rather than disconnected cards. */}
+        <View className="gap-3" style={{ alignSelf: 'stretch', width: '100%' }}>
+          {isFutureWeek ? (
+            <FutureWeekAwardsCard weekNumber={selectedWeekNumber} />
+          ) : awardsQuery.data ? (
+            <WeeklyAwardsCard awards={awardsQuery.data} weekNumber={selectedWeekNumber} />
+          ) : null}
+          <TabSwitcher activeTab={activeTab} onChange={setActiveTab} />
+          <TabContent
+            canStartSeason={canStartSeason}
+            cosmeticsByUserId={cosmeticsByUserId}
+            detail={selectedDetail}
+            hasSeasonStandings={detail.standings.length > 0}
+            onStartSeason={handleStartSeason}
+            selectedWeekNumber={selectedWeekNumber}
+            standingsWeekNumber={selectedStandingsSnapshot.weekNumber}
+            startSeasonError={generateSchedule.error?.message}
+            startingSeason={generateSchedule.isPending}
+            tab={activeTab}
+            userId={userId}
+          />
+        </View>
       </ScrollView>
     </SafeAreaView>
   );

@@ -4139,9 +4139,10 @@ export default function BetBoardScreen() {
     viewedWeek,
   );
   const placedBets = placedBetsQuery.data ?? [];
-  const hasSubmittedLineup = placedBets.length > 0;
+  const hasLoadedPlacedBets = placedBetsQuery.isSuccess;
+  const hasSubmittedLineup = hasLoadedPlacedBets && placedBets.length > 0;
   const isReadOnly = isPastWeek || hasSubmittedLineup;
-  const canBuildLineup = isCurrentWeek && !hasSubmittedLineup;
+  const canBuildLineup = isCurrentWeek && hasLoadedPlacedBets && !hasSubmittedLineup;
   const canAccessBetBoard = accessQuery.data ?? true;
   const potwSwapClosed = revealTimeQuery.data
     ? Date.now() >= new Date(revealTimeQuery.data).getTime()

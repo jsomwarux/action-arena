@@ -16,6 +16,8 @@
     "test:weekly-resolution": "supabase db query --linked -f scripts/test-weekly-matchup-resolution.sql",
     "test:profile-stats": "node scripts/test-profile-stats.mjs",
     "test:leaderboard": "supabase db query --linked -f scripts/test-leaderboard-ranking.sql",
+    "test:notifications": "supabase db query --linked -f scripts/test-notification-events.sql",
+    "seed:manual-regressions": "supabase db query --linked -f scripts/seed-manual-regression-fixtures.sql",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

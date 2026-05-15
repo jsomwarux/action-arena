@@ -202,8 +202,15 @@ begin
   where game_id = new.game_id;
 
   if canonical_game.game_id is not null then
-    new.game_start_time := canonical_game.commence_time;
-    new.locked := new.locked or canonical_game.commence_time <= now();
+    -- Canonical game rows own scheduled future times, but a direct live/start
+    -- update on a placed leg must still be able to move the global game earlier.
+    -- Otherwise older edit/POTW gates that mark a leg as started get overwritten
+    -- by the future canonical row before the after-trigger can fan that start out.
+    new.game_start_time := case
+      when new.locked or new.game_start_time <= now() then least(new.game_start_time, canonical_game.commence_time)
+      else canonical_game.commence_time
+    end;
+    new.locked := new.locked or new.game_start_time <= now();
   end if;
 
   return new;
@@ -228,24 +235,44 @@ as $$
 declare
   reveal_time timestamptz;
 begin
-  select min(coalesce(game.commence_time, slate.commence_time))
+  -- Reveal/lock gates need the earliest known kickoff from canonical games,
+  -- league slate compatibility rows, or placed legs. The canonical row prevents
+  -- future schedule drift, but it must not hide a started local compatibility
+  -- row while fan-out catches up.
+  select min(source_time)
   into reveal_time
-  from public.league_week_slate_games slate
-  left join public.games game on game.game_id = slate.game_id
-  where slate.league_id = p_league_id
-    and slate.week_number = p_week_number;
+  from (
+    select slate.commence_time as source_time
+    from public.league_week_slate_games slate
+    where slate.league_id = p_league_id
+      and slate.week_number = p_week_number
 
-  if reveal_time is not null then
-    return reveal_time;
-  end if;
+    union all
 
-  select min(coalesce(game.commence_time, bl.game_start_time))
-  into reveal_time
-  from public.bets b
-  join public.bet_legs bl on bl.bet_id = b.id
-  left join public.games game on game.game_id = bl.game_id
-  where b.league_id = p_league_id
-    and b.week_number = p_week_number;
+    select game.commence_time
+    from public.league_week_slate_games slate
+    join public.games game on game.game_id = slate.game_id
+    where slate.league_id = p_league_id
+      and slate.week_number = p_week_number
+
+    union all
+
+    select bl.game_start_time
+    from public.bets b
+    join public.bet_legs bl on bl.bet_id = b.id
+    where b.league_id = p_league_id
+      and b.week_number = p_week_number
+
+    union all
+
+    select game.commence_time
+    from public.bets b
+    join public.bet_legs bl on bl.bet_id = b.id
+    join public.games game on game.game_id = bl.game_id
+    where b.league_id = p_league_id
+      and b.week_number = p_week_number
+  ) kickoff_sources
+  where source_time is not null;
 
   return reveal_time;
 end;
