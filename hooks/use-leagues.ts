@@ -238,7 +238,10 @@ export function useLeagueDetail(leagueId: string | undefined, userId: string | u
       ]);
 
       const members = assertSupabaseResult(membersResult.data, membersResult.error);
-      const standings = assertSupabaseResult(standingsResult.data, standingsResult.error);
+      const activeMemberIds = new Set(members.map((member) => member.user_id));
+      const standings = assertSupabaseResult(standingsResult.data, standingsResult.error).filter(
+        (standing) => activeMemberIds.has(standing.user_id),
+      );
       const matchups = assertSupabaseResult(matchupsResult.data, matchupsResult.error);
       if (seasonResult.error) {
         throw new Error(seasonResult.error.message);

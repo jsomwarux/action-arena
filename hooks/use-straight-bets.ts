@@ -73,6 +73,16 @@ function assertSupabaseResult<T>(data: T | null, error: { message: string } | nu
 }
 
 function normalizeSubmitPicksError(message: string) {
+  if (
+    /failed to fetch|network request failed|load failed|networkerror|fetch failed/i.test(message)
+  ) {
+    return 'Network connection lost. Your lineup is still in the slip - reconnect and submit again.';
+  }
+
+  if (/already been submitted for this week/i.test(message)) {
+    return 'Picks have already been submitted for this week. Refresh the board to review your card.';
+  }
+
   return message
     .replace(/\$(\d+(?:\.\d+)?)/g, (_match, amount: string) => `${Math.round(Number(amount))} coins`)
     .replace(/\bBets\b/g, 'Picks')
@@ -176,12 +186,21 @@ export function useSubmitBetsMutation(
         throw new Error('Choose a league before submitting picks.');
       }
 
-      const { data, error } = await supabase.rpc('submit_bets', {
-        p_bets: bets as unknown as Json,
-        p_league_id: leagueId,
-        p_week_number: weekNumber,
-      });
+      const response = await (async () => {
+        try {
+          return await supabase.rpc('submit_bets', {
+            p_bets: bets as unknown as Json,
+            p_league_id: leagueId,
+            p_week_number: weekNumber,
+          });
+        } catch (error) {
+          throw new Error(
+            normalizeSubmitPicksError(error instanceof Error ? error.message : String(error)),
+          );
+        }
+      })();
 
+      const { data, error } = response;
       if (error) {
         throw new Error(normalizeSubmitPicksError(error.message));
       }
@@ -196,8 +215,8 @@ export function useSubmitBetsMutation(
         },
         { parlay: 0, straight: 0, teaser: 0 },
       );
-      logAnalyticsEvent('picks_submitted', {
-        pick_count: bets.length,
+      logAnalyticsEvent('bets_placed', {
+        bet_count: bets.length,
         league_id: leagueId,
         parlay_count: counts.parlay,
         straight_count: counts.straight,
@@ -210,10 +229,12 @@ export function useSubmitBetsMutation(
       });
     },
     onError: (_error, _variables, context) => {
-      queryClient.setQueryData(
-        straightBetKeys.placed(leagueId, userId, weekNumber),
-        context?.previous ?? [],
-      );
+      if (context?.previous) {
+        queryClient.setQueryData(
+          straightBetKeys.placed(leagueId, userId, weekNumber),
+          context.previous,
+        );
+      }
     },
   });
 }
@@ -285,14 +306,23 @@ export function useUpdatePlacedBetMutation(
       return { previous };
     },
     mutationFn: async (edit: BetEditSubmission) => {
-      const { data, error } = await supabase.rpc('update_submitted_bet', {
-        p_bet_id: edit.bet_id,
-        p_legs: edit.legs as unknown as Json,
-        p_odds: edit.odds,
-        p_potential_payout: edit.potential_payout,
-        p_teaser_points: edit.teaser_points,
-      });
+      const response = await (async () => {
+        try {
+          return await supabase.rpc('update_submitted_bet', {
+            p_bet_id: edit.bet_id,
+            p_legs: edit.legs as unknown as Json,
+            p_odds: edit.odds,
+            p_potential_payout: edit.potential_payout,
+            p_teaser_points: edit.teaser_points,
+          });
+        } catch (error) {
+          throw new Error(
+            normalizeSubmitPicksError(error instanceof Error ? error.message : String(error)),
+          );
+        }
+      })();
 
+      const { data, error } = response;
       if (error) {
         throw new Error(normalizeSubmitPicksError(error.message));
       }
@@ -331,10 +361,19 @@ export function useSetPickOfWeekMutation(
       return { previous };
     },
     mutationFn: async (betId: string) => {
-      const { data, error } = await supabase.rpc('set_pick_of_week', {
-        p_bet_id: betId,
-      });
+      const response = await (async () => {
+        try {
+          return await supabase.rpc('set_pick_of_week', {
+            p_bet_id: betId,
+          });
+        } catch (error) {
+          throw new Error(
+            normalizeSubmitPicksError(error instanceof Error ? error.message : String(error)),
+          );
+        }
+      })();
 
+      const { data, error } = response;
       if (error) {
         throw new Error(normalizeSubmitPicksError(error.message));
       }

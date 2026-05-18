@@ -251,9 +251,9 @@ export function useShareBetToChat(userId: string | undefined) {
       return assertSupabaseResult(data, error);
     },
     onSuccess: async (_data, bet) => {
-      logAnalyticsEvent('pick_shared_to_chat', {
-        pick_id: bet.id,
-        pick_type: bet.bet_type,
+      logAnalyticsEvent('bet_shared_to_chat', {
+        bet_id: bet.id,
+        bet_type: bet.bet_type,
         is_lock: bet.is_lock,
         league_id: bet.league_id,
         user_id: userId,

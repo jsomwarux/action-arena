@@ -4677,6 +4677,10 @@ export default function BetBoardScreen() {
   };
 
   const handleConfirm = async () => {
+    if (submitBets.isPending) {
+      return;
+    }
+
     try {
       await submitBets.mutateAsync(slipBets);
       setIsConfirmOpen(false);

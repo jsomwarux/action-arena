@@ -157,6 +157,7 @@ function LockedAnalyticsPreview({
           <View className="gap-2">
             <Button onPress={onGetPass} title="Get Season Pass" />
             <Button
+              icon="play-circle"
               onPress={onRewardedUnlock}
               title="Watch video to unlock stats"
               variant="secondary"

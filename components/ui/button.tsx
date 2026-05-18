@@ -1,8 +1,12 @@
+import type { ComponentProps } from 'react';
+
+import Ionicons from '@expo/vector-icons/Ionicons';
 import {
   ActivityIndicator,
   Pressable,
   type PressableProps,
   Text,
+  View,
   type ViewStyle,
 } from 'react-native';
 
@@ -13,6 +17,8 @@ type ButtonVariant = 'primary' | 'secondary' | 'destructive';
 
 type ButtonProps = PressableProps & {
   fullWidth?: boolean;
+  icon?: ComponentProps<typeof Ionicons>['name'];
+  iconColor?: string;
   loading?: boolean;
   title: string;
   variant?: ButtonVariant;
@@ -54,12 +60,16 @@ const glowStyles: Record<ButtonVariant, ViewStyle> = {
 export function Button({
   disabled,
   fullWidth = true,
+  icon,
+  iconColor,
   loading = false,
   title,
   variant = 'primary',
   ...rest
 }: ButtonProps) {
   const isDisabled = disabled || loading;
+  const contentColor =
+    iconColor ?? (variant === 'primary' ? THEME_COLORS.background : THEME_COLORS.textPrimary);
 
   return (
     <Pressable
@@ -84,14 +94,17 @@ export function Button({
           color={variant === 'primary' ? THEME_COLORS.background : THEME_COLORS.textPrimary}
         />
       ) : (
-        <Text
-          adjustsFontSizeToFit
-          className={cn('text-base font-black uppercase', textClasses[variant])}
-          minimumFontScale={0.78}
-          numberOfLines={1}
-          style={{ letterSpacing: 1.5 }}>
-          {title}
-        </Text>
+        <View className="flex-row items-center justify-center gap-2">
+          {icon ? <Ionicons color={contentColor} name={icon} size={18} /> : null}
+          <Text
+            adjustsFontSizeToFit
+            className={cn('shrink text-base font-black uppercase', textClasses[variant])}
+            minimumFontScale={0.78}
+            numberOfLines={1}
+            style={{ letterSpacing: 1.5 }}>
+            {title}
+          </Text>
+        </View>
       )}
     </Pressable>
   );

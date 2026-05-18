@@ -9,6 +9,17 @@ type SettlementSummary = {
   updated_legs: number;
 };
 
+type SettledBetAnalyticsRow = {
+  bet_legs?: { game_id: string }[];
+  bet_type: string;
+  id: string;
+  league_id: string;
+  profit: number | null;
+  result: string;
+  user_id: string;
+  week_number: number;
+};
+
 type SettlementDatabase = {
   public: {
     CompositeTypes: Record<string, never>;
@@ -157,6 +168,58 @@ function assertScoresPayload(payload: unknown): OddsApiScoreGame[] {
   });
 }
 
+async function logSettledBetAnalyticsEvents({
+  scores,
+  sportKey,
+  supabase,
+}: {
+  scores: OddsApiScoreGame[];
+  sportKey: string;
+  supabase: ReturnType<typeof createClient<SettlementDatabase>>;
+}) {
+  const completedGameIds = [
+    ...new Set(scores.filter((score) => score.completed).map((score) => score.id).filter(Boolean)),
+  ];
+
+  if (completedGameIds.length === 0) {
+    return 0;
+  }
+
+  const { data, error } = await supabase
+    .from('bets')
+    .select(
+      'id,user_id,league_id,week_number,bet_type,result,profit,bet_legs!inner(game_id)',
+    )
+    .in('bet_legs.game_id', completedGameIds)
+    .neq('result', 'pending')
+    .not('profit', 'is', null);
+
+  if (error) {
+    console.warn('Unable to load settled bet analytics rows', { error: error.message });
+    return 0;
+  }
+
+  const uniqueRows = new Map<string, SettledBetAnalyticsRow>();
+  (data as SettledBetAnalyticsRow[] | null)?.forEach((settledBet) => {
+    uniqueRows.set(settledBet.id, settledBet);
+  });
+
+  uniqueRows.forEach((settledBet) => {
+    console.info('[analytics]', 'bet_settled', {
+      bet_id: settledBet.id,
+      bet_type: settledBet.bet_type,
+      league_id: settledBet.league_id,
+      profit: settledBet.profit,
+      result: settledBet.result,
+      sportKey,
+      user_id: settledBet.user_id,
+      week_number: settledBet.week_number,
+    });
+  });
+
+  return uniqueRows.size;
+}
+
 async function fetchCompletedScores({
   daysFrom,
   oddsApiKey,
@@ -242,12 +305,21 @@ Deno.serve(async (request) => {
 
     const durationMs = Date.now() - startedAt;
     console.info('Completed pick settlement run', { durationMs, settlement: data });
-    console.info('[analytics]', 'pick_settled', {
-      durationMs,
-      result: 'summary',
-      settled_picks: data?.settled_bets ?? 0,
+    const analyticsEventsLogged = await logSettledBetAnalyticsEvents({
+      scores,
       sportKey,
+      supabase,
     });
+
+    if (analyticsEventsLogged === 0) {
+      console.info('[analytics]', 'bet_settled', {
+        durationMs,
+        profit: null,
+        result: 'summary',
+        settled_bets: data?.settled_bets ?? 0,
+        sportKey,
+      });
+    }
 
     return new Response(
       JSON.stringify({

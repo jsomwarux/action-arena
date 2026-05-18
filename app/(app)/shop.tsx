@@ -132,6 +132,7 @@ function ShopItemCard({
   item,
   loading,
   onEquip,
+  onPreview,
   onPurchase,
   owned,
   recentlyPurchased,
@@ -141,6 +142,7 @@ function ShopItemCard({
   item: CosmeticItem;
   loading: boolean;
   onEquip: (item: CosmeticItem) => void;
+  onPreview: (item: CosmeticItem) => void;
   onPurchase: (item: CosmeticItem) => void;
   owned: boolean;
   recentlyPurchased: boolean;
@@ -185,7 +187,13 @@ function ShopItemCard({
 
       <View className="items-center gap-3 px-5 pb-5 pt-5">
         <View>
-          <CosmeticPreview category={item.category} itemId={item.id} size="lg" />
+          <Pressable
+            accessibilityLabel={`Preview ${item.name}`}
+            accessibilityRole="button"
+            onPress={() => onPreview(item)}
+            style={({ pressed }) => ({ opacity: pressed ? 0.82 : 1 })}>
+            <CosmeticPreview category={item.category} itemId={item.id} size="lg" />
+          </Pressable>
           <PurchaseSparkle trigger={sparkleTrigger} />
         </View>
 
@@ -401,6 +409,17 @@ export default function ShopScreen() {
     }
   };
 
+  const onPreview = (item: CosmeticItem) => {
+    haptics.selection();
+    logAnalyticsEvent('shop_item_previewed', {
+      category: item.category,
+      coin_cost: item.cost,
+      item_id: item.id,
+      is_season_pass_exclusive: Boolean(item.seasonLabel),
+      user_id: user?.id,
+    });
+  };
+
   const ownedByItemId = cosmeticsQuery.data?.ownedByItemId ?? {};
   const equippedByCategory = cosmeticsQuery.data?.equippedByCategory ?? {};
   const canUseSeasonPassItem = Boolean(seasonPassQuery.data);
@@ -467,6 +486,7 @@ export default function ShopScreen() {
                 item={item}
                 loading={purchaseCosmetic.isPending || equipCosmetic.isPending}
                 onEquip={onEquip}
+                onPreview={onPreview}
                 onPurchase={onPurchase}
                 owned={Boolean(ownedByItemId[item.id])}
                 recentlyPurchased={recentPurchaseId === item.id}

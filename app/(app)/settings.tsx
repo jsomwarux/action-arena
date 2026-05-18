@@ -136,20 +136,24 @@ export default function SettingsScreen() {
   };
 
   const confirmLeaveLeague = (leagueId: string, leagueName: string) => {
-    Alert.alert('Leave league?', `You will leave ${leagueName}. Your historical picks remain visible.`, [
-      { style: 'cancel', text: 'Cancel' },
-      {
-        onPress: async () => {
-          try {
-            await leaveLeague.mutateAsync(leagueId);
-          } catch (error) {
-            Alert.alert('Could not leave league', error instanceof Error ? error.message : 'Try again.');
-          }
+    Alert.alert(
+      'Leave league?',
+      `Leaving ${leagueName} is permanent and cannot be undone. Your historical picks and past matchups remain visible to the league.`,
+      [
+        { style: 'cancel', text: 'Cancel' },
+        {
+          onPress: async () => {
+            try {
+              await leaveLeague.mutateAsync(leagueId);
+            } catch (error) {
+              Alert.alert('Could not leave league', error instanceof Error ? error.message : 'Try again.');
+            }
+          },
+          style: 'destructive',
+          text: 'Leave',
         },
-        style: 'destructive',
-        text: 'Leave',
-      },
-    ]);
+      ],
+    );
   };
 
   return (

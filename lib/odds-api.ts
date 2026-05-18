@@ -136,13 +136,28 @@ export async function fetchUpcomingNflOdds() {
   url.searchParams.set('oddsFormat', 'american');
   url.searchParams.set('dateFormat', 'iso');
 
-  const response = await fetch(url.toString());
-
-  if (!response.ok) {
-    throw new Error(`Lines request failed with status ${response.status}.`);
+  let response: Awaited<ReturnType<typeof fetch>>;
+  try {
+    response = await fetch(url.toString());
+  } catch {
+    throw new Error('Unable to load odds right now. Check your connection, then try again.');
   }
 
-  const data = (await response.json()) as OddsApiGame[];
+  if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('Unable to load odds. Check the Odds API key, then try again.');
+    }
+
+    throw new Error(`Unable to load odds right now. The Odds API returned status ${response.status}.`);
+  }
+
+  let data: OddsApiGame[];
+  try {
+    data = (await response.json()) as OddsApiGame[];
+  } catch {
+    throw new Error('Unable to load odds right now. The Odds API response could not be read.');
+  }
+
   return data
     .map(normalizeOddsApiGame)
     .filter((game) => new Date(game.commenceTime).getTime() > Date.now())

@@ -1508,10 +1508,11 @@ export function ProfileContent({
             </View>
             <Text
               className="mt-1 text-3xl font-extrabold text-white"
+              numberOfLines={1}
               style={{ letterSpacing: -0.5 }}>
               {title}
             </Text>
-            <Text className="mt-1.5 text-base font-medium text-white/60">
+            <Text className="mt-1.5 text-base font-medium text-white/60" numberOfLines={1}>
               {data.profile.display_name}
             </Text>
           </View>
