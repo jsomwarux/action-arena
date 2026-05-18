@@ -22,6 +22,7 @@ import {
   useUpdateNotificationPreferences,
 } from '@/hooks/use-notifications';
 import { useProfileData } from '@/hooks/use-profile-stats';
+import { useSeasonPass } from '@/hooks/use-season-pass';
 import { useUpdateUserProfile } from '@/hooks/use-user-profile';
 import { cn } from '@/lib/cn';
 import { formatLeagueType } from '@/lib/format';
@@ -89,6 +90,7 @@ export default function SettingsScreen() {
   });
   const leaguesQuery = useMyLeagues(user?.id);
   const preferencesQuery = useNotificationPreferences(user?.id);
+  const seasonPassQuery = useSeasonPass(user?.id);
   const updatePreferences = useUpdateNotificationPreferences(user?.id);
   const updateProfile = useUpdateUserProfile(user?.id);
   const leaveLeague = useLeaveLeagueMutation(user?.id);
@@ -102,7 +104,12 @@ export default function SettingsScreen() {
     }
   }, [profileQuery.data?.profile]);
 
-  const isLoading = profileQuery.isLoading || leaguesQuery.isLoading || preferencesQuery.isLoading;
+  const isLoading =
+    profileQuery.isLoading ||
+    leaguesQuery.isLoading ||
+    preferencesQuery.isLoading ||
+    seasonPassQuery.isLoading;
+  const hasSeasonPass = Boolean(seasonPassQuery.data);
 
   const saveProfile = async () => {
     if (!displayName.trim()) {
@@ -245,21 +252,27 @@ export default function SettingsScreen() {
 
             <Card tone="highlight">
               <View className="gap-3">
-                <View className="flex-row items-center gap-2">
-                  <Ionicons color={THEME_COLORS.gold} name="sparkles" size={14} />
-                  <Text
-                    className="text-[11px] font-semibold uppercase text-gold"
-                    style={{ letterSpacing: 1.2 }}>
-                    Premium
-                  </Text>
+                <View className="flex-row items-center justify-between gap-3">
+                  <View className="flex-row items-center gap-2">
+                    <Ionicons color={THEME_COLORS.gold} name="sparkles" size={14} />
+                    <Text
+                      className="text-[11px] font-semibold uppercase text-gold"
+                      style={{ letterSpacing: 1.2 }}>
+                      Premium
+                    </Text>
+                  </View>
+                  <Badge
+                    label={hasSeasonPass ? 'Pass Holder' : 'Available'}
+                    tone={hasSeasonPass ? 'green' : 'gold'}
+                  />
                 </View>
                 <Text
                   className="text-lg font-extrabold text-white"
                   style={{ letterSpacing: -0.2 }}>
-                  Action Arena Plus
+                  {hasSeasonPass ? 'Season Pass Active' : 'Action Arena Plus'}
                 </Text>
                 <Text className="text-sm font-medium text-white/60">
-                  Season Pass unlocks exclusive cosmetics, advanced analytics, early Pick Board access, and future ad-free hooks.
+                  Season Pass unlocks exclusive cosmetics, advanced analytics, early Bet Board access, and future ad-free hooks.
                 </Text>
                 <Button
                   onPress={() => router.push('/season-pass')}

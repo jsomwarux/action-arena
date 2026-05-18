@@ -1,9 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { RefreshControl, ScrollView, Text, View } from 'react-native';
 
-import { Badge, Card, ScreenWrapper, SkeletonLoader } from '@/components/ui';
+import { Badge, Button, Card, ScreenWrapper, SkeletonLoader } from '@/components/ui';
 import { CURRENT_SEASON_YEAR } from '@/constants/cosmetics';
 import { THEME_COLORS } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
@@ -17,9 +17,13 @@ import { useSeasonPass } from '@/hooks/use-season-pass';
 import { logAnalyticsEvent } from '@/lib/analytics';
 import { cn } from '@/lib/cn';
 import { formatProfit, getProfitTone } from '@/lib/format';
-import { haptics } from '@/lib/haptics';
 import { getPickLegBaseLabel } from '@/lib/pick-labels';
 import type { BetWithLegs } from '@/types/database';
+
+type WeeklyProfitPoint = {
+  profit: number;
+  week: number;
+};
 
 function StatCard({
   label,
@@ -40,110 +44,6 @@ function StatCard({
       <Text className={cn('mt-1 text-xl font-extrabold text-white', tone)} style={{ letterSpacing: -0.2 }}>
         {value}
       </Text>
-    </View>
-  );
-}
-
-function TeaseSparkline({ accent = THEME_COLORS.cyanAccent }: { accent?: string }) {
-  // A faux sparkline so the user sees the *shape* of the chart they're missing.
-  const heights = [16, 22, 18, 30, 26, 38, 34, 46, 40, 52, 48, 60];
-  const max = Math.max(...heights);
-  return (
-    <View className="flex-row items-end gap-1">
-      {heights.map((value, idx) => (
-        <View
-          key={idx}
-          className="flex-1 rounded-md"
-          style={{
-            backgroundColor: idx === heights.length - 1 ? accent : `${accent}55`,
-            height: 4 + (value / max) * 64,
-            opacity: 0.55,
-          }}
-        />
-      ))}
-    </View>
-  );
-}
-
-function GateOverlay({
-  body,
-  ctaLabel,
-  onUnlock,
-  onUpgrade,
-  rewardedDisabled,
-  variant = 'sparkline',
-}: {
-  body?: string;
-  ctaLabel?: string;
-  onUnlock: () => void;
-  onUpgrade: () => void;
-  rewardedDisabled?: boolean;
-  variant?: 'sparkline' | 'distribution';
-}) {
-  return (
-    <View className="absolute inset-0 overflow-hidden rounded-2xl">
-      <View className="flex-1 bg-arena-bg/85">
-        <View className="absolute inset-x-3 top-3 opacity-50">
-          {variant === 'sparkline' ? (
-            <TeaseSparkline accent={THEME_COLORS.cyanAccent} />
-          ) : (
-            <View className="flex-row gap-2">
-              {[0.4, 0.7, 0.55, 0.85].map((value, idx) => (
-                <View key={idx} className="h-2 flex-1 rounded-full bg-white/15">
-                  <View
-                    className="h-2 rounded-full bg-cyan-accent/55"
-                    style={{ width: `${value * 100}%` }}
-                  />
-                </View>
-              ))}
-            </View>
-          )}
-        </View>
-        <View className="flex-1 items-center justify-center gap-3 px-5">
-          <View className="h-12 w-12 items-center justify-center rounded-full border border-gold/55 bg-gold/15">
-            <Ionicons color={THEME_COLORS.gold} name="lock-closed" size={20} />
-          </View>
-          <Text className="text-center text-base font-extrabold text-white" style={{ letterSpacing: -0.2 }}>
-            See the shape, unlock the numbers
-          </Text>
-          <Text className="text-center text-xs font-medium leading-4 text-white/65">
-            {body ??
-              'Season Pass holders see the full breakdown. Or watch a short video to unlock this week’s stats free.'}
-          </Text>
-          <Pressable
-            accessibilityRole="button"
-            disabled={rewardedDisabled}
-            onPress={() => {
-              haptics.medium();
-              onUnlock();
-            }}
-            style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}>
-            <View
-              className="flex-row items-center gap-2 rounded-full border border-electric-green bg-electric-green/15 px-4 py-2"
-              style={{
-                shadowColor: THEME_COLORS.electricGreen,
-                shadowOffset: { width: 0, height: 0 },
-                shadowOpacity: 0.4,
-                shadowRadius: 10,
-              }}>
-              <Ionicons color={THEME_COLORS.electricGreen} name="play-circle" size={16} />
-              <Text className="text-xs font-bold text-electric-green">
-                {ctaLabel ?? 'Watch a short video'}
-              </Text>
-            </View>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => {
-              haptics.light();
-              onUpgrade();
-            }}>
-            <Text className="text-[11px] font-semibold text-gold underline">
-              Or unlock the full season with the Pass
-            </Text>
-          </Pressable>
-        </View>
-      </View>
     </View>
   );
 }
@@ -175,16 +75,138 @@ function teamSplits(bets: BetWithLegs[]) {
   };
 }
 
+function HiddenStatPill({ width = 72 }: { width?: number }) {
+  return (
+    <View
+      className="rounded-full border border-white/10 bg-white/[0.08]"
+      style={{ height: 18, width }}
+    />
+  );
+}
+
+function LockedAnalyticsPreview({
+  onGetPass,
+  onRewardedUnlock,
+}: {
+  onGetPass: () => void;
+  onRewardedUnlock: () => void;
+}) {
+  const previewBars = [42, 68, 55, 82, 63, 76];
+
+  return (
+    <View className="gap-4">
+      <Card tone="highlight">
+        <View className="gap-4">
+          <View className="flex-row items-center justify-between gap-3">
+            <View className="flex-1">
+              <Text
+                className="text-[11px] font-semibold uppercase text-gold"
+                style={{ letterSpacing: 1.2 }}>
+                Advanced Stats Locked
+              </Text>
+              <Text className="mt-1 text-lg font-extrabold text-white">
+                The shape is here. The numbers stay hidden.
+              </Text>
+              <Text className="mt-1 text-sm font-medium leading-5 text-white/55">
+                Season Pass unlocks the full analytics dashboard. A rewarded-video placeholder can unlock this view immediately for testing.
+              </Text>
+            </View>
+            <Badge label="Pass Only" tone="gold" />
+          </View>
+
+          <View className="gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.04] p-3">
+            <View className="flex-row gap-3">
+              <View className="flex-1 rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+                <Text className="text-[10px] font-semibold uppercase text-white/40">
+                  Win Rate
+                </Text>
+                <View className="mt-2 opacity-55">
+                  <HiddenStatPill width={84} />
+                </View>
+              </View>
+              <View className="flex-1 rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+                <Text className="text-[10px] font-semibold uppercase text-white/40">
+                  ROI
+                </Text>
+                <View className="mt-2 opacity-55">
+                  <HiddenStatPill width={64} />
+                </View>
+              </View>
+            </View>
+
+            <View className="flex-row items-end gap-2 opacity-45">
+              {previewBars.map((height, index) => (
+                <View className="flex-1 items-center gap-1.5" key={index}>
+                  <View
+                    className="w-full rounded-t-lg bg-cyan-accent"
+                    style={{ height }}
+                  />
+                  <View className="h-2 w-7 rounded-full bg-white/15" />
+                </View>
+              ))}
+            </View>
+
+            {(['straight', 'parlay', 'teaser'] as const).map((type) => (
+              <View className="flex-row items-center justify-between" key={type}>
+                <Badge betType={type} />
+                <HiddenStatPill />
+              </View>
+            ))}
+          </View>
+
+          <View className="gap-2">
+            <Button onPress={onGetPass} title="Get Season Pass" />
+            <Button
+              onPress={onRewardedUnlock}
+              title="Watch video to unlock stats"
+              variant="secondary"
+            />
+          </View>
+        </View>
+      </Card>
+    </View>
+  );
+}
+
+function ProfitTrendChart({ points }: { points: WeeklyProfitPoint[] }) {
+  if (points.length === 0) {
+    return null;
+  }
+
+  const maxMagnitude = Math.max(
+    1,
+    ...points.map((point) => Math.abs(point.profit)),
+  );
+
+  return (
+    <View className="flex-row items-end gap-2 rounded-2xl border border-cyan-accent/25 bg-cyan-accent/[0.06] p-3">
+      {points.map((point) => {
+        const positive = point.profit >= 0;
+        const height = 12 + (Math.abs(point.profit) / maxMagnitude) * 68;
+
+        return (
+          <View className="flex-1 items-center gap-1.5" key={point.week}>
+            <View
+              className={cn('w-full rounded-t-lg', positive ? 'bg-electric-green' : 'bg-coral-red')}
+              style={{ height }}
+            />
+            <Text className="text-[10px] font-bold text-white/45">W{point.week}</Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 export default function AnalyticsScreen() {
   const { user } = useAuth();
   const router = useRouter();
-  const [rewardedUnlocked, setRewardedUnlocked] = useState(false);
+  const [rewardedUnlock, setRewardedUnlock] = useState(false);
   const profileQuery = useProfileData({
     targetUserId: user?.id,
     viewerUserId: user?.id,
   });
   const seasonPassQuery = useSeasonPass(user?.id, CURRENT_SEASON_YEAR);
-  const hasAccess = Boolean(seasonPassQuery.data) || rewardedUnlocked;
 
   useEffect(() => {
     logAnalyticsEvent('profile_viewed', {
@@ -206,14 +228,32 @@ export default function AnalyticsScreen() {
     [profileQuery.data?.bets],
   );
   const teams = useMemo(() => teamSplits(profileQuery.data?.bets ?? []), [profileQuery.data?.bets]);
+  const hasSeasonPass = Boolean(seasonPassQuery.data);
+  const hasAnalyticsAccess = hasSeasonPass || rewardedUnlock;
+  const parlayBreakdown = useMemo(
+    () => betTypeBreakdowns.find((breakdown) => breakdown.type === 'parlay') ?? null,
+    [betTypeBreakdowns],
+  );
 
-  const unlockRewarded = () => {
-    setRewardedUnlocked(true);
+  const unlockWithRewardedVideo = () => {
+    setRewardedUnlock(true);
     logAnalyticsEvent('rewarded_unlock_triggered', {
-      feature: 'advanced_analytics',
+      placement: 'advanced_analytics',
       user_id: user?.id,
     });
   };
+
+  if (seasonPassQuery.isLoading) {
+    return (
+      <ScreenWrapper className="pb-0">
+        <View className="gap-3">
+          {[0, 1, 2].map((item) => (
+            <SkeletonLoader height={150} key={item} />
+          ))}
+        </View>
+      </ScreenWrapper>
+    );
+  }
 
   return (
     <ScreenWrapper className="pb-0">
@@ -244,9 +284,28 @@ export default function AnalyticsScreen() {
           <Text className="mt-1 text-sm font-medium text-white/55">
             Deep stat views are a Season Pass perk. Core gameplay stays free.
           </Text>
+          <View className="mt-3">
+            <Badge
+              label={
+                hasSeasonPass
+                  ? 'Season Pass Holder'
+                  : rewardedUnlock
+                    ? 'Video Unlock Active'
+                    : 'Preview Locked'
+              }
+              tone={hasAnalyticsAccess ? 'green' : 'gold'}
+            />
+          </View>
         </View>
 
-        {profileQuery.isLoading ? (
+        {!hasAnalyticsAccess ? (
+          <LockedAnalyticsPreview
+            onGetPass={() => router.push('/season-pass')}
+            onRewardedUnlock={unlockWithRewardedVideo}
+          />
+        ) : null}
+
+        {hasAnalyticsAccess && profileQuery.isLoading ? (
           <View className="gap-3">
             {[0, 1, 2].map((item) => (
               <SkeletonLoader height={150} key={item} />
@@ -254,7 +313,7 @@ export default function AnalyticsScreen() {
           </View>
         ) : null}
 
-        {summary ? (
+        {hasAnalyticsAccess && summary ? (
           <View className="gap-4">
             <View>
               <Card>
@@ -268,11 +327,7 @@ export default function AnalyticsScreen() {
                         Overview
                       </Text>
                     </View>
-                    {hasAccess ? (
-                      <Badge label="Unlocked" tone="green" />
-                    ) : (
-                      <Badge label="Preview" tone="gold" />
-                    )}
+                    <Badge label="Unlocked" tone="green" />
                   </View>
                   <View className="flex-row gap-3">
                     <StatCard label="Win Rate" value={`${summary.stats.winRate.toFixed(1)}%`} />
@@ -290,15 +345,19 @@ export default function AnalyticsScreen() {
                     />
                     <StatCard label="Current Streak" value={summary.stats.currentStreak} />
                   </View>
+                  <View className="flex-row gap-3">
+                    <StatCard
+                      label="Parlay Hit Rate"
+                      tone="text-amber-accent"
+                      value={parlayBreakdown ? `${parlayBreakdown.hitRate.toFixed(1)}%` : '0.0%'}
+                    />
+                    <StatCard
+                      label="Parlay Record"
+                      tone="text-amber-accent"
+                      value={parlayBreakdown?.record ?? '0-0-0'}
+                    />
+                  </View>
                 </View>
-                {!hasAccess ? (
-                  <GateOverlay
-                    body="Season Pass holders see win rate, ROI, average profit, and the streak you're riding. Or watch a short video to unlock this week's stats free."
-                    onUnlock={unlockRewarded}
-                    onUpgrade={() => router.push('/season-pass')}
-                    variant="distribution"
-                  />
-                ) : null}
               </Card>
             </View>
 
@@ -336,6 +395,9 @@ export default function AnalyticsScreen() {
                       Weekly Profit Trend
                     </Text>
                   </View>
+                  {summary.weeklyProfits.length > 0 ? (
+                    <ProfitTrendChart points={summary.weeklyProfits} />
+                  ) : null}
                   {summary.weeklyProfits.length === 0 ? (
                     <Text className="text-sm font-medium text-white/55">
                       Settled weeks will appear here.
@@ -356,14 +418,6 @@ export default function AnalyticsScreen() {
                   )}
                 </View>
               </Card>
-              {!hasAccess ? (
-                <GateOverlay
-                  body="Watch a short video to unlock this week's stats — or grab the Season Pass to keep them all year."
-                  onUnlock={unlockRewarded}
-                  onUpgrade={() => router.push('/season-pass')}
-                  variant="sparkline"
-                />
-              ) : null}
             </View>
 
             <Card>
@@ -424,16 +478,16 @@ export default function AnalyticsScreen() {
                   </View>
                 </View>
               </Card>
-              {!hasAccess ? (
-                <GateOverlay
-                  body="Free users see the labels — Pass holders see the actual team names and win rates."
-                  onUnlock={unlockRewarded}
-                  onUpgrade={() => router.push('/season-pass')}
-                  variant="distribution"
-                />
-              ) : null}
             </View>
           </View>
+        ) : null}
+
+        {hasAnalyticsAccess && !profileQuery.isLoading && !summary ? (
+          <Card>
+            <Text className="text-base font-semibold text-white/55">
+              Analytics will appear once your first league card is settled.
+            </Text>
+          </Card>
         ) : null}
       </ScrollView>
     </ScreenWrapper>

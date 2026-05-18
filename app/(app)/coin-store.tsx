@@ -177,6 +177,185 @@ function PackHero({ accent, icon, plateSize }: { accent: string; icon: React.Com
   );
 }
 
+function PackCardBanner({ accent, tagline }: { accent: string; tagline: string }) {
+  return (
+    <View
+      className="flex-row items-center justify-center gap-1.5 border-b px-3 py-1.5"
+      style={{
+        backgroundColor: `${accent}26`,
+        borderColor: `${accent}66`,
+      }}>
+      <Ionicons color={accent} name="star" size={11} />
+      <Text
+        className="text-[10px] font-black uppercase"
+        style={{ color: accent, letterSpacing: 1.6 }}
+        numberOfLines={1}>
+        {tagline}
+      </Text>
+    </View>
+  );
+}
+
+function PriceBlock({
+  accent,
+  alignment,
+  isFeatured,
+  priceLabel,
+}: {
+  accent: string;
+  alignment: 'end' | 'center';
+  isFeatured: boolean;
+  priceLabel: string;
+}) {
+  return (
+    <View className={cn('gap-2', alignment === 'center' ? 'items-center' : 'items-end')}>
+      <View
+        className="rounded-2xl border px-3 py-2"
+        style={{
+          backgroundColor: `${accent}26`,
+          borderColor: accent,
+          shadowColor: accent,
+          shadowOffset: { width: 0, height: 0 },
+          shadowOpacity: 0.45,
+          shadowRadius: 8,
+        }}>
+        <Text
+          className={cn('font-extrabold text-white', isFeatured ? 'text-lg' : 'text-base')}
+          numberOfLines={1}>
+          {priceLabel}
+        </Text>
+      </View>
+      <Text
+        className="text-[10px] font-semibold uppercase"
+        style={{ color: accent, letterSpacing: 1 }}>
+        Tap to buy
+      </Text>
+    </View>
+  );
+}
+
+function CompactPackCard({
+  accent,
+  bonus,
+  isFeatured,
+  meta,
+  pack,
+}: {
+  accent: string;
+  bonus: string;
+  isFeatured: boolean;
+  meta: (typeof TIER_META)[Tier];
+  pack: CoinPack;
+}) {
+  return (
+    <View className="flex-row items-center gap-3 p-4">
+      <PackHero accent={accent} icon={meta.icon} plateSize={meta.plateSize} />
+      <View className="flex-1 gap-1.5" style={{ minWidth: 0 }}>
+        <Text
+          className="text-[11px] font-semibold uppercase"
+          style={{ color: accent, letterSpacing: 1 }}
+          numberOfLines={2}>
+          {pack.label}
+        </Text>
+        <View className="flex-row items-baseline gap-1.5">
+          <Text
+            adjustsFontSizeToFit
+            className="text-3xl font-extrabold text-white"
+            minimumFontScale={0.7}
+            numberOfLines={1}
+            style={{ letterSpacing: -0.6 }}>
+            {pack.coins.toLocaleString()}
+          </Text>
+          <Text
+            className="text-xs font-bold"
+            style={{ color: `${accent}cc`, letterSpacing: 0.3 }}>
+            coins
+          </Text>
+        </View>
+        <Text className="text-xs font-medium leading-4 text-white/55" numberOfLines={2}>
+          {meta.subtitle}
+        </Text>
+        <View className="mt-1 flex-row items-center gap-2">
+          <View
+            className="self-start rounded-full border px-2.5 py-0.5"
+            style={{
+              backgroundColor: `${accent}22`,
+              borderColor: `${accent}66`,
+            }}>
+            <Text
+              className="text-[10px] font-bold"
+              numberOfLines={1}
+              style={{ color: accent, letterSpacing: 0.4 }}>
+              {bonus}
+            </Text>
+          </View>
+        </View>
+      </View>
+      <PriceBlock accent={accent} alignment="end" isFeatured={isFeatured} priceLabel={pack.priceLabel} />
+    </View>
+  );
+}
+
+function FeaturedPackCard({
+  accent,
+  bonus,
+  meta,
+  pack,
+}: {
+  accent: string;
+  bonus: string;
+  meta: (typeof TIER_META)[Tier];
+  pack: CoinPack;
+}) {
+  return (
+    <View className="items-center gap-3 p-5">
+      <PackHero accent={accent} icon={meta.icon} plateSize={meta.plateSize} />
+      <Text
+        className="text-center text-xs font-semibold uppercase"
+        style={{ color: accent, letterSpacing: 1.2 }}
+        numberOfLines={2}>
+        {pack.label}
+      </Text>
+      <View className="flex-row items-baseline gap-2">
+        <Text
+          adjustsFontSizeToFit
+          className="text-4xl font-extrabold text-white"
+          minimumFontScale={0.7}
+          numberOfLines={1}
+          style={{ letterSpacing: -0.6 }}>
+          {pack.coins.toLocaleString()}
+        </Text>
+        <Text
+          className="text-sm font-bold"
+          style={{ color: `${accent}cc`, letterSpacing: 0.3 }}>
+          coins
+        </Text>
+      </View>
+      <Text
+        className="text-center text-xs font-medium leading-5 text-white/65"
+        numberOfLines={3}>
+        {meta.subtitle}
+      </Text>
+      <View
+        className="self-center rounded-full border px-3 py-1"
+        style={{
+          backgroundColor: `${accent}22`,
+          borderColor: `${accent}66`,
+        }}>
+        <Text
+          className="text-[11px] font-bold"
+          numberOfLines={1}
+          style={{ color: accent, letterSpacing: 0.4 }}>
+          {bonus}
+        </Text>
+      </View>
+      <View className="mt-1 items-center">
+        <PriceBlock accent={accent} alignment="center" isFeatured priceLabel={pack.priceLabel} />
+      </View>
+    </View>
+  );
+}
+
 function PackCard({
   isFeatured,
   pack,
@@ -201,81 +380,18 @@ function PackCard({
           shadowOpacity: isFeatured ? 0.55 : 0.3,
           shadowRadius: isFeatured ? 22 : 14,
         }}>
+        {isFeatured ? <PackCardBanner accent={meta.accent} tagline={meta.tagline} /> : null}
         {isFeatured ? (
-          <View
-            className="flex-row items-center justify-center gap-1.5 border-b px-3 py-1.5"
-            style={{
-              backgroundColor: `${meta.accent}26`,
-              borderColor: `${meta.accent}66`,
-            }}>
-            <Ionicons color={meta.accent} name="star" size={11} />
-            <Text
-              className="text-[10px] font-black uppercase"
-              style={{ color: meta.accent, letterSpacing: 1.6 }}>
-              {meta.tagline}
-            </Text>
-          </View>
-        ) : null}
-        <View className="flex-row items-center gap-3 p-4">
-          <PackHero accent={meta.accent} icon={meta.icon} plateSize={meta.plateSize} />
-          <View className="flex-1 gap-1.5">
-            <Text
-              className="text-[11px] font-semibold uppercase"
-              style={{ color: meta.accent, letterSpacing: 1 }}>
-              {pack.label}
-            </Text>
-            <View className="flex-row items-baseline gap-1.5">
-              <Text
-                className="text-3xl font-extrabold text-white"
-                style={{ letterSpacing: -0.6 }}>
-                {pack.coins.toLocaleString()}
-              </Text>
-              <Text
-                className="text-xs font-bold"
-                style={{ color: `${meta.accent}cc`, letterSpacing: 0.3 }}>
-                coins
-              </Text>
-            </View>
-            <Text className="text-xs font-medium leading-4 text-white/55" numberOfLines={2}>
-              {meta.subtitle}
-            </Text>
-            <View className="mt-1 flex-row items-center gap-2">
-              <View
-                className="rounded-full border px-2.5 py-0.5"
-                style={{
-                  backgroundColor: `${meta.accent}22`,
-                  borderColor: `${meta.accent}66`,
-                }}>
-                <Text
-                  className="text-[10px] font-bold"
-                  style={{ color: meta.accent, letterSpacing: 0.4 }}>
-                  {meta.bonus}
-                </Text>
-              </View>
-            </View>
-          </View>
-          <View className="items-end gap-2">
-            <View
-              className="rounded-2xl border px-3 py-2"
-              style={{
-                backgroundColor: `${meta.accent}26`,
-                borderColor: meta.accent,
-                shadowColor: meta.accent,
-                shadowOffset: { width: 0, height: 0 },
-                shadowOpacity: 0.45,
-                shadowRadius: 8,
-              }}>
-              <Text className={cn('font-extrabold text-white', isFeatured ? 'text-lg' : 'text-base')}>
-                {pack.priceLabel}
-              </Text>
-            </View>
-            <Text
-              className="text-[10px] font-semibold uppercase"
-              style={{ color: meta.accent, letterSpacing: 1 }}>
-              Tap to buy
-            </Text>
-          </View>
-        </View>
+          <FeaturedPackCard accent={meta.accent} bonus={meta.bonus} meta={meta} pack={pack} />
+        ) : (
+          <CompactPackCard
+            accent={meta.accent}
+            bonus={meta.bonus}
+            isFeatured={isFeatured}
+            meta={meta}
+            pack={pack}
+          />
+        )}
       </View>
     </PressableScale>
   );

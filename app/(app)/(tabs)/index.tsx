@@ -862,7 +862,7 @@ export default function HomeScreen() {
   const cards = dashboardQuery.data?.cards ?? [];
 
   return (
-    <ScreenWrapper className="pb-0">
+    <ScreenWrapper className="pb-0" topSafe>
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ gap: 22, paddingBottom: 32 }}

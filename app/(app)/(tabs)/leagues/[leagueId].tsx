@@ -70,6 +70,7 @@ import { formatBetLegLabel, formatPickTitle, getPickLogoLabel } from '@/lib/pick
 import type {
   BetMarket,
   BetType,
+  ChampionshipSummary,
   EquippedCosmeticsByCategory,
   Json,
   LeagueVisibility,
@@ -178,6 +179,50 @@ function isBetMarket(value: string): value is BetMarket {
   return value === 'moneyline' || value === 'spread' || value === 'over_under';
 }
 
+function isBetType(value: string): value is BetType {
+  return value === 'straight' || value === 'parlay' || value === 'teaser';
+}
+
+function isSeasonAwardBetLeg(value: Json) {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const leg = value as Record<string, Json | undefined>;
+
+  return (
+    typeof leg.game_id === 'string' &&
+    typeof leg.market === 'string' &&
+    isBetMarket(leg.market) &&
+    typeof leg.selection === 'string' &&
+    (typeof leg.original_line === 'number' || leg.original_line === null) &&
+    (typeof leg.adjusted_line === 'number' || leg.adjusted_line === null) &&
+    typeof leg.leg_odds === 'number'
+  );
+}
+
+function isSeasonAwardBet(value: Json) {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const bet = value as Record<string, Json | undefined>;
+
+  return (
+    typeof bet.id === 'string' &&
+    typeof bet.week_number === 'number' &&
+    typeof bet.bet_type === 'string' &&
+    isBetType(bet.bet_type) &&
+    typeof bet.amount === 'number' &&
+    typeof bet.odds === 'number' &&
+    typeof bet.potential_payout === 'number' &&
+    (typeof bet.profit === 'number' || bet.profit === null) &&
+    typeof bet.is_lock === 'boolean' &&
+    Array.isArray(bet.legs) &&
+    bet.legs.every(isSeasonAwardBetLeg)
+  );
+}
+
 function isSharedBetMetadata(value: Json): value is SharedBetMetadata {
   if (!isRecord(value)) {
     return false;
@@ -207,12 +252,17 @@ function isSeasonAward(value: Json): value is SeasonAward {
     return false;
   }
 
+  const award = value as Record<string, Json | undefined>;
+
   return (
-    typeof value.award_key === 'string' &&
-    typeof value.award_label === 'string' &&
-    (typeof value.user_id === 'string' || value.user_id === null) &&
-    (typeof value.metric === 'number' || value.metric === null) &&
-    (typeof value.value_label === 'string' || value.value_label === null)
+    typeof award.award_key === 'string' &&
+    typeof award.award_label === 'string' &&
+    (typeof award.user_id === 'string' || award.user_id === null) &&
+    (typeof award.metric === 'number' || award.metric === null) &&
+    (typeof award.value_label === 'string' || award.value_label === null) &&
+    (award.bet_id === undefined || typeof award.bet_id === 'string') &&
+    (award.is_lock === undefined || typeof award.is_lock === 'boolean') &&
+    (award.bet === undefined || award.bet === null || isSeasonAwardBet(award.bet))
   );
 }
 
@@ -222,6 +272,69 @@ function seasonAwardsFromJson(value: Json): SeasonAward[] {
   }
 
   return value.filter(isSeasonAward);
+}
+
+function championshipSummaryFromJson(value: Json | null): ChampionshipSummary | null {
+  if (!value || !isRecord(value)) {
+    return null;
+  }
+
+  const record = value as Record<string, Json | undefined>;
+  if (
+    typeof record.week_number !== 'number' ||
+    typeof record.champion_user_id !== 'string'
+  ) {
+    return null;
+  }
+
+  return {
+    champion_profit:
+      typeof record.champion_profit === 'number' ? record.champion_profit : null,
+    champion_user_id: record.champion_user_id,
+    opponent_profit:
+      typeof record.opponent_profit === 'number' ? record.opponent_profit : null,
+    opponent_user_id:
+      typeof record.opponent_user_id === 'string' ? record.opponent_user_id : null,
+    week_number: record.week_number,
+  };
+}
+
+type ChampionRecord = {
+  losses: number;
+  total_profit: number;
+  ties: number;
+  wins: number;
+};
+
+function findChampionRecord(
+  standings: Json,
+  championUserId: string | null,
+): ChampionRecord | null {
+  if (!championUserId || !Array.isArray(standings)) {
+    return null;
+  }
+
+  for (const entry of standings) {
+    if (!isRecord(entry)) continue;
+    const row = entry as Record<string, Json | undefined>;
+    if (row.user_id !== championUserId) continue;
+    if (
+      typeof row.wins !== 'number' ||
+      typeof row.losses !== 'number' ||
+      typeof row.ties !== 'number' ||
+      typeof row.total_profit !== 'number'
+    ) {
+      return null;
+    }
+    return {
+      losses: row.losses,
+      total_profit: row.total_profit,
+      ties: row.ties,
+      wins: row.wins,
+    };
+  }
+
+  return null;
 }
 
 function betTypeAccent(type: BetType) {
@@ -817,27 +930,97 @@ function seasonAwardIcon(key: SeasonAward['award_key']): React.ComponentProps<ty
   return 'flash';
 }
 
+type AwardPalette = {
+  hexColor: string;
+  iconRingClass: string;
+  labelClass: string;
+};
+
+function getAwardPalette(key: SeasonAward['award_key']): AwardPalette {
+  if (key === 'best_record') {
+    return {
+      hexColor: THEME_COLORS.electricGreen,
+      iconRingClass: 'border-electric-green/45 bg-electric-green/12',
+      labelClass: 'text-electric-green',
+    };
+  }
+  if (key === 'parlay_king') {
+    return {
+      hexColor: THEME_COLORS.amberAccent,
+      iconRingClass: 'border-amber-accent/45 bg-amber-accent/12',
+      labelClass: 'text-amber-accent',
+    };
+  }
+  if (key === 'most_consistent') {
+    return {
+      hexColor: THEME_COLORS.cyanAccent,
+      iconRingClass: 'border-cyan-accent/45 bg-cyan-accent/12',
+      labelClass: 'text-cyan-accent',
+    };
+  }
+  return {
+    hexColor: THEME_COLORS.gold,
+    iconRingClass: 'border-gold/45 bg-gold/15',
+    labelClass: 'text-gold',
+  };
+}
+
+function getSeasonAwardValueLabel(award: SeasonAward) {
+  if (
+    (award.award_key === 'season_mvp' || award.award_key === 'biggest_single_bet') &&
+    typeof award.metric === 'number'
+  ) {
+    return formatProfit(award.metric);
+  }
+
+  return award.value_label;
+}
+
 function ChampionBanner({
   championName,
+  championRecord,
+  championshipResult,
   cosmetics,
+  leagueType,
   seasonYear,
 }: {
   championName: string;
+  championRecord: ChampionRecord | null;
+  championshipResult: {
+    championProfit: number | null;
+    opponentName: string;
+    opponentProfit: number | null;
+    weekNumber: number;
+  } | null;
   cosmetics?: EquippedCosmeticsByCategory;
+  leagueType: 'h2h' | 'cumulative';
   seasonYear: number;
 }) {
+  const hasScores =
+    championshipResult !== null &&
+    championshipResult.championProfit !== null &&
+    championshipResult.opponentProfit !== null;
+
   return (
     <View
-      className="overflow-hidden rounded-2xl border border-gold bg-gold/[0.12]"
+      className="overflow-hidden rounded-3xl border-2 border-gold bg-gold/[0.14]"
       style={{
-        borderWidth: 2,
         shadowColor: THEME_COLORS.gold,
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.55,
-        shadowRadius: 22,
+        shadowOffset: { width: 0, height: 14 },
+        shadowOpacity: 0.65,
+        shadowRadius: 28,
       }}>
-      <View className="items-center gap-3 px-5 py-6">
-        <TrophySkinIcon cosmetics={cosmetics} size={30} />
+      <View className="items-center gap-4 px-5 pt-7 pb-6">
+        <View
+          className="h-16 w-16 items-center justify-center rounded-3xl border-2 border-gold/70 bg-gold/20"
+          style={{
+            shadowColor: THEME_COLORS.gold,
+            shadowOffset: { width: 0, height: 0 },
+            shadowOpacity: 0.6,
+            shadowRadius: 14,
+          }}>
+          <TrophySkinIcon cosmetics={cosmetics} size={32} />
+        </View>
         <View className="items-center gap-1">
           <Text
             className="text-[10px] font-black uppercase text-gold"
@@ -845,13 +1028,90 @@ function ChampionBanner({
             {seasonYear} Champion
           </Text>
           <Text
-            className="text-3xl font-black uppercase text-white"
-            numberOfLines={1}
+            className="text-center text-3xl font-black uppercase text-white"
+            numberOfLines={2}
             style={{ letterSpacing: -0.4 }}>
             {championName}
           </Text>
         </View>
       </View>
+
+      {(championshipResult || championRecord) && (
+        <View className="border-t border-gold/30 bg-arena-bg/60 px-5 py-4">
+          {championshipResult ? (
+            <View className="items-center gap-2">
+              <Text
+                className="text-[10px] font-black uppercase text-gold/85"
+                style={{ letterSpacing: 2.4 }}>
+                Championship · Week {championshipResult.weekNumber}
+              </Text>
+              {hasScores ? (
+                <View className="flex-row items-end justify-center gap-3">
+                  <Text
+                    className={cn(
+                      'text-2xl font-black',
+                      getProfitTone(championshipResult.championProfit ?? 0),
+                    )}>
+                    {formatProfit(championshipResult.championProfit ?? 0)}
+                  </Text>
+                  <Text className="pb-0.5 text-xs font-black uppercase tracking-widest text-white/55">
+                    vs
+                  </Text>
+                  <Text
+                    className={cn(
+                      'text-2xl font-black',
+                      getProfitTone(championshipResult.opponentProfit ?? 0),
+                    )}>
+                    {formatProfit(championshipResult.opponentProfit ?? 0)}
+                  </Text>
+                </View>
+              ) : null}
+              <Text className="text-xs font-semibold text-white/65" numberOfLines={1}>
+                Defeated {championshipResult.opponentName}
+              </Text>
+            </View>
+          ) : null}
+
+          {championRecord ? (
+            <View
+              className={cn(
+                'flex-row items-center justify-center gap-4',
+                championshipResult ? 'mt-3 border-t border-white/10 pt-3' : null,
+              )}>
+              {leagueType === 'h2h' ? (
+                <View className="items-center">
+                  <Text
+                    className="text-[9px] font-black uppercase text-white/55"
+                    style={{ letterSpacing: 1.6 }}>
+                    Record
+                  </Text>
+                  <Text className="mt-0.5 text-base font-black text-white">
+                    {formatRecord(
+                      championRecord.wins,
+                      championRecord.losses,
+                      championRecord.ties,
+                    )}
+                  </Text>
+                </View>
+              ) : null}
+              <View className="items-center">
+                <Text
+                  className="text-[9px] font-black uppercase text-white/55"
+                  style={{ letterSpacing: 1.6 }}>
+                  Season Profit
+                </Text>
+                <Text
+                  className={cn(
+                    'mt-0.5 text-base font-black',
+                    getProfitTone(championRecord.total_profit),
+                  )}>
+                  {formatProfit(championRecord.total_profit)}
+                </Text>
+              </View>
+            </View>
+          ) : null}
+        </View>
+      )}
     </View>
   );
 }
@@ -865,6 +1125,8 @@ function MvpAwardCard({
   cosmetics?: EquippedCosmeticsByCategory;
   winnerName: string;
 }) {
+  const valueLabel = getSeasonAwardValueLabel(award);
+
   return (
     <View
       className="overflow-hidden rounded-2xl border border-gold/65 bg-gold/[0.10]"
@@ -897,8 +1159,8 @@ function MvpAwardCard({
             style={{ letterSpacing: -0.4 }}>
             {winnerName}
           </Text>
-          {award.value_label ? (
-            <Text className="text-xs font-semibold text-white/65">{award.value_label}</Text>
+          {valueLabel ? (
+            <Text className="text-xs font-semibold text-white/65">{valueLabel}</Text>
           ) : null}
         </View>
       </View>
@@ -908,24 +1170,25 @@ function MvpAwardCard({
 
 function SeasonAwardCard({
   award,
-  cosmetics,
   winnerName,
 }: {
   award: SeasonAward;
-  cosmetics?: EquippedCosmeticsByCategory;
   winnerName: string;
 }) {
+  const valueLabel = getSeasonAwardValueLabel(award);
+  const palette = getAwardPalette(award.award_key);
+
   return (
-    <View className="flex-1 rounded-2xl border border-gold/30 bg-gold/[0.06] p-3">
-      {award.award_key === 'season_mvp' || award.award_key === 'best_record' ? (
-        <TrophySkinIcon cosmetics={cosmetics} size={16} />
-      ) : (
-        <View className="h-9 w-9 items-center justify-center rounded-2xl border border-gold/45 bg-gold/15">
-          <Ionicons color={THEME_COLORS.gold} name={seasonAwardIcon(award.award_key)} size={16} />
-        </View>
-      )}
+    <View className="flex-1 rounded-2xl border border-white/12 bg-white/[0.04] p-3">
+      <View
+        className={cn(
+          'h-9 w-9 items-center justify-center rounded-2xl border',
+          palette.iconRingClass,
+        )}>
+        <Ionicons color={palette.hexColor} name={seasonAwardIcon(award.award_key)} size={16} />
+      </View>
       <Text
-        className="mt-2 text-[10px] font-black uppercase text-gold"
+        className={cn('mt-2 text-[10px] font-black uppercase', palette.labelClass)}
         style={{ letterSpacing: 1.5 }}
         numberOfLines={2}>
         {award.award_label}
@@ -936,10 +1199,82 @@ function SeasonAwardCard({
         style={{ letterSpacing: -0.2 }}>
         {winnerName}
       </Text>
-      {award.value_label ? (
+      {valueLabel ? (
         <Text className="mt-0.5 text-[11px] font-semibold text-white/55" numberOfLines={1}>
-          {award.value_label}
+          {valueLabel}
         </Text>
+      ) : null}
+    </View>
+  );
+}
+
+function BiggestSingleBetAwardCard({
+  award,
+  winnerName,
+}: {
+  award: SeasonAward;
+  winnerName: string;
+}) {
+  const bet = award.bet ?? null;
+  const valueLabel = getSeasonAwardValueLabel(award);
+  const betLabel = bet
+    ? bet.bet_type === 'straight'
+      ? titleCaseBetType(bet.bet_type)
+      : `${bet.legs.length}-Leg ${titleCaseBetType(bet.bet_type)}`
+    : 'Bet details unavailable';
+
+  return (
+    <View className="rounded-2xl border border-white/12 bg-white/[0.04] p-4">
+      <View className="flex-row items-start gap-3">
+        <View className="h-10 w-10 items-center justify-center rounded-2xl border border-amber-accent/45 bg-amber-accent/12">
+          <Ionicons color={THEME_COLORS.amberAccent} name="flash" size={18} />
+        </View>
+        <View className="flex-1 gap-1">
+          <Text
+            className="text-[10px] font-black uppercase text-amber-accent"
+            style={{ letterSpacing: 1.6 }}>
+            {award.award_label}
+          </Text>
+          <Text
+            className="text-base font-black text-white"
+            numberOfLines={1}
+            style={{ letterSpacing: -0.2 }}>
+            {winnerName}
+          </Text>
+          {valueLabel ? (
+            <Text className="text-xs font-semibold text-white/60">{valueLabel}</Text>
+          ) : null}
+        </View>
+      </View>
+
+      {bet ? (
+        <View className="mt-4 gap-3">
+          <View className="flex-row flex-wrap gap-2">
+            <Badge label={`Week ${bet.week_number}`} tone="cyan" />
+            <Badge betType={bet.bet_type} label={betLabel} />
+            <Badge betType={bet.bet_type} label={formatAmericanOdds(bet.odds)} />
+            {bet.is_lock ? <Badge label="Lock of the Week" tone="gold" /> : null}
+          </View>
+          {bet.is_lock ? (
+            <Text className="text-[11px] font-semibold text-gold/85">
+              Lock of the Week — pays 1.5× on win, costs 1.5× on loss.
+            </Text>
+          ) : null}
+          <Text className="text-xs font-semibold text-white/55">
+            {formatCurrency(bet.amount)} risked · Reward {formatCurrency(bet.potential_payout)}
+          </Text>
+          {bet.legs.length > 0 ? (
+            <View className="gap-1.5">
+              {bet.legs.map((leg, index) => (
+                <Text
+                  className="text-xs font-semibold leading-4 text-white/72"
+                  key={`${bet.id}-${leg.game_id}-${index}`}>
+                  {index + 1}. {formatBetLegLabel(leg, { betType: bet.bet_type })}
+                </Text>
+              ))}
+            </View>
+          ) : null}
+        </View>
       ) : null}
     </View>
   );
@@ -957,21 +1292,37 @@ function SeasonAwardsCard({
   }
 
   const awards = seasonAwardsFromJson(detail.seasonSnapshot.awards);
-  const championName = detail.seasonSnapshot.champion_user_id
-    ? getDisplayName(detail, detail.seasonSnapshot.champion_user_id)
+  const championUserId = detail.seasonSnapshot.champion_user_id;
+  const championName = championUserId
+    ? getDisplayName(detail, championUserId)
     : 'Champion pending';
 
-  if (awards.length === 0 && !detail.seasonSnapshot.champion_user_id) {
+  if (awards.length === 0 && !championUserId) {
     return null;
   }
 
+  const championRecord = findChampionRecord(
+    detail.seasonSnapshot.final_standings,
+    championUserId,
+  );
+  const championshipSummary = championshipSummaryFromJson(
+    detail.seasonSnapshot.championship_summary,
+  );
+  const championshipResult =
+    championshipSummary && championshipSummary.opponent_user_id
+      ? {
+          championProfit: championshipSummary.champion_profit,
+          opponentName: getDisplayName(detail, championshipSummary.opponent_user_id),
+          opponentProfit: championshipSummary.opponent_profit,
+          weekNumber: championshipSummary.week_number,
+        }
+      : null;
+
   const mvpAward = awards.find((award) => award.award_key === 'season_mvp');
-  const otherAwards = awards.filter((award) => award.award_key !== 'season_mvp');
-  // Group remaining awards into pairs for a 2-up grid that scales nicely.
-  const grid: SeasonAward[][] = [];
-  for (let i = 0; i < otherAwards.length; i += 2) {
-    grid.push(otherAwards.slice(i, i + 2));
-  }
+  const biggestBetAward = awards.find((award) => award.award_key === 'biggest_single_bet');
+  const midTierAwards = awards.filter(
+    (award) => award.award_key !== 'season_mvp' && award.award_key !== 'biggest_single_bet',
+  );
 
   return (
     <View className="gap-4">
@@ -992,11 +1343,10 @@ function SeasonAwardsCard({
 
       <ChampionBanner
         championName={championName}
-        cosmetics={
-          detail.seasonSnapshot.champion_user_id
-            ? cosmeticsByUserId[detail.seasonSnapshot.champion_user_id]
-            : undefined
-        }
+        championRecord={championRecord}
+        championshipResult={championshipResult}
+        cosmetics={championUserId ? cosmeticsByUserId[championUserId] : undefined}
+        leagueType={detail.league.type}
         seasonYear={detail.league.season_year}
       />
 
@@ -1008,24 +1358,25 @@ function SeasonAwardsCard({
         />
       ) : null}
 
-      {grid.length > 0 ? (
-        <View className="gap-2">
-          {grid.map((row, rowIndex) => (
-            <View className="flex-row gap-2" key={`row-${rowIndex}`}>
-              {row.map((award) => (
-                <SeasonAwardCard
-                  award={award}
-                  cosmetics={award.user_id ? cosmeticsByUserId[award.user_id] : undefined}
-                  key={award.award_key}
-                  winnerName={
-                    award.user_id ? getDisplayName(detail, award.user_id) : 'No winner'
-                  }
-                />
-              ))}
-              {row.length === 1 ? <View className="flex-1" /> : null}
-            </View>
+      {midTierAwards.length > 0 ? (
+        <View className="flex-row gap-2">
+          {midTierAwards.map((award) => (
+            <SeasonAwardCard
+              award={award}
+              key={award.award_key}
+              winnerName={
+                award.user_id ? getDisplayName(detail, award.user_id) : 'No winner'
+              }
+            />
           ))}
         </View>
+      ) : null}
+
+      {biggestBetAward ? (
+        <BiggestSingleBetAwardCard
+          award={biggestBetAward}
+          winnerName={biggestBetAward.user_id ? getDisplayName(detail, biggestBetAward.user_id) : 'No winner'}
+        />
       ) : null}
     </View>
   );
@@ -1084,7 +1435,9 @@ function StandingsBoard({
 
   const resolvedStandingsWeekNumber = standingsWeekNumber ?? selectedWeekNumber;
   const badgeLabel =
-    resolvedStandingsWeekNumber === selectedWeekNumber
+    detail.league.status === 'complete' && resolvedStandingsWeekNumber === detail.league.current_week
+      ? 'Final'
+      : resolvedStandingsWeekNumber === selectedWeekNumber
       ? selectedWeekNumber === detail.league.current_week
         ? 'Live'
         : 'Snapshot'

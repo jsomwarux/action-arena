@@ -541,9 +541,33 @@ export type LiveGameStateInsert = {
 
 export type LiveGameStateUpdate = Partial<LiveGameStateInsert>;
 
+export type SeasonAwardBetLegSnapshot = {
+  adjusted_line: number | null;
+  game_id: string;
+  leg_odds: number;
+  market: BetMarket;
+  original_line: number | null;
+  selection: string;
+};
+
+export type SeasonAwardBetSnapshot = {
+  amount: number;
+  bet_type: BetType;
+  id: string;
+  is_lock: boolean;
+  legs: SeasonAwardBetLegSnapshot[];
+  odds: number;
+  potential_payout: number;
+  profit: number | null;
+  week_number: number;
+};
+
 export type SeasonAward = {
   award_key: SeasonAwardKey;
   award_label: string;
+  bet?: SeasonAwardBetSnapshot | null;
+  bet_id?: string;
+  is_lock?: boolean;
   metric: number | null;
   user_id: string | null;
   value_label: string | null;
@@ -559,9 +583,18 @@ export type SeasonStandingSnapshot = {
   wins: number;
 };
 
+export type ChampionshipSummary = {
+  champion_profit: number | null;
+  champion_user_id: string;
+  opponent_profit: number | null;
+  opponent_user_id: string | null;
+  week_number: number;
+};
+
 export type SeasonRow = {
   awards: Json;
   champion_user_id: string | null;
+  championship_summary: Json | null;
   completed_at: string;
   final_standings: Json;
   id: string;
@@ -572,6 +605,7 @@ export type SeasonRow = {
 export type SeasonInsert = {
   awards?: Json;
   champion_user_id?: string | null;
+  championship_summary?: Json | null;
   completed_at?: string;
   final_standings?: Json;
   id?: string;

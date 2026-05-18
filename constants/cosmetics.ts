@@ -102,7 +102,7 @@ export const COSMETIC_ITEMS: CosmeticItem[] = [
   { accent: cyan, category: 'lock_effect', cost: 225, description: 'Frosted edges and icy glow on Pick of the Week picks.', id: 'lock_frost', icon: 'snow', name: 'Ice/Frost', styleKey: 'frost' },
   { accent: green, category: 'lock_effect', cost: 300, description: 'A bright neon pulse for premium confidence.', id: 'lock_neon', icon: 'sparkles', name: 'Neon Glow', styleKey: 'neon' },
 
-  { accent: green, category: 'win_celebration', cost: 200, description: 'A bright scoreboard celebration after a winning matchup.', id: 'celebration_money_rain', icon: 'sparkles', name: 'Score Burst', styleKey: 'score' },
+  { accent: green, category: 'win_celebration', cost: 200, description: 'A punchy scoreboard-number burst after a winning matchup.', id: 'celebration_money_rain', icon: 'stats-chart', name: 'Score Burst', styleKey: 'score' },
   { accent: amber, category: 'win_celebration', cost: 250, description: 'A stadium crowd burst with gold noise.', id: 'celebration_crowd', icon: 'people', name: 'Stadium Crowd', styleKey: 'crowd' },
   { accent: gold, category: 'win_celebration', cost: 400, description: 'A full fireworks-style victory burst.', id: 'celebration_fireworks', icon: 'sparkles', name: 'Fireworks', styleKey: 'fireworks' },
 
@@ -117,11 +117,13 @@ export const COSMETIC_ITEMS: CosmeticItem[] = [
   { accent: gold, category: 'profile_frame', cost: 250, description: 'A gold frame for top-table flexing.', id: 'frame_gold', icon: 'square-outline', name: 'Gold Frame', styleKey: 'gold' },
 ];
 
+const FOUNDER_SEASON_LABEL = `Season ${CURRENT_SEASON_YEAR} Exclusive`;
+
 export const SEASON_PASS_COSMETICS: CosmeticItem[] = [
-  { accent: gold, category: 'team_logo', cost: 0, description: 'Exclusive Season 1 founder team logo.', id: 's1_logo_founder', icon: 'star', name: 'Founder Star', seasonLabel: 'Season 1 Exclusive', styleKey: 'founder' },
-  { accent: cyan, category: 'profile_frame', cost: 0, description: 'Exclusive animated Season 1 profile frame.', id: 's1_frame_champion', icon: 'ribbon', name: 'S1 Champion Frame', seasonLabel: 'Season 1 Exclusive', styleKey: 's1_champion' },
-  { accent: red, category: 'lock_effect', cost: 0, description: 'Exclusive Season 1 overdrive Lock treatment.', id: 's1_lock_overdrive', icon: 'flash', name: 'Lock Overdrive', seasonLabel: 'Season 1 Exclusive', styleKey: 'overdrive' },
-  { accent: gold, category: 'trophy_skin', cost: 0, description: 'Exclusive Season 1 trophy skin.', id: 's1_trophy_legacy', icon: 'trophy', name: 'Legacy Trophy', seasonLabel: 'Season 1 Exclusive', styleKey: 'legacy' },
+  { accent: gold, category: 'team_logo', cost: 0, description: 'Founder team logo for the inaugural pass class.', id: 's1_logo_founder', icon: 'star', name: 'Founder Star', seasonLabel: FOUNDER_SEASON_LABEL, styleKey: 'founder' },
+  { accent: cyan, category: 'profile_frame', cost: 0, description: 'Animated profile frame for pass holders.', id: 's1_frame_champion', icon: 'ribbon', name: 'Champion Frame', seasonLabel: FOUNDER_SEASON_LABEL, styleKey: 's1_champion' },
+  { accent: red, category: 'lock_effect', cost: 0, description: 'Overdrive Lock treatment for founders.', id: 's1_lock_overdrive', icon: 'flash', name: 'Lock Overdrive', seasonLabel: FOUNDER_SEASON_LABEL, styleKey: 'overdrive' },
+  { accent: gold, category: 'trophy_skin', cost: 0, description: 'Legacy trophy skin for founders.', id: 's1_trophy_legacy', icon: 'trophy', name: 'Legacy Trophy', seasonLabel: FOUNDER_SEASON_LABEL, styleKey: 'legacy' },
 ];
 
 export const ALL_COSMETIC_ITEMS = [...COSMETIC_ITEMS, ...SEASON_PASS_COSMETICS];

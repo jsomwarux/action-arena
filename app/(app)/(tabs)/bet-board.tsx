@@ -4125,6 +4125,7 @@ export default function BetBoardScreen() {
     userId: user?.id,
     weekNumber: viewedWeek,
   });
+  const hasBetBoardAccessInputs = Boolean(selectedLeague?.id && user?.id && viewedWeek);
   const placedBetsQuery = usePlacedBets(selectedLeague?.id, user?.id, viewedWeek);
   const revealTimeQuery = useLeagueWeekRevealTime(selectedLeague?.id, viewedWeek);
   const submitBets = useSubmitBetsMutation(selectedLeague?.id, user?.id, viewedWeek);
@@ -4143,7 +4144,8 @@ export default function BetBoardScreen() {
   const hasSubmittedLineup = hasLoadedPlacedBets && placedBets.length > 0;
   const isReadOnly = isPastWeek || hasSubmittedLineup;
   const canBuildLineup = isCurrentWeek && hasLoadedPlacedBets && !hasSubmittedLineup;
-  const canAccessBetBoard = accessQuery.data ?? true;
+  const isCheckingBetBoardAccess = hasBetBoardAccessInputs && accessQuery.isLoading;
+  const canAccessBetBoard = hasBetBoardAccessInputs ? accessQuery.data === true : true;
   const potwSwapClosed = revealTimeQuery.data
     ? Date.now() >= new Date(revealTimeQuery.data).getTime()
     : false;
@@ -4756,7 +4758,7 @@ export default function BetBoardScreen() {
 
   if (leaguesQuery.isLoading) {
     return (
-      <ScreenWrapper>
+      <ScreenWrapper topSafe>
         <OddsSkeletons />
       </ScreenWrapper>
     );
@@ -4764,7 +4766,7 @@ export default function BetBoardScreen() {
 
   if (leagues.length === 0) {
     return (
-      <ScreenWrapper centered>
+      <ScreenWrapper centered topSafe>
         <View className="items-center gap-4">
           <View className="h-16 w-16 items-center justify-center rounded-full border border-electric-green/30 bg-electric-green/10">
             <Ionicons color={THEME_COLORS.electricGreen} name="receipt" size={28} />
@@ -4791,7 +4793,7 @@ export default function BetBoardScreen() {
 
   return (
     <View style={{ backgroundColor: THEME_COLORS.background, flex: 1 }}>
-      <ScreenWrapper className="pb-0">
+      <ScreenWrapper className="pb-0" topSafe>
         <FlatList
           contentContainerStyle={{ paddingBottom: slipBottomPadding }}
           data={canBuildLineup && canAccessBetBoard ? oddsQuery.data ?? [] : []}
@@ -4866,7 +4868,21 @@ export default function BetBoardScreen() {
                 />
               ) : null}
 
-              {canBuildLineup && !canAccessBetBoard ? (
+              {canBuildLineup && isCheckingBetBoardAccess ? (
+                <Card>
+                  <View className="items-center gap-3 py-3">
+                    <Ionicons color={THEME_COLORS.cyanAccent} name="time" size={28} />
+                    <Text className="text-center text-xl font-black uppercase text-white">
+                      Checking Access
+                    </Text>
+                    <Text className="text-center text-sm font-semibold leading-5 text-white/60">
+                      Confirming whether this slate is inside the Season Pass early-access window.
+                    </Text>
+                  </View>
+                </Card>
+              ) : null}
+
+              {canBuildLineup && !isCheckingBetBoardAccess && !canAccessBetBoard ? (
                 <Card tone="highlight">
                   <View className="items-center gap-3 py-3">
                     <Ionicons color={THEME_COLORS.gold} name="time" size={28} />

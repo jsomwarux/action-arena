@@ -16,7 +16,7 @@ import { logAnalyticsEvent } from '@/lib/analytics';
 import { cn } from '@/lib/cn';
 import { haptics } from '@/lib/haptics';
 
-const PASS_PRICE = '9.99 USD';
+const PASS_PRICE = '$9.99';
 
 const PASS_FEATURES: {
   body: string;
@@ -25,10 +25,10 @@ const PASS_FEATURES: {
   title: string;
 }[] = [
   {
-    body: 'Claim your Season 1 identity with a founder logo, animated frame, exclusive Pick of the Week effect, and a legacy trophy skin.',
+    body: 'Claim your founder identity with an exclusive team logo, profile frame, Pick of the Week effect, and legacy trophy skin.',
     highlight: '4 exclusive cosmetics',
     icon: 'sparkles',
-    title: 'Season 1 Exclusive Drops',
+    title: `Season ${CURRENT_SEASON_YEAR} Exclusive Drops`,
   },
   {
     body: 'Win-rate splits, weekly score trends, hit rates by pick type, and best/toughest team reads. Permanent unlock.',
@@ -37,16 +37,16 @@ const PASS_FEATURES: {
     title: 'Advanced Analytics Dashboard',
   },
   {
-    body: 'See new weekly matchups 30 minutes before free users every week. Build your lineup before the slate opens.',
+    body: 'See new weekly matchups 30 minutes before free users every week. Build your card before the Bet Board opens.',
     highlight: '30-minute head start',
     icon: 'time',
-    title: 'Early Pick Board Access',
+    title: 'Early Bet Board Access',
   },
   {
-    body: 'Customize league rules, scoring caps, and pick types while keeping core play free for every member.',
-    highlight: 'Rules + scoring caps',
-    icon: 'options',
-    title: 'League Customization',
+    body: 'No ad placements once the ad SDK arrives. For now, the app simply hides all ad hooks for pass holders.',
+    highlight: 'Future ad-free hooks',
+    icon: 'shield-checkmark',
+    title: 'Ad-Free Experience',
   },
 ];
 
@@ -56,20 +56,17 @@ function HeroPriceTag() {
       <Text
         className="text-[10px] font-semibold uppercase text-gold/80"
         style={{ letterSpacing: 1 }}>
-        One-time
+        Per Season
       </Text>
-      <View className="flex-row items-baseline gap-1">
-        <Text
-          className="text-3xl font-extrabold text-white"
-          style={{ letterSpacing: -0.6 }}>
-          {PASS_PRICE}
-        </Text>
-        <Text className="text-xs font-medium text-white/55">/season</Text>
-      </View>
+      <Text
+        className="text-3xl font-extrabold text-white"
+        style={{ letterSpacing: -0.6 }}>
+        {PASS_PRICE}
+      </Text>
       <Text
         className="text-[10px] font-semibold uppercase text-gold"
         style={{ letterSpacing: 1 }}>
-        Less than a coffee
+        One payment
       </Text>
     </View>
   );
@@ -101,7 +98,7 @@ function HeroCard({ hasPass }: { hasPass: boolean }) {
             <Text
               className="text-[10px] font-semibold uppercase text-gold/85"
               style={{ letterSpacing: 1.4 }}>
-              Backstage Pass
+              All-Access Pass
             </Text>
             <Text
               className="text-2xl font-extrabold text-white"
@@ -109,7 +106,7 @@ function HeroCard({ hasPass }: { hasPass: boolean }) {
               Buy your ticket to the season.
             </Text>
             <Text className="text-sm font-medium leading-5 text-white/65">
-              Unlock every Season 1 exclusive, the analytics lab, league customization, and a 30-minute jump on the slate. {PASS_PRICE} once. Yours all season.
+              Season {CURRENT_SEASON_YEAR} pass holders join the founders’ class. Four perks unlock for the full season — detailed below.
             </Text>
           </View>
           <HeroPriceTag />
@@ -312,6 +309,14 @@ export default function SeasonPassScreen() {
     }
   };
 
+  const showPurchasePlaceholder = () => {
+    haptics.light();
+    Alert.alert(
+      'Coming Soon — payment integration not yet available.',
+      'Use a redeem code for Season Pass testing right now.',
+    );
+  };
+
   return (
     <ScreenWrapper className="pb-0">
       <ScrollView
@@ -374,8 +379,13 @@ export default function SeasonPassScreen() {
                   onPress={redeem}
                   title="Redeem Pass"
                 />
+                <Button
+                  onPress={showPurchasePlaceholder}
+                  title={`Buy Season Pass · ${PASS_PRICE}`}
+                  variant="secondary"
+                />
                 <Text className="text-[11px] font-medium text-white/45">
-                  Apple In-App Purchase ({PASS_PRICE}) ships before launch.
+                  Processed through Apple In-App Purchase at launch. No payment SDK is connected in this build.
                 </Text>
               </View>
             ) : null}
@@ -414,7 +424,7 @@ export default function SeasonPassScreen() {
           <Text
             className="text-[11px] font-semibold uppercase text-gold"
             style={{ letterSpacing: 1.2 }}>
-            Season 1 Exclusive Drops
+            Season {CURRENT_SEASON_YEAR} Exclusive Drops
           </Text>
           <Text
             className="mt-0.5 text-base font-bold text-white"
