@@ -429,7 +429,7 @@ export default function LeaderboardScreen() {
   const valueFor = (row: LeaderboardRow | undefined) => (row ? valueForRow(row, boardView) : 0);
 
   return (
-    <ScreenWrapper className="pb-0">
+    <ScreenWrapper className="pb-0" topSafe>
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ gap: 18, paddingBottom: 120 }}

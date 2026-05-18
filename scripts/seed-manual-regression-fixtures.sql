@@ -403,46 +403,80 @@ select league_fixture.id, users.id, 17,
     when 1 then 900
     else 800 - (users.slot * 75)
   end,
-  users.slot
+  case users.slot
+    when 2 then 1
+    when 1 then 2
+    else users.slot
+  end
 from qa_manual_leagues league_fixture
 join qa_manual_users users on true
 where league_fixture.key = 'championship';
 
-insert into public.seasons (league_id, season_year, champion_user_id, final_standings, awards, completed_at)
+-- Settled season activity for the trophy case. These rows make the completed
+-- season snapshot generate all Test 22 awards from the same function used in
+-- production, including Parlay King and Biggest Single Bet details.
+insert into public.bets (
+  id,
+  user_id,
+  league_id,
+  week_number,
+  bet_type,
+  amount,
+  odds,
+  potential_payout,
+  result,
+  profit,
+  is_lock,
+  created_at
+)
 select
+  bet.bet_id,
+  pg_temp.qa_user(bet.user_slot),
   league_fixture.id,
-  2098,
-  pg_temp.qa_user(1),
-  (
-    select jsonb_agg(
-      jsonb_build_object(
-        'user_id', standings.user_id,
-        'rank', standings.rank,
-        'wins', standings.wins,
-        'losses', standings.losses,
-        'ties', standings.ties,
-        'weekly_profit', standings.weekly_profit,
-        'total_profit', standings.total_profit
-      )
-      order by standings.rank
-    )
-    from public.standings standings
-    where standings.league_id = league_fixture.id
-      and standings.week_number = 17
-  ),
-  jsonb_build_array(
-    jsonb_build_object('award_key', 'season_mvp', 'award_label', 'Season MVP', 'user_id', pg_temp.qa_user(2), 'metric', 1200, 'value_label', '+$1200.00'),
-    jsonb_build_object('award_key', 'best_record', 'award_label', 'Best Record', 'user_id', pg_temp.qa_user(2), 'metric', 15, 'value_label', '15-2-0'),
-    jsonb_build_object('award_key', 'most_consistent', 'award_label', 'Most Consistent', 'user_id', pg_temp.qa_user(1), 'metric', 12, 'value_label', '12 positive weeks')
-  ),
-  now() - interval '1 day'
+  bet.week_number,
+  bet.bet_type,
+  bet.amount,
+  bet.odds,
+  bet.potential_payout,
+  'win'::public.bet_result,
+  bet.profit,
+  bet.is_lock,
+  now() - (bet.created_minutes_ago::text || ' minutes')::interval
 from qa_manual_leagues league_fixture
+join (
+  values
+    ('00000000-0000-0000-0000-000000021411'::uuid, 1, 1, 'straight'::public.bet_type, 20::numeric, 100, 40::numeric, 8::numeric, false, 90),
+    ('00000000-0000-0000-0000-000000021412'::uuid, 1, 2, 'straight'::public.bet_type, 20::numeric, 100, 40::numeric, 9::numeric, false, 89),
+    ('00000000-0000-0000-0000-000000021413'::uuid, 1, 3, 'straight'::public.bet_type, 20::numeric, 100, 40::numeric, 10::numeric, false, 88),
+    ('00000000-0000-0000-0000-000000021414'::uuid, 1, 4, 'straight'::public.bet_type, 20::numeric, 100, 40::numeric, 11::numeric, false, 87),
+    ('00000000-0000-0000-0000-000000021415'::uuid, 1, 5, 'parlay'::public.bet_type, 20::numeric, 175, 55::numeric, 35::numeric, false, 86),
+    ('00000000-0000-0000-0000-000000021421'::uuid, 2, 1, 'straight'::public.bet_type, 20::numeric, 100, 40::numeric, 7::numeric, false, 85),
+    ('00000000-0000-0000-0000-000000021422'::uuid, 2, 6, 'parlay'::public.bet_type, 20::numeric, 250, 70::numeric, 50::numeric, false, 84),
+    ('00000000-0000-0000-0000-000000021423'::uuid, 2, 7, 'parlay'::public.bet_type, 20::numeric, 300, 80::numeric, 60::numeric, false, 83),
+    ('00000000-0000-0000-0000-000000021431'::uuid, 3, 8, 'straight'::public.bet_type, 35::numeric, 800, 315::numeric, 280::numeric, true, 82),
+    ('00000000-0000-0000-0000-000000021441'::uuid, 4, 9, 'parlay'::public.bet_type, 20::numeric, 160, 52::numeric, 32::numeric, false, 81)
+) as bet(
+  bet_id,
+  user_slot,
+  week_number,
+  bet_type,
+  amount,
+  odds,
+  potential_payout,
+  profit,
+  is_lock,
+  created_minutes_ago
+) on true
 where league_fixture.key = 'championship'
-on conflict (league_id, season_year) do update
-  set champion_user_id = excluded.champion_user_id,
-      final_standings = excluded.final_standings,
-      awards = excluded.awards,
-      completed_at = excluded.completed_at;
+on conflict (id) do nothing;
+
+insert into public.bet_legs (bet_id, game_id, market, selection, original_line, adjusted_line, leg_odds, result, game_start_time, locked)
+values
+  ('00000000-0000-0000-0000-000000021431'::uuid, 'qa_manual_championship_den_kc', 'moneyline'::public.bet_market, 'Denver Broncos', null, null, 800, 'win'::public.bet_result, now() - interval '30 days', true);
+
+select public.capture_completed_season(id)
+from qa_manual_leagues
+where key = 'championship';
 
 select jsonb_build_object(
   'tester_user',

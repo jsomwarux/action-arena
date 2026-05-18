@@ -89,3 +89,6 @@ the app after the seed finishes so React Query does not show an old cached card.
      `Season MVP`/final standings can show the rival as the higher total-profit
      leader. This verifies championship winner and standings leader are no
      longer conflated.
+   - Expected: the trophy case includes `Season MVP`, `Best Record`,
+     `Parlay King`, `Most Consistent`, and `Biggest Single Bet`, with the
+     biggest-bet card showing the bet type, odds, stake, reward, and selection.

@@ -183,31 +183,29 @@ function ShopItemCard({
         </View>
       ) : null}
 
-      <View className="items-center gap-3 px-4 pb-4 pt-5">
+      <View className="items-center gap-3 px-5 pb-5 pt-5">
         <View>
           <CosmeticPreview category={item.category} itemId={item.id} size="lg" />
           <PurchaseSparkle trigger={sparkleTrigger} />
         </View>
 
-        <View className="items-center gap-1">
-          <View className="flex-row items-center gap-2">
-            <Text
-              className="text-base font-black text-white"
-              numberOfLines={1}
-              style={{ letterSpacing: -0.2 }}>
-              {item.name}
-            </Text>
-            {equipped ? (
-              <View className="flex-row items-center gap-1 rounded-full border border-electric-green/55 bg-electric-green/15 px-2 py-px">
-                <Ionicons color={THEME_COLORS.electricGreen} name="checkmark" size={10} />
-                <Text className="text-[10px] font-bold text-electric-green">Equipped</Text>
-              </View>
-            ) : owned ? (
-              <View className="rounded-full border border-white/15 bg-white/[0.05] px-2 py-px">
-                <Text className="text-[10px] font-semibold text-white/65">Owned</Text>
-              </View>
-            ) : null}
-          </View>
+        <View className="items-center gap-1.5 self-stretch">
+          <Text
+            className="text-center text-base font-black text-white"
+            numberOfLines={1}
+            style={{ letterSpacing: -0.2 }}>
+            {item.name}
+          </Text>
+          {equipped ? (
+            <View className="flex-row items-center gap-1 self-center rounded-full border border-electric-green/55 bg-electric-green/15 px-2.5 py-0.5">
+              <Ionicons color={THEME_COLORS.electricGreen} name="checkmark" size={10} />
+              <Text className="text-[10px] font-bold text-electric-green">Equipped</Text>
+            </View>
+          ) : owned ? (
+            <View className="self-center rounded-full border border-white/15 bg-white/[0.05] px-2.5 py-0.5">
+              <Text className="text-[10px] font-semibold text-white/65">Owned</Text>
+            </View>
+          ) : null}
           <Text
             className="text-center text-xs font-medium leading-4 text-white/55"
             numberOfLines={2}>
@@ -222,12 +220,16 @@ function ShopItemCard({
             size={13}
           />
           <Text className="text-xs font-bold text-white/75">
-            {item.seasonLabel ? 'Season Pass only' : `${item.cost} coins`}
+            {item.seasonLabel
+              ? lockedExclusive
+                ? 'Season Pass required'
+                : 'Season Pass included'
+              : `${item.cost} coins`}
           </Text>
         </View>
 
         {lockedExclusive ? (
-          <Button disabled title="Season Pass Exclusive" variant="secondary" />
+          <Button disabled title="Season Pass Required" variant="secondary" />
         ) : owned || canUseSeasonPassItem ? (
           <Button
             disabled={equipped}
@@ -431,8 +433,10 @@ export default function ShopScreen() {
           ))}
         </ScrollView>
 
-        <View className="flex-row items-center justify-between">
-          <Text className="text-sm font-medium text-white/60" numberOfLines={2}>
+        <View className="flex-row items-start justify-between gap-3">
+          <Text
+            className="flex-1 text-sm font-medium text-white/60"
+            numberOfLines={3}>
             {COSMETIC_CATEGORY_DESCRIPTIONS[category]}
           </Text>
           <Badge

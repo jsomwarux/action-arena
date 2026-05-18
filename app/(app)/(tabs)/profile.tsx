@@ -5,11 +5,12 @@ import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native'
 
 import { CosmeticAvatar } from '@/components/cosmetics';
 import { ProfileContent } from '@/components/profile/profile-content';
-import { AnimatedNumber, Card, ScreenWrapper } from '@/components/ui';
+import { AnimatedNumber, Badge, Card, ScreenWrapper } from '@/components/ui';
 import { THEME_COLORS } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
 import { useUserCosmetics } from '@/hooks/use-cosmetics';
 import { useProfileData } from '@/hooks/use-profile-stats';
+import { useSeasonPass } from '@/hooks/use-season-pass';
 import { logAnalyticsEvent } from '@/lib/analytics';
 import { haptics } from '@/lib/haptics';
 
@@ -57,6 +58,14 @@ export default function ProfileScreen() {
     viewerUserId: user?.id,
   });
   const cosmeticsQuery = useUserCosmetics(user?.id);
+  const seasonPassQuery = useSeasonPass(user?.id);
+  const hasSeasonPass = Boolean(seasonPassQuery.data);
+  const quickActions = [
+    { icon: 'storefront' as const, label: 'Shop', route: '/shop' as const },
+    { icon: 'ellipse' as const, label: 'Coins', route: '/coin-store' as const },
+    { icon: 'ribbon' as const, label: 'Pass', route: '/season-pass' as const },
+    { icon: 'analytics' as const, label: 'Analytics', route: '/analytics' as const },
+  ];
 
   useEffect(() => {
     logAnalyticsEvent('profile_viewed', {
@@ -66,7 +75,7 @@ export default function ProfileScreen() {
   }, [user?.id]);
 
   return (
-    <ScreenWrapper className="pb-0">
+    <ScreenWrapper className="pb-0" topSafe>
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ gap: 18, paddingBottom: 36 }}
@@ -116,12 +125,7 @@ export default function ProfileScreen() {
               </Pressable>
             </View>
             <View className="flex-row gap-3">
-              {[
-                { icon: 'storefront' as const, label: 'Shop', route: '/shop' as const },
-                { icon: 'ellipse' as const, label: 'Coins', route: '/coin-store' as const },
-                { icon: 'ribbon' as const, label: 'Pass', route: '/season-pass' as const },
-                { icon: 'analytics' as const, label: 'Stats', route: '/analytics' as const },
-              ].map((action) => (
+              {quickActions.map((action) => (
                 <Pressable
                   accessibilityRole="button"
                   key={action.route}
@@ -132,12 +136,39 @@ export default function ProfileScreen() {
                   style={({ pressed }) => ({ flex: 1, opacity: pressed ? 0.78 : 1 })}>
                   <View className="items-center gap-1.5 rounded-2xl border border-white/10 bg-white/[0.04] px-2 py-3">
                     <Ionicons color={THEME_COLORS.electricGreen} name={action.icon} size={17} />
-                    <Text className="text-[11px] font-semibold text-white/75">
+                    <Text
+                      adjustsFontSizeToFit
+                      className="text-[11px] font-semibold text-white/75"
+                      minimumFontScale={0.75}
+                      numberOfLines={1}>
                       {action.label}
                     </Text>
                   </View>
                 </Pressable>
               ))}
+            </View>
+            <View
+              className={
+                hasSeasonPass
+                  ? 'flex-row items-center justify-between gap-3 rounded-2xl border border-electric-green/35 bg-electric-green/10 p-3'
+                  : 'flex-row items-center justify-between gap-3 rounded-2xl border border-gold/35 bg-gold/10 p-3'
+              }>
+              <View className="flex-1 flex-row items-center gap-2">
+                <Ionicons
+                  color={hasSeasonPass ? THEME_COLORS.electricGreen : THEME_COLORS.gold}
+                  name="ribbon"
+                  size={16}
+                />
+                <Text className="flex-1 text-sm font-bold text-white">
+                  {hasSeasonPass
+                    ? 'Season Pass holder'
+                    : 'Season Pass preview available'}
+                </Text>
+              </View>
+              <Badge
+                label={hasSeasonPass ? 'Active' : 'Free'}
+                tone={hasSeasonPass ? 'green' : 'gold'}
+              />
             </View>
           </View>
         </Card>
