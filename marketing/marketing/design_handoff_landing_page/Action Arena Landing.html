@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Action Arena — Landing</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<!-- Display font (per design system: Bebas Neue is the pragmatic Family 4 pick; Anton + Oswald are the two Tweaks alts) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Anton&family=Oswald:wght@500;700&display=swap" rel="stylesheet">
+
+<style>
+  html, body { margin: 0; padding: 0; background: #f0eee9; }
+  body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; }
+  * { box-sizing: border-box; }
+</style>
+</head>
+<body>
+
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="pick-cards.jsx"></script>
+<script type="text/babel" src="landing-page.jsx"></script>
+
+<script type="text/babel" data-presets="env,react">
+// ────────────────────────────────────────────────────────────────
+// App — owns Tweaks state, mounts the design canvas with mobile +
+// desktop artboards side-by-side, mounts the floating Tweaks panel.
+// ────────────────────────────────────────────────────────────────
+
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "activeState": "teaser",
+  "autoAdvance": true,
+  "autoInterval": 3500,
+  "displayFont": "bebas",
+  "bgIntensity": "bold",
+  "ghostText": true,
+  "ghostScale": 1,
+  "headline": "A",
+  "reducedMotion": false
+}/*EDITMODE-END*/;
+
+function App() {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+
+  return (
+    <>
+      <DesignCanvas>
+        <DCSection
+          id="landing"
+          title="Action Arena · Landing page"
+          subtitle="Hero carousel (STRAIGHT → PARLAY → TEASER → LOCK) + how-it-works strip. Auto-advances until first user interaction.">
+          <DCArtboard id="desktop" label="Desktop · 1440 × 1900" width={1440} height={1900}>
+            <LandingPage variant="desktop" tweaks={t} setTweak={setTweak} />
+          </DCArtboard>
+          <DCArtboard id="mobile" label="Mobile · 390 × 2200" width={390} height={2200}>
+            <LandingPage variant="mobile" tweaks={t} setTweak={setTweak} />
+          </DCArtboard>
+        </DCSection>
+
+        <DCPostIt top={28} left={60} rotate={-1.5} width={220}>
+          Carousel auto-advances every 3.5s. Click any state tab or arrow on the right artboard to take manual control — both artboards stay in sync.
+        </DCPostIt>
+        <DCPostIt top={80} right={60} rotate={2} width={220}>
+          Tweaks panel exposes all 7 controls: state, auto-advance, font, bg intensity, ghost text, headline A/B/C, reduced motion. Toggle from the toolbar.
+        </DCPostIt>
+      </DesignCanvas>
+
+      <TweaksPanel title="Tweaks">
+        <TweakSection label="Carousel">
+          <TweakSelect
+            label="Active state"
+            value={t.activeState}
+            options={[
+              { value: 'straight', label: 'Straight pick' },
+              { value: 'parlay',   label: 'Parlay' },
+              { value: 'teaser',   label: 'Teaser' },
+              { value: 'lock',     label: 'Lock of the Week' },
+            ]}
+            onChange={(v) => setTweak('activeState', v)}
+          />
+          <TweakToggle
+            label="Auto-advance"
+            value={t.autoAdvance}
+            onChange={(v) => setTweak('autoAdvance', v)}
+          />
+          <TweakSlider
+            label="Interval"
+            value={t.autoInterval}
+            min={1500} max={8000} step={250} unit="ms"
+            onChange={(v) => setTweak('autoInterval', v)}
+          />
+        </TweakSection>
+
+        <TweakSection label="Typography">
+          <TweakRadio
+            label="Display font"
+            value={t.displayFont}
+            options={[
+              { value: 'bebas',    label: 'Bebas' },
+              { value: 'anton',    label: 'Anton' },
+              { value: 'druk-sub', label: 'Oswald' },
+            ]}
+            onChange={(v) => setTweak('displayFont', v)}
+          />
+        </TweakSection>
+
+        <TweakSection label="Background">
+          <TweakRadio
+            label="Reactivity"
+            value={t.bgIntensity}
+            options={[
+              { value: 'subtle',  label: 'Subtle' },
+              { value: 'bold',    label: 'Bold' },
+              { value: 'extreme', label: 'Extreme' },
+            ]}
+            onChange={(v) => setTweak('bgIntensity', v)}
+          />
+        </TweakSection>
+
+        <TweakSection label="Ghost text">
+          <TweakToggle
+            label="Visible"
+            value={t.ghostText}
+            onChange={(v) => setTweak('ghostText', v)}
+          />
+          <TweakSlider
+            label="Scale"
+            value={t.ghostScale}
+            min={0.5} max={1.6} step={0.05}
+            onChange={(v) => setTweak('ghostScale', v)}
+          />
+        </TweakSection>
+
+        <TweakSection label="Headline">
+          <TweakRadio
+            label="Variant"
+            value={t.headline}
+            options={['A', 'B', 'C']}
+            onChange={(v) => setTweak('headline', v)}
+          />
+          <div style={{ fontSize: 11, color: 'rgba(41,38,27,.55)', lineHeight: 1.4, padding: '2px 2px 0' }}>
+            {t.headline === 'A' && '"Settle it in the Arena." — punchy, league-rivalry register.'}
+            {t.headline === 'B' && '"A private NFL pick league for you and your friends." — plain-spoken benefit.'}
+            {t.headline === 'C' && '"Spend smarter than your friends." — mechanic-led, $100 budget framing.'}
+          </div>
+        </TweakSection>
+
+        <TweakSection label="Accessibility">
+          <TweakToggle
+            label="Reduced motion"
+            value={t.reducedMotion}
+            onChange={(v) => setTweak('reducedMotion', v)}
+          />
+        </TweakSection>
+      </TweaksPanel>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+
+</body>
+</html>

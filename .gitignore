@@ -32,6 +32,7 @@ yarn-error.*
 
 # local assistant/tooling state
 .claude/settings.local.json
+marketing/marketing/.claude/
 
 # local env files
 .env
