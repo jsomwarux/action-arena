@@ -29,7 +29,6 @@ import {
   formatCurrency,
   formatLeagueType,
   formatProfit,
-  formatRecord,
   getProfitTone,
 } from '@/lib/format';
 import { formatBetLegLabel, formatPickTitle } from '@/lib/pick-labels';
@@ -51,6 +50,16 @@ function bestBet(bets: BetWithLegs[], direction: 'best' | 'worst') {
 
 function hasLiveBets(bets: BetWithLegs[]) {
   return bets.some((bet) => bet.result === 'pending' && isParentPickLocked(bet));
+}
+
+function picksSubmittedLabel(betsPlaced: number) {
+  const needed = remainingBetsNeeded(betsPlaced);
+
+  if (needed > 0) {
+    return `${needed} ${needed === 1 ? 'pick' : 'picks'} needed`;
+  }
+
+  return `${betsPlaced} ${betsPlaced === 1 ? 'pick' : 'picks'} ready`;
 }
 
 function Header() {
@@ -259,131 +268,131 @@ function ThisWeekCard({ card }: { card: HomeLeagueCard }) {
   const opponentLabel =
     card.opponent?.display_name ?? (card.currentMatchup ? 'Bye Week' : 'Schedule Pending');
   const live = hasLiveBets(card.thisWeekBets);
+  const openCardDestination = () => {
+    if (currentMatchup) {
+      router.push({
+        pathname: '/matchups/[matchupId]',
+        params: { matchupId: currentMatchup.id },
+      });
+      return;
+    }
+
+    router.push({
+      pathname: '/leagues/[leagueId]',
+      params: { leagueId: card.league.id },
+    });
+  };
 
   return (
-    <Card>
-      <View className="gap-4">
-        <View className="flex-row items-start justify-between gap-3">
-          <View className="flex-1 gap-2">
-            <Text
-              className="text-xl font-black uppercase text-white"
-              numberOfLines={1}
-              style={{ letterSpacing: -0.3 }}>
-              {card.league.name}
-            </Text>
-            <View className="flex-row flex-wrap gap-2">
-              <Badge label={formatLeagueType(card.league.type)} tone={isH2H ? 'cyan' : 'gold'} />
-              <Badge label={`Week ${card.league.current_week}`} tone="green" />
-              {live ? (
-                <View className="flex-row items-center gap-1 rounded-full border border-gold/45 bg-gold/15 px-2 py-0.5">
-                  <View className="h-1.5 w-1.5 rounded-full bg-gold" />
-                  <Text
-                    className="text-[10px] font-black uppercase text-gold"
-                    style={{ letterSpacing: 1.4 }}>
-                    Live
-                  </Text>
-                </View>
-              ) : null}
+    <PressableScale accessibilityRole="button" onPress={openCardDestination}>
+      <Card>
+        <View className="gap-4">
+          <View className="flex-row items-start justify-between gap-3">
+            <View className="flex-1 gap-2">
+              <Text
+                className="text-xl font-black uppercase text-white"
+                numberOfLines={1}
+                style={{ letterSpacing: -0.3 }}>
+                {card.league.name}
+              </Text>
+              <View className="flex-row flex-wrap gap-2">
+                <Badge label={formatLeagueType(card.league.type)} tone={isH2H ? 'cyan' : 'gold'} />
+                <Badge label={`Week ${card.league.current_week}`} tone="green" />
+                {live ? (
+                  <View className="flex-row items-center gap-1 rounded-full border border-gold/45 bg-gold/15 px-2 py-0.5">
+                    <View className="h-1.5 w-1.5 rounded-full bg-gold" />
+                    <Text
+                      className="text-[10px] font-black uppercase text-gold"
+                      style={{ letterSpacing: 1.4 }}>
+                      Live
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+            </View>
+            <View className="items-end">
+              <Text
+                className="text-[10px] font-black uppercase text-white/45"
+                style={{ letterSpacing: 1.4 }}>
+                Profit
+              </Text>
+              <AnimatedNumber
+                className={cn('mt-1 text-2xl font-black', getProfitTone(card.weeklyProfit))}
+                decimals={0}
+                prefix={card.weeklyProfit < 0 ? '-' : '+'}
+                suffix=" coins"
+                style={{ letterSpacing: -0.5 }}
+                value={Math.abs(card.weeklyProfit)}
+              />
             </View>
           </View>
-          <View className="items-end">
-            <Text
-              className="text-[10px] font-black uppercase text-white/45"
-              style={{ letterSpacing: 1.4 }}>
-              Profit
-            </Text>
-            <AnimatedNumber
-              className={cn('mt-1 text-2xl font-black', getProfitTone(card.weeklyProfit))}
-              decimals={0}
-              prefix={card.weeklyProfit < 0 ? '-' : '+'}
-              suffix=" coins"
-              style={{ letterSpacing: -0.5 }}
-              value={Math.abs(card.weeklyProfit)}
-            />
-          </View>
-        </View>
 
-        <View className="rounded-2xl border border-white/[0.07] bg-white/[0.04]">
-          <View className="flex-row items-center justify-between px-4 py-3">
-            <View className="flex-1 flex-row items-center gap-3">
-              <View className="h-10 w-10 items-center justify-center rounded-2xl border border-electric-green/45 bg-electric-green/15">
-                <Ionicons color={THEME_COLORS.electricGreen} name="person" size={16} />
-              </View>
-              <View className="flex-1">
-                <Text
-                  className="text-[10px] font-black uppercase text-white/45"
-                  style={{ letterSpacing: 1.4 }}>
-                  You
-                </Text>
-                <Text
-                  className="text-sm font-black text-white"
-                  numberOfLines={1}
-                  style={{ letterSpacing: -0.2 }}>
-                  {isH2H && card.currentStanding
-                    ? formatRecord(
-                        card.currentStanding.wins,
-                        card.currentStanding.losses,
-                        card.currentStanding.ties,
-                      )
-                    : card.currentStanding
-                      ? `Rank #${card.currentStanding.rank}`
-                      : `${card.memberCount} members`}
-                </Text>
-              </View>
-            </View>
-            {isH2H ? (
-              <View className="px-2">
-                <View className="h-7 w-7 items-center justify-center rounded-full border border-gold/40 bg-gold/15">
-                  <Text
-                    className="text-[10px] font-black text-gold"
-                    style={{ letterSpacing: 0.4 }}>
-                    VS
-                  </Text>
-                </View>
-              </View>
-            ) : null}
-            {isH2H ? (
+          <View className="rounded-2xl border border-white/[0.07] bg-white/[0.04]">
+            <View className="flex-row items-center justify-between px-4 py-3">
               <View className="flex-1 flex-row items-center gap-3">
-                <View className="flex-1 items-end">
+                <View className="h-10 w-10 items-center justify-center rounded-2xl border border-electric-green/45 bg-electric-green/15">
+                  <Ionicons color={THEME_COLORS.electricGreen} name="person" size={16} />
+                </View>
+                <View className="flex-1">
                   <Text
                     className="text-[10px] font-black uppercase text-white/45"
                     style={{ letterSpacing: 1.4 }}>
-                    Opponent
+                    You
                   </Text>
                   <Text
                     className="text-sm font-black text-white"
                     numberOfLines={1}
                     style={{ letterSpacing: -0.2 }}>
-                    {opponentLabel}
+                    {card.viewerLabel}
                   </Text>
                 </View>
-                <View className="h-10 w-10 items-center justify-center rounded-2xl border border-coral-red/35 bg-coral-red/10">
-                  <Ionicons color={THEME_COLORS.coralRed} name="person-outline" size={16} />
+              </View>
+              {isH2H ? (
+                <View className="px-2">
+                  <View className="h-7 w-7 items-center justify-center rounded-full border border-gold/40 bg-gold/15">
+                    <Text
+                      className="text-[10px] font-black text-gold"
+                      style={{ letterSpacing: 0.4 }}>
+                      VS
+                    </Text>
+                  </View>
                 </View>
-              </View>
-            ) : (
-              <View className="items-end">
-                <Text
-                  className="text-[10px] font-black uppercase text-white/45"
-                  style={{ letterSpacing: 1.4 }}>
-                  Field
-                </Text>
-                <Text className="text-sm font-black text-white">
-                  {card.memberCount} players
-                </Text>
-              </View>
-            )}
-          </View>
+              ) : null}
+              {isH2H ? (
+                <View className="flex-1 flex-row items-center gap-3">
+                  <View className="flex-1 items-end">
+                    <Text
+                      className="text-[10px] font-black uppercase text-white/45"
+                      style={{ letterSpacing: 1.4 }}>
+                      Opponent
+                    </Text>
+                    <Text
+                      className="text-sm font-black text-white"
+                      numberOfLines={1}
+                      style={{ letterSpacing: -0.2 }}>
+                      {opponentLabel}
+                    </Text>
+                  </View>
+                  <View className="h-10 w-10 items-center justify-center rounded-2xl border border-coral-red/35 bg-coral-red/10">
+                    <Ionicons color={THEME_COLORS.coralRed} name="person-outline" size={16} />
+                  </View>
+                </View>
+              ) : (
+                <View className="items-end">
+                  <Text
+                    className="text-[10px] font-black uppercase text-white/45"
+                    style={{ letterSpacing: 1.4 }}>
+                    Field
+                  </Text>
+                  <Text className="text-sm font-black text-white">
+                    {card.memberCount} players
+                  </Text>
+                </View>
+              )}
+            </View>
 
-          {currentMatchup ? (
-            <View className="border-t border-white/[0.06]">
-              <PressableScale
-                onPress={() =>
-                  router.push({
-                    pathname: '/matchups/[matchupId]',
-                    params: { matchupId: currentMatchup.id },
-                  })
-                }>
+            {currentMatchup ? (
+              <View className="border-t border-white/[0.06]">
                 <View className="flex-row items-center justify-center gap-1.5 py-3">
                   <Text
                     className="text-[10px] font-black uppercase text-electric-green"
@@ -392,53 +401,54 @@ function ThisWeekCard({ card }: { card: HomeLeagueCard }) {
                   </Text>
                   <Ionicons color={THEME_COLORS.electricGreen} name="arrow-forward" size={12} />
                 </View>
-              </PressableScale>
-            </View>
-          ) : null}
-        </View>
-
-        <View className="flex-row items-center justify-between">
-          <View className="flex-row items-center gap-2">
-            <Ionicons
-              color={needed > 0 ? THEME_COLORS.amberAccent : THEME_COLORS.electricGreen}
-              name={needed > 0 ? 'time-outline' : 'checkmark-circle'}
-              size={14}
-            />
-            <Text
-              className={cn(
-                'text-[11px] font-black uppercase',
-                needed > 0 ? 'text-amber-accent' : 'text-electric-green',
-              )}
-              style={{ letterSpacing: 1.4 }}>
-              {card.betsPlaced}/{MINIMUM_BETS_PER_WEEK} picks submitted
-            </Text>
+              </View>
+            ) : null}
           </View>
-          <PressableScale onPress={() => router.push('/bet-board')}>
-            <View
-              className={cn(
-                'flex-row items-center gap-1 rounded-full border px-3 py-1.5',
-                needed > 0
-                  ? 'border-electric-green/55 bg-electric-green/15'
-                  : 'border-white/15 bg-white/[0.05]',
-              )}>
+
+          <View className="flex-row items-center justify-between gap-3">
+            <View className="flex-1 flex-row items-center gap-2">
+              <Ionicons
+                color={needed > 0 ? THEME_COLORS.amberAccent : THEME_COLORS.electricGreen}
+                name={needed > 0 ? 'time-outline' : 'checkmark-circle'}
+                size={14}
+              />
               <Text
                 className={cn(
-                  'text-[10px] font-black uppercase',
-                  needed > 0 ? 'text-electric-green' : 'text-white/65',
+                  'text-[11px] font-black uppercase',
+                  needed > 0 ? 'text-amber-accent' : 'text-electric-green',
                 )}
-                style={{ letterSpacing: 1.2 }}>
-                {needed > 0 ? `Place ${needed}` : 'Card Ready'}
+                numberOfLines={1}
+                style={{ letterSpacing: 1.4 }}>
+                {picksSubmittedLabel(card.betsPlaced)}
               </Text>
-              <Ionicons
-                color={needed > 0 ? THEME_COLORS.electricGreen : 'rgba(255,255,255,0.55)'}
-                name="chevron-forward"
-                size={11}
-              />
             </View>
-          </PressableScale>
+            <PressableScale onPress={() => router.push('/bet-board')}>
+              <View
+                className={cn(
+                  'flex-row items-center gap-1 rounded-full border px-3 py-1.5',
+                  needed > 0
+                    ? 'border-electric-green/55 bg-electric-green/15'
+                    : 'border-white/15 bg-white/[0.05]',
+                )}>
+                <Text
+                  className={cn(
+                    'text-[10px] font-black uppercase',
+                    needed > 0 ? 'text-electric-green' : 'text-white/65',
+                  )}
+                  style={{ letterSpacing: 1.2 }}>
+                  {needed > 0 ? `Place ${needed}` : 'Card Ready'}
+                </Text>
+                <Ionicons
+                  color={needed > 0 ? THEME_COLORS.electricGreen : 'rgba(255,255,255,0.55)'}
+                  name="chevron-forward"
+                  size={11}
+                />
+              </View>
+            </PressableScale>
+          </View>
         </View>
-      </View>
-    </Card>
+      </Card>
+    </PressableScale>
   );
 }
 

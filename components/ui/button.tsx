@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   Pressable,
   type PressableProps,
+  StyleSheet,
   Text,
   View,
   type ViewStyle,
@@ -94,14 +95,12 @@ export function Button({
           color={variant === 'primary' ? THEME_COLORS.background : THEME_COLORS.textPrimary}
         />
       ) : (
-        <View className="flex-row items-center justify-center gap-2">
+        <View className="flex-row items-center justify-center gap-2" style={styles.content}>
           {icon ? <Ionicons color={contentColor} name={icon} size={18} /> : null}
           <Text
-            adjustsFontSizeToFit
-            className={cn('shrink text-base font-black uppercase', textClasses[variant])}
-            minimumFontScale={0.78}
+            className={cn('font-black uppercase', textClasses[variant])}
             numberOfLines={1}
-            style={{ letterSpacing: 1.5 }}>
+            style={styles.label}>
             {title}
           </Text>
         </View>
@@ -109,3 +108,18 @@ export function Button({
     </Pressable>
   );
 }
+
+const styles = StyleSheet.create({
+  content: {
+    maxWidth: '100%',
+    width: '100%',
+  },
+  label: {
+    flexShrink: 1,
+    fontSize: 16,
+    letterSpacing: 1.5,
+    lineHeight: 20,
+    minWidth: 0,
+    textAlign: 'center',
+  },
+});

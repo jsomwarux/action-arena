@@ -47,6 +47,7 @@ export type HomeLeagueCard = {
   memberCount: number;
   opponent: UserRow | null;
   thisWeekBets: BetWithLegs[];
+  viewerLabel: string;
   weeklyAwards: WeeklyAwards;
   weeklyProfit: number;
 };
@@ -147,6 +148,13 @@ function sumSettledProfit(bets: BetWithLegs[]) {
 
 function sortByCreatedAt(bets: BetWithLegs[]) {
   return [...bets].sort((left, right) => left.created_at.localeCompare(right.created_at));
+}
+
+function memberDisplayLabel(member: LeagueMemberRow | undefined, user: UserRow | undefined) {
+  const teamName = member?.team_name.trim();
+  const displayName = user?.display_name?.trim();
+
+  return teamName || displayName || 'You';
 }
 
 function normalizeMatchupDetail(data: unknown): MatchupDetail {
@@ -307,6 +315,8 @@ export function useHomeDashboard(userId: string | undefined) {
               currentMatchup?.home_user_id === userId
                 ? currentMatchup.away_user_id
                 : currentMatchup?.home_user_id ?? null;
+            const leagueMembers = members.filter((member) => member.league_id === league.id);
+            const viewerMembership = leagueMembers.find((member) => member.user_id === userId);
             const thisWeekBets = sortByCreatedAt(betsForUserWeek(bets, userId, currentWeek));
             const lastWeekBets = sortByCreatedAt(betsForUserWeek(bets, userId, lastWeek));
 
@@ -319,9 +329,10 @@ export function useHomeDashboard(userId: string | undefined) {
               lastWeekMatchup,
               lastWeekStanding: standingsByKey[`${league.id}:${userId}:${lastWeek}`] ?? null,
               league,
-              memberCount: members.filter((member) => member.league_id === league.id).length,
+              memberCount: leagueMembers.length,
               opponent: opponentId ? usersById[opponentId] ?? null : null,
               thisWeekBets,
+              viewerLabel: memberDisplayLabel(viewerMembership, usersById[userId]),
               weeklyAwards: calculateWeeklyAwards(
                 leagueBets.filter(
                   (bet) => bet.league_id === league.id && bet.week_number === awardsWeek,

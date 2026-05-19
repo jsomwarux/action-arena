@@ -2,7 +2,6 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Modal, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CosmeticAvatar, LockEffect, WinCelebration } from '@/components/cosmetics';
 import { LiveBetStatusSummary, LiveLegScoreLine } from '@/components/picks/live-pick-status';
@@ -15,6 +14,7 @@ import {
   ModalShell,
   NflTeamLogo,
   PressableScale,
+  ScreenWrapper,
   SkeletonLoader,
   StaggeredItem,
   WeekNavigator,
@@ -1205,14 +1205,12 @@ function ReadOnlyPickDetailModal({
 
 function LoadingState() {
   return (
-    <SafeAreaView className="flex-1 bg-arena-bg">
-      <View className="gap-5 px-5 py-6">
-        <SkeletonLoader height={34} width="65%" />
-        <SkeletonLoader height={210} radius={20} />
-        <SkeletonLoader height={120} radius={20} />
-        <SkeletonLoader height={160} radius={20} />
-      </View>
-    </SafeAreaView>
+    <ScreenWrapper className="gap-5 py-6">
+      <SkeletonLoader height={34} width="65%" />
+      <SkeletonLoader height={210} radius={20} />
+      <SkeletonLoader height={120} radius={20} />
+      <SkeletonLoader height={160} radius={20} />
+    </ScreenWrapper>
   );
 }
 
@@ -1428,27 +1426,25 @@ export default function MatchupDetailScreen() {
 
   if (!initialDetail) {
     return (
-      <SafeAreaView className="flex-1 bg-arena-bg">
-        <View className="flex-1 items-center justify-center gap-4 px-5">
-          <View className="h-16 w-16 items-center justify-center rounded-full border border-coral-red/40 bg-coral-red/10">
-            <Ionicons color={THEME_COLORS.coralRed} name="alert" size={28} />
-          </View>
-          <Text
-            className="text-center text-2xl font-black uppercase text-white"
-            style={{ letterSpacing: -0.4 }}>
-            Matchup Unavailable
-          </Text>
-          <Text className="text-center text-base font-semibold text-white/55">
-            This matchup could not be loaded.
-          </Text>
+      <ScreenWrapper centered className="gap-4">
+        <View className="h-16 w-16 items-center justify-center rounded-full border border-coral-red/40 bg-coral-red/10">
+          <Ionicons color={THEME_COLORS.coralRed} name="alert" size={28} />
         </View>
-      </SafeAreaView>
+        <Text
+          className="text-center text-2xl font-black uppercase text-white"
+          style={{ letterSpacing: -0.4 }}>
+          Matchup Unavailable
+        </Text>
+        <Text className="text-center text-base font-semibold text-white/55">
+          This matchup could not be loaded.
+        </Text>
+      </ScreenWrapper>
     );
   }
 
   if (isFutureWeek || !detail) {
     return (
-      <SafeAreaView className="flex-1 bg-arena-bg">
+      <ScreenWrapper className="px-0 pb-0 pt-0">
         <ScrollView
           className="flex-1"
           contentContainerStyle={{ gap: 18, padding: 20, paddingBottom: 36 }}
@@ -1482,7 +1478,7 @@ export default function MatchupDetailScreen() {
             <NoMatchupScheduledCard weekNumber={selectedWeekNumber} />
           )}
         </ScrollView>
-      </SafeAreaView>
+      </ScreenWrapper>
     );
   }
 
@@ -1535,7 +1531,7 @@ export default function MatchupDetailScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-arena-bg">
+    <ScreenWrapper className="px-0 pb-0 pt-0">
       <WinCelebration
         cosmetics={userId ? cosmeticsByUserId[userId] : undefined}
         fireKey={resolvedMatchupId}
@@ -1693,6 +1689,6 @@ export default function MatchupDetailScreen() {
           </>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </ScreenWrapper>
   );
 }

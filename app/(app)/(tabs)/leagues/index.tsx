@@ -167,7 +167,7 @@ export default function LeaguesScreen() {
   const data = leaguesQuery.data ?? [];
 
   return (
-    <ScreenWrapper className="pb-0">
+    <ScreenWrapper className="pb-0" topSafe>
       <View className="mb-4 gap-3">
         <View>
           <View className="flex-row items-center gap-2">

@@ -1,10 +1,9 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect } from 'react';
-import { RefreshControl, ScrollView, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { RefreshControl, ScrollView, Text } from 'react-native';
 
 import { ProfileContent } from '@/components/profile/profile-content';
-import { Card, SkeletonLoader } from '@/components/ui';
+import { Card, ScreenWrapper, SkeletonLoader } from '@/components/ui';
 import { THEME_COLORS } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
 import { buildMemberComparison, useProfileData } from '@/hooks/use-profile-stats';
@@ -16,13 +15,11 @@ function getParamValue(param: string | string[] | undefined) {
 
 function LoadingState() {
   return (
-    <SafeAreaView className="flex-1 bg-arena-bg">
-      <View className="gap-4 px-5 py-6">
-        <SkeletonLoader height={34} width="65%" />
-        <SkeletonLoader height={160} />
-        <SkeletonLoader height={180} />
-      </View>
-    </SafeAreaView>
+    <ScreenWrapper className="gap-4 py-6">
+      <SkeletonLoader height={34} width="65%" />
+      <SkeletonLoader height={160} />
+      <SkeletonLoader height={180} />
+    </ScreenWrapper>
   );
 }
 
@@ -56,7 +53,7 @@ export default function MemberProfileScreen() {
       : undefined;
 
   return (
-    <SafeAreaView className="flex-1 bg-arena-bg">
+    <ScreenWrapper className="px-0 pb-0 pt-0">
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ gap: 18, padding: 20, paddingBottom: 36 }}
@@ -82,6 +79,6 @@ export default function MemberProfileScreen() {
           </Card>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </ScreenWrapper>
   );
 }
