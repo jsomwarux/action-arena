@@ -37,6 +37,10 @@ import {
   getProfitTone,
 } from '@/lib/format';
 import {
+  getLeagueMemberPrimaryName,
+  getLeagueMemberSecondaryName,
+} from '@/lib/league-member-display';
+import {
   comparePicksByStartTimeDesc,
   formatBetLegLabel,
   formatPickTitle,
@@ -253,18 +257,15 @@ function StaticSegmentedToggle<V extends string>({
               style={{ borderColor: active ? `${color}73` : 'transparent' }}>
               {option.icon ? (
                 <Ionicons
-                  color={active ? color : 'rgba(255,255,255,0.48)'}
+                  color={active ? color : THEME_COLORS.textMuted}
                   name={option.icon}
                   size={12}
                 />
               ) : null}
               <Text
-                className={cn(
-                  'text-[10px] font-black uppercase',
-                  active ? 'text-white' : 'text-white/50',
-                )}
+                className="text-[10px] font-black uppercase"
                 numberOfLines={1}
-                style={{ color: active ? color : undefined, letterSpacing: 0.8 }}>
+                style={{ color: active ? color : THEME_COLORS.textMuted, letterSpacing: 0.8 }}>
                 {option.label}
               </Text>
             </View>
@@ -1479,6 +1480,18 @@ export function ProfileContent({
     resolvedLeagueId === 'all'
       ? 'All leagues'
       : data.leagueOptions.find((option) => option.id === resolvedLeagueId)?.label ?? 'Selected league';
+  const scopedMembership =
+    resolvedLeagueId === 'all'
+      ? null
+      : data.memberships.find((membership) => membership.league_id === resolvedLeagueId) ?? null;
+  const isLeagueScoped = resolvedLeagueId !== 'all';
+  const primaryName = isLeagueScoped
+    ? getLeagueMemberPrimaryName(scopedMembership, data.profile, 'Player')
+    : data.profile.display_name;
+  const secondaryName = isLeagueScoped
+    ? getLeagueMemberSecondaryName(scopedMembership, data.profile) ?? scopeLabel
+    : data.profile.display_name;
+  const headerTitle = isLeagueScoped ? primaryName : title;
   const leagueNameById = useMemo(
     () =>
       data.leagues.reduce<LeagueNameById>((names, league) => {
@@ -1494,7 +1507,7 @@ export function ProfileContent({
         <View className="flex-row items-center gap-4">
           <CosmeticAvatar
             cosmetics={cosmeticsQuery.data?.[data.profile.id]}
-            name={data.profile.display_name}
+            name={primaryName}
             size="lg"
           />
           <View className="flex-1">
@@ -1510,10 +1523,10 @@ export function ProfileContent({
               className="mt-1 text-3xl font-extrabold text-white"
               numberOfLines={1}
               style={{ letterSpacing: -0.5 }}>
-              {title}
+              {headerTitle}
             </Text>
             <Text className="mt-1.5 text-base font-medium text-white/60" numberOfLines={1}>
-              {data.profile.display_name}
+              {secondaryName}
             </Text>
           </View>
         </View>

@@ -1,167 +1,201 @@
 # Action Arena App Store Screenshots Plan
 
-Source context: `marketing/marketing/INTAKE.md`, `marketing/marketing/COMPONENTS.md`, and `marketing/marketing/TOKENS.md`.
+Updated after simulator review on May 19, 2026.
 
-Capture principle: make this feel like a fantasy league game with friends, not a sportsbook. Use "pick", "card", "league", "coins", "bragging rights", and "no real money" in overlay copy. Avoid App Store overlay headlines that use "bet", "wager", "sportsbook", "cash", "win money", or "odds boost".
+## Capture Data Now Available
 
-## Part 1 - Narrative Arc
+I seeded a dedicated fixture in the linked Supabase project:
 
-### 1. Hook Screenshot
+- League: `App Store Screenshot League`
+- Invite code: `APPSTR`
+- Current week: `Week 3`
+- Leaderboard hero row: `Sunday Syndicate`, `+245 coins`, rank 1
+- Other podium rows: `Review Rebels`, `+188 coins`; `Fourth Quarter Club`, `+106 coins`
+- Completed matchup if logged in as `jsomwarux@yahoo.com`: matchup `00000000-0000-0000-0000-000000031301`, `Sunday Syndicate` won `+118` to `+32`
+- Completed matchup if logged in as `appreview@actionarena.app`: matchup `00000000-0000-0000-0000-000000031302`, `Review Rebels` won `+64` to `+35`
+
+Re-seed any time with:
+
+```sh
+npx supabase db query --linked -f scripts/seed-app-store-screenshot-fixtures.sql
+```
+
+## Screenshot 1 - Hook
 
 Headline: **Build Your Sunday Card**
 
-Narrative purpose: Stops the scroll with the core fantasy-prediction gameplay surface: a glowing NFL slate, a weekly virtual-coin budget, and recognizable Straight / Parlay / Teaser strategy without implying real-money gambling.
+Purpose: Make the App Store visitor instantly understand the product: a weekly NFL pick board with virtual coins, league context, and sports-strategy energy.
 
-### 2. Mechanic Screenshot
+Best screen: `app/(app)/(tabs)/bet-board.tsx` - Pick Board.
+
+Use this instead of the selected Parlay Builder frame. Your Screenshot 1 proves the selected parlay legs do not fit above the fold, so the Parlay Builder should not be the hook capture. It reads as a setup panel, not the hero feature.
+
+Best state:
+
+- League: `Test H2H League`, or any open league where you can still build picks.
+- Pick type: `Straight`, not `Parlay`.
+- Weekly budget visible.
+- First game card visible with team matchup and pick buttons.
+- Lineup sheet collapsed.
+- No amount modal, tour overlay, or empty parlay builder dominating the bottom.
+
+Step-by-step:
+
+1. Launch the simulator and log in.
+2. Tap `Picks`.
+3. If the selected league is `App Store Screenshot League`, switch the Active League picker back to `Test H2H League` because the screenshot fixture is already settled/submitted.
+4. Select `Straight`.
+5. Keep Week 2 if that is the open week with available games.
+6. Drag the page slightly upward until the first actual game card appears below the budget tracker.
+7. Keep the bottom Lineup sheet collapsed.
+8. Capture when the screen is settled.
+
+Frame note: The ideal frame has `Pick Board`, `Weekly Budget`, and the top of the first real matchup. Avoid a frame where the visible bottom is mostly `Parlay Builder 0/6 legs`.
+
+## Screenshot 2 - Mechanic
 
 Headline: **Pick Five. Spend 100.**
 
-Narrative purpose: Explains the main action in one glance: choose weekly picks, allocate the full 100 virtual coins, and name one Pick of the Week before submitting.
+Purpose: Show the core loop: build a five-pick lineup, allocate the full 100 virtual coins, and choose one Pick of the Week.
 
-### 3. Social / Proof Screenshot
+Best screen: `app/(app)/(tabs)/bet-board.tsx` - expanded Lineup bottom sheet.
+
+Use Screenshot 3 as the model, not Screenshot 2. Screenshot 2 is clean, but three straight picks in a column undersells the app. Screenshot 3 is stronger because it shows Straight, Parlay, and the Teaser accent peeking in, which communicates the product's variety in one frame.
+
+Best state:
+
+- Expanded lineup sheet.
+- Header shows `5/5 picks · 100 coins` and `Remaining 0 coins`.
+- One Straight card at the top.
+- One 2-leg Parlay card fully visible.
+- Teaser card peeking at the bottom.
+- One pick marked as Pick of the Week so the gold lock treatment appears.
+
+Step-by-step:
+
+1. Open `Picks`.
+2. Select `Test H2H League` or another unsubmitted open league.
+3. Add one Straight pick for `20 coins`.
+4. Add one 2-leg Parlay for `20 coins`.
+5. Add one 2-leg Teaser for `20 coins`.
+6. Add two more Straight picks for `20 coins` each.
+7. Expand the Lineup sheet.
+8. Tap `Mark as Pick of the Week (1.5x)` on the top Straight card or the Parlay card.
+9. Scroll the Lineup sheet so the top Straight card and the full Parlay card are visible, with the Teaser card starting at the bottom.
+10. Capture after the gold lock highlight settles.
+
+Frame note: If the lock badge makes the first card too tall, put the lock on the Parlay card and frame the Parlay as the hero card. Do not use an all-Straight lineup for the final App Store screenshot unless the mixed lineup becomes visually cramped.
+
+## Screenshot 3 - Social / Proof
 
 Headline: **Climb Your League**
 
-Narrative purpose: Shows the product is multiplayer and season-long by making friends, ranks, records, and profit movement the center of the frame.
+Purpose: Prove this is multiplayer and season-long: friends, rankings, records, movement, and realistic virtual profit.
 
-### 4. Reward / Outcome Screenshot
+Best screen: `app/(app)/(tabs)/leaderboard.tsx` - Leaderboard.
+
+Best state:
+
+- League: `App Store Screenshot League`.
+- Segmented control: `Season`.
+- Podium visible.
+- `Sunday Syndicate` at rank 1 with `+245`.
+- `Review Rebels` and `Fourth Quarter Club` visible as rank 2 and rank 3.
+- At least the first row of the full leaderboard table visible below podium if possible.
+
+Step-by-step:
+
+1. Pull to refresh, or fully restart the app after seeding.
+2. Tap `Leaders`.
+3. If the league chip is not already `App Store Screenshot League`, tap that league chip.
+4. Select `Season`.
+5. Wait about 1 second for podium and number animations.
+6. Capture with the podium centered and the table header/first row still visible.
+
+If logged in as `jsomwarux@yahoo.com`, `Sunday Syndicate` should also show the `You` badge on the first-place podium. That is the optimal capture.
+
+## Screenshot 4 - Reward / Outcome
 
 Headline: **Bragging Rights Unlocked**
 
-Narrative purpose: Delivers the emotional payoff: a won matchup, virtual profit, a rank-worthy result, and the celebration effect that makes the weekly loop feel game-like.
+Purpose: Show the payoff: your picks settled, your weekly matchup won, and the app celebrating the result.
 
-### 5. Brand / Compliance Screenshot
+Best screen: `app/(app)/(tabs)/matchups/[matchupId].tsx` - completed Matchup Detail.
+
+Best state:
+
+- League: `App Store Screenshot League`.
+- Week: `Week 3`.
+- Current user won.
+- Top matchup score area visible.
+- User side has positive virtual profit.
+- Celebration overlay is firing, or the settled result is visible immediately after it.
+
+Step-by-step if logged in as `jsomwarux@yahoo.com`:
+
+1. Tap `Leagues`.
+2. Open `App Store Screenshot League`.
+3. Make sure the Week Navigator is on `Week 3`.
+4. Open the current matchup card for `Sunday Syndicate` vs `Fourth Quarter Club`.
+5. The win celebration should auto-fire the first time the matchup opens.
+6. Capture 300-700 ms after the celebration starts, when particles are visible but the matchup is still readable.
+
+Step-by-step if logged in as `appreview@actionarena.app`:
+
+1. Tap `Leagues`.
+2. Open `App Store Screenshot League`.
+3. Make sure the Week Navigator is on `Week 3`.
+4. Open the current matchup card for `Review Rebels` vs `North End Picks`.
+5. Capture the win celebration or settled result.
+
+If the celebration does not fire:
+
+1. Delete the app from the simulator or erase app data to clear the local `action-arena.win-celebration.<matchupId>` flag.
+2. Reinstall/reopen the app.
+3. Open the same matchup again.
+
+Frame note: A clean settled-result frame is acceptable if the celebration obscures too much. The important read is "I beat my friend and gained virtual coins."
+
+## Screenshot 5 - Brand / Compliance
 
 Headline: **No Real Money. All Rivalry.**
 
-Narrative purpose: Lands the brand promise and compliance posture clearly: Action Arena is free-to-play fantasy sports competition with virtual coins and no in-app gambling.
+Purpose: Close the carousel by making the compliance promise explicit: free-to-play fantasy sports predictions, virtual coins only, no real-money gambling.
 
-## Part 2 - Screen Capture Plan
+Best raw app screen: `app/(app)/disclosure.tsx` - How Action Arena Works.
 
-### Shot 1 - Hook Screenshot
+Your Screenshot 4 is the screen I meant as the compliance fallback. It is correct for the disclosure requirement, but it is not the strongest brand screenshot by itself because there is no Action Arena wordmark and the top has a lot of empty space.
 
-Screen / route: `app/(app)/(tabs)/bet-board.tsx` - Pick Board, current week.
+Best state:
 
-State to capture: Current-week slate loaded with several NFL game cards visible, populated budget tracker, and the Pick Type segmented control near the top. Best frame is Parlay mode because amber carries the strongest visual contrast and the `ParlayBuilder` can show "Stack the Chain", combo value, and selected legs.
+- Disclosure card fully visible.
+- Shield icon visible.
+- `How Action Arena Works` title visible.
+- Body copy readable enough to show "free-to-play", "virtual", "no monetary value", and "No real money".
 
-Navigation from launch:
+Step-by-step:
 
-1. Log in with the App Review demo account from `docs/app-review-notes.md`.
-2. If the disclosure appears, tap `Got It`.
-3. From Home, tap `Open Pick Board`, or use the bottom tab for Pick Board.
-4. Select `App Review Demo League` if multiple leagues appear.
-5. Ensure the Week Navigator is on the open week, currently seeded as Week 4 in the demo notes.
-6. Tap `Parlay` in the Pick Type segmented control.
-7. Tap two or three non-conflicting values from different games so the Parlay Builder fills in.
+1. Open Settings / About / disclosure entry if available, or trigger the one-time disclosure with a fresh account/session.
+2. Stay on the disclosure screen.
+3. Capture the settled state.
+4. In the App Store composed screenshot, add the external headline `No Real Money. All Rivalry.` and the Action Arena wordmark above or below the phone frame.
 
-Setup needed: Demo user must belong to a league with an open current week and upcoming mock or live NFL lines. For reliable capture, start the app with `EXPO_PUBLIC_USE_MOCK_DATA=true` so mock NFL games are available even if The Odds API is unavailable. Mark the Bet Board tour complete in AsyncStorage before capture, or dismiss it before framing.
+Best final-composition option:
 
-Capture timing: Capture after the `StaggeredItem` card entrances and `AnimatedNumber` values settle, roughly 1 second after the last leg is selected. If using the Parlay Builder, capture with at least 2 legs and a non-zero amount so combo value and reward are visible.
+- Use the disclosure screen as the phone content.
+- Add `Action Arena` wordmark outside the phone in the App Store screenshot layout.
+- Add a short compliance line outside the phone: `Free to play. Virtual coins only. No real money.`
 
-Concerns: The in-app screen uses sportsbook-adjacent visual language by necessity, so the App Store overlay headline should stay fantasy-coded. Avoid an overlay that says "bet", "odds", "wager", or "payout". Also watch for the first-run tour overlay, early-access window, empty lines, or "Lines Loading Up" states.
+## Final Recommended 5-Shot Order
 
-### Shot 2 - Mechanic Screenshot
+1. `Build Your Sunday Card` - Pick Board with real game cards, not empty Parlay Builder.
+2. `Pick Five. Spend 100.` - mixed Lineup sheet using Screenshot 3 style.
+3. `Climb Your League` - seeded `App Store Screenshot League` leaderboard.
+4. `Bragging Rights Unlocked` - seeded completed winning matchup.
+5. `No Real Money. All Rivalry.` - disclosure screen plus brand treatment.
 
-Screen / route: `app/(app)/(tabs)/bet-board.tsx` - Pick Board with `BetSlipSheet`, `AmountModal`, and `ConfirmationModal`.
+## Copy Rules
 
-State to capture: Mid-flow or final-review lineup with exactly 5 picks, exactly 100 virtual coins allocated, and one Pick of the Week highlighted. Ideal frame is the expanded lineup bottom sheet showing 5/5 picks, the lock badge, validation passing, and `Review & Submit`. A stronger alternate is the `ConfirmationModal` with `Final Review` and grouped Straight / Parlay / Teaser rows.
-
-Navigation from launch:
-
-1. Open Pick Board.
-2. In Straight mode, tap a game value.
-3. In the amount modal, choose a quick amount like `20 coins`, then tap `Add to Lineup`.
-4. Repeat until the lineup has enough items, mixing Straight plus one Parlay or Teaser if possible.
-5. For Parlay: switch to `Parlay`, select 2 different games, enter an amount, and tap `Add Parlay to Lineup`.
-6. For Teaser: switch to `Teaser`, keep a point option selected, choose spread or total values from 2 different games, enter an amount, and tap `Add Teaser to Lineup`.
-7. Expand the bottom lineup sheet.
-8. Tap the star / Pick of the Week control on the most visually distinctive pick.
-9. Adjust amounts until the budget is exactly 100 coins.
-
-Setup needed: Use an unsubmitted current-week lineup. If the demo account already has Week 4 submitted, use another seeded capture account or reset / reseed the demo week before capture. The rules require at least 5 picks, exactly 100 coins, max 35 coins per pick, and exactly one Pick of the Week.
-
-Capture timing: Capture either immediately after the Pick of the Week highlight pulse begins, or once the lineup sheet is fully expanded and no modal keyboard is visible. For the confirmation modal, capture after tapping `Review & Submit` and waiting for the modal fade to finish.
-
-Concerns: This is the most setup-sensitive shot. It is easy to accidentally create duplicate side conflicts, exceed the 35-coin max, miss the exact 100-coin allocation, or forget the Pick of the Week. If this becomes too slow in the simulator, use the final-review modal as a mocked composition later in Claude Design with the same app UI.
-
-### Shot 3 - Social / Proof Screenshot
-
-Primary screen / route: `app/(app)/(tabs)/leaderboard.tsx` - Leaderboard.
-
-Alternate screen / route: `app/(app)/(tabs)/leagues/[leagueId].tsx` - League Detail, `standings` or `chat` tab.
-
-State to capture: Populated league leaderboard with at least 6 members if possible, visible podium cards for ranks 1-3, trend badges, and current user row. If the demo league only has two members, use League Detail instead and capture the Standings card plus Invite Code / Schedule context, or capture the Chat tab with shared pick cards and stickers.
-
-Navigation from launch:
-
-1. Log in and land on Home.
-2. Tap the `Leaderboard` bottom tab.
-3. If multiple league chips appear, select the most populated league.
-4. Keep `Season` selected for the clearest season-long proof, or switch to `This Week` if weekly movement looks stronger.
-5. Scroll just enough to include the podium and first rows of the table.
-
-Setup needed: A marketable capture league should have more than two members, believable team names, diverse avatars/cosmetics, and standings rows with positive and negative virtual profit. The App Review demo league is enough for review, but may be visually thin for App Store proof if it only has two demo members.
-
-Capture timing: Capture after podium entrance animations settle, about 1 second after the screen loads or after changing the Season / This Week segmented control.
-
-Concerns: Empty or two-person standings undercut the social proof claim. Avoid all-male-coded or joke-only names in screenshots; Priya's persona is sensitive to "men yelling about football" energy. If the live app cannot produce a strong leaderboard, build this shot later as a controlled composition using the Leaderboard UI with seeded rows.
-
-### Shot 4 - Reward / Outcome Screenshot
-
-Primary screen / route: `app/(app)/(tabs)/matchups/[matchupId].tsx` - Matchup Detail with `WinCelebration`.
-
-Alternate screen / route: `app/(app)/shop.tsx` - Arena Locker if a clean celebration cannot be triggered.
-
-State to capture: A completed matchup where the current user won. The frame should show side-by-side players, the user's positive virtual-coin profit, winning / leading visual treatment, settled pick cards, and the `WinCelebration` overlay firing. Best version is a Score Burst, Stadium Crowd, Fireworks, or confetti celebration layered over a visible winning matchup.
-
-Navigation from launch:
-
-1. Open `Leagues`.
-2. Enter `App Review Demo League`.
-3. On League Detail, use the Week Navigator to choose a settled past week where the demo user won.
-4. Tap the current user's matchup card.
-5. If needed, clear the local celebration flag for that matchup so the celebration replays: `action-arena.win-celebration.<matchupId>`.
-6. Reopen the matchup detail screen.
-
-Setup needed: The selected matchup must have `winner_id` equal to the logged-in user. The user should have equipped a visually strong win celebration cosmetic in the Arena Locker, or else the default confetti still works. If no seeded win exists, create or seed one rather than showing a loss, since this slot is the reward shot.
-
-Capture timing: Capture during the celebration peak, roughly 300-700 ms after the overlay appears, while particles / scoreboard digits are most visible but before they obscure all underlying matchup context. For a static alternative, capture the settled screen after the overlay completes with positive virtual profit and the winner treatment visible.
-
-Concerns: The celebration only auto-fires once per matchup per local flag. It will not show if the user lost, if the matchup is pending, or if the local flag says it has already been seen. Also avoid a frame where confetti hides all data; the shot still needs to read as "I beat my friend", not just generic celebration.
-
-### Shot 5 - Brand / Compliance Screenshot
-
-Primary screen / route: `app/onboarding.tsx` - Onboarding, first slide.
-
-Compliance alternate: `app/(app)/disclosure.tsx` - How Action Arena Works disclosure.
-
-State to capture: Onboarding slide 1 with the Action Arena wordmark visible, dark navy background, electric-green accent, and the body copy "Compete with friends. No real money. Just bragging rights." The App Store overlay should carry the compliance headline and a short disclosure line.
-
-Navigation from launch:
-
-1. Use a fresh simulator install or clear the onboarding AsyncStorage flag `action-arena.onboarding-complete`.
-2. Launch the app.
-3. Stay on onboarding slide 1.
-4. If using the disclosure alternate, log in, open the one-time disclosure, or navigate to the disclosure route from settings if exposed.
-
-Setup needed: Fresh local app state for onboarding. For the disclosure alternate, use a user who has not acknowledged the disclosure, or open it from Settings / About if the route is exposed there. No special league data is needed.
-
-Capture timing: Capture after the onboarding card animation settles, with the wordmark, first slide, and CTA visible. For the disclosure screen, capture the settled state with the shield icon, title, and body legible.
-
-Concerns: This slot maps imperfectly to a pure in-app screen. Onboarding has brand plus short "no real money" copy, but it also includes `Skip` and `Create Account` UI that may not be ideal for a final App Store image. The disclosure screen has excellent compliance language, but no wordmark. Best App Store result may be a Claude Design composition using the ArenaLogo from `components/ui/arena-logo.tsx`, the disclosure language from `constants/disclosure.ts`, and a subtle phone mockup of onboarding or the Pick Board.
-
-## Capture Preflight
-
-- Use iOS simulator as the source of truth; this app is iOS-first and has no web version.
-- Prefer a tall modern iPhone simulator such as iPhone 15 Pro Max / 16 Pro Max so App Store text overlays have room.
-- Confirm the demo account from `docs/app-review-notes.md` works before the capture block.
-- Use mock NFL data for deterministic Pick Board frames when possible: `EXPO_PUBLIC_USE_MOCK_DATA=true`.
-- Clear or set local flags intentionally: onboarding complete, Bet Board tour complete, and matchup celebration seen flags can change what appears.
-- Keep overlay copy compliant: "free-to-play", "virtual coins", "sports picks", "prediction league", "friends", "bragging rights".
-- Avoid screenshots with placeholder errors, empty states, loading skeletons, API failures, early-access lockouts, or "Season Pass required" as the central message.
-
-## If Screens Map Poorly
-
-- If the Leaderboard is underpopulated, use League Detail standings/chat as the social shot, or create a seeded capture league with 6-10 members.
-- If the WinCelebration will not replay, use a settled Matchup Detail screen as the reward shot and add celebration treatment in Claude Design.
-- If the brand/compliance screen feels too utilitarian, build the fifth shot as a designed composition rather than a raw simulator screenshot. Keep the compliance line direct: "Free to play. Virtual coins only. No real money."
+- Use `pick`, `card`, `lineup`, `league`, `coins`, `rivalry`, `bragging rights`.
+- Avoid `bet`, `wager`, `sportsbook`, `cash`, `win money`, `payout`, and `odds boost` in App Store overlay text.
+- In screenshots where the app itself says `Parlay`, `Teaser`, or `Reward`, that is acceptable because it is product UI, but the marketing headline should stay fantasy-league coded.

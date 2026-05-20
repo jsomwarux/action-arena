@@ -38,6 +38,10 @@ Module._load = function loadWithAppStubs(request, parent, isMain) {
     return { supabase: {} };
   }
 
+  if (request === '@/lib/league-member-display') {
+    return require(path.join(root, 'lib/league-member-display.ts'));
+  }
+
   return originalLoad.call(this, request, parent, isMain);
 };
 

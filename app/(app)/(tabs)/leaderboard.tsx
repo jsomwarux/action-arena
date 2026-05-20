@@ -29,6 +29,10 @@ import { useSeasonPass } from '@/hooks/use-season-pass';
 import { triggerAdHook } from '@/lib/ad-hooks';
 import { cn } from '@/lib/cn';
 import { formatProfit, formatRecord, getProfitTone } from '@/lib/format';
+import {
+  getLeagueMemberPrimaryName,
+  getLeagueMemberSecondaryName,
+} from '@/lib/league-member-display';
 import type { EquippedCosmeticsByCategory } from '@/types/database';
 
 type BoardView = 'season' | 'week';
@@ -221,7 +225,7 @@ function PodiumCard({
 }) {
   const accent = rankAccent(rank);
   const trendMeta = trend ? trendDescriptor(trend) : null;
-  const avatarName = row.member.team_name || row.profile?.display_name || '?';
+  const displayName = getLeagueMemberPrimaryName(row.member, row.profile, 'Player');
   const iconSize = featured ? 20 : 14;
   const nameSize = featured ? 'text-sm' : 'text-xs';
   const valueSize = featured ? 'text-base' : 'text-sm';
@@ -252,14 +256,14 @@ function PodiumCard({
         <View className="mt-2">
           <CosmeticAvatar
             cosmetics={cosmetics}
-            name={avatarName}
+            name={displayName}
             size={featured ? 'lg' : 'md'}
           />
         </View>
         <Text
           className={cn('mt-2 text-center font-semibold text-white', nameSize)}
           numberOfLines={1}>
-          {row.member.team_name}
+          {displayName}
         </Text>
         <View className="mt-1.5 flex-row items-center gap-1">
           {trendMeta ? (
@@ -300,6 +304,8 @@ function LeaderboardListRow({
 }) {
   const accent = rankAccent(showRank);
   const trendMeta = trend ? trendDescriptor(trend) : null;
+  const displayName = getLeagueMemberPrimaryName(row.member, row.profile, 'Player');
+  const secondaryName = getLeagueMemberSecondaryName(row.member, row.profile);
 
   return (
     <TapTarget onPress={onPress}>
@@ -343,14 +349,14 @@ function LeaderboardListRow({
           <View className="flex-row items-center gap-2">
             <CosmeticAvatar
               cosmetics={cosmetics}
-              name={row.member.team_name || row.profile?.display_name || 'Player'}
+              name={displayName}
               size="sm"
             />
             <Text
               className="text-base font-bold text-white"
               numberOfLines={1}
               style={{ letterSpacing: -0.2 }}>
-              {row.member.team_name}
+              {displayName}
             </Text>
             {isUser ? <Badge label="You" tone="green" /> : null}
           </View>
@@ -358,7 +364,7 @@ function LeaderboardListRow({
             {row.standing
               ? formatRecord(row.standing.wins, row.standing.losses, row.standing.ties)
               : '0-0'}
-            {row.profile?.display_name ? ` · ${row.profile.display_name}` : ''}
+            {secondaryName ? ` · ${secondaryName}` : ''}
           </Text>
         </View>
 
@@ -576,7 +582,7 @@ export default function LeaderboardScreen() {
                   <Text
                     className="flex-1 text-xs font-bold uppercase text-white/55"
                     style={{ letterSpacing: 1.2 }}>
-                    Player
+                    Team
                   </Text>
                   <Text
                     className="text-xs font-bold uppercase text-white/55"

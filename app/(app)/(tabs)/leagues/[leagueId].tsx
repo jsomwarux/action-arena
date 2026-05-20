@@ -5,6 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
+  Modal,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   Platform,
@@ -27,9 +28,11 @@ import {
   Badge,
   Button,
   Card,
+  ModalShell,
   NflTeamLogo,
   PressableScale,
   SkeletonLoader,
+  TextInput as AppTextInput,
   WeekNavigator,
 } from '@/components/ui';
 import { getCosmeticItem } from '@/constants/cosmetics';
@@ -49,6 +52,7 @@ import {
   type LeagueDetail,
   useGenerateScheduleMutation,
   useLeagueDetail,
+  useUpdateLeagueTeamNameMutation,
 } from '@/hooks/use-leagues';
 import {
   type WeeklyAward,
@@ -67,12 +71,18 @@ import {
   getProfitTone,
 } from '@/lib/format';
 import { formatBetLegLabel, formatPickTitle, getPickLogoLabel } from '@/lib/pick-labels';
+import {
+  getLeagueMemberPrimaryName,
+  getLeagueMemberSecondaryName,
+  TEAM_NAME_MAX_LENGTH,
+} from '@/lib/league-member-display';
 import type {
   BetMarket,
   BetType,
   ChampionshipSummary,
   EquippedCosmeticsByCategory,
   Json,
+  LeagueMemberRow,
   LeagueVisibility,
   SeasonAward,
   StandingRow,
@@ -102,8 +112,16 @@ function getParamValue(param: string | string[] | undefined) {
   return Array.isArray(param) ? param[0] : param;
 }
 
-function getDisplayName(detail: LeagueDetail, userId: string) {
-  return detail.profilesById[userId]?.display_name ?? 'Unknown Player';
+function getMember(detail: LeagueDetail, userId: string) {
+  return detail.members.find((member) => member.user_id === userId) ?? null;
+}
+
+function getDisplayName(detail: LeagueDetail, userId: string, fallback = 'Unknown Player') {
+  return getLeagueMemberPrimaryName(getMember(detail, userId), detail.profilesById[userId], fallback);
+}
+
+function getSecondaryDisplayName(detail: LeagueDetail, userId: string) {
+  return getLeagueMemberSecondaryName(getMember(detail, userId), detail.profilesById[userId]);
 }
 
 function getAwayDisplayName(detail: LeagueDetail, matchup: WeeklyMatchupRow) {
@@ -743,13 +761,164 @@ function InviteCodeCard({
   );
 }
 
+function YourTeamCard({
+  detail,
+  onEdit,
+  userId,
+}: {
+  detail: LeagueDetail;
+  onEdit: (member: LeagueMemberRow) => void;
+  userId: string;
+}) {
+  const member = getMember(detail, userId);
+
+  if (!member) {
+    return null;
+  }
+
+  const teamName = getDisplayName(detail, userId, 'Your Team');
+  const secondaryName = getSecondaryDisplayName(detail, userId);
+
+  return (
+    <Card>
+      <View className="gap-4">
+        <View className="flex-row items-center justify-between gap-3">
+          <View className="min-w-0 flex-1 flex-row items-center gap-3">
+            <View className="h-12 w-12 items-center justify-center rounded-2xl border border-electric-green/35 bg-electric-green/12">
+              <Ionicons color={THEME_COLORS.electricGreen} name="shield-checkmark" size={20} />
+            </View>
+            <View className="min-w-0 flex-1">
+              <Text
+                className="text-[10px] font-black uppercase text-electric-green"
+                style={{ letterSpacing: 2 }}>
+                Your Team
+              </Text>
+              <Text
+                className="mt-1 text-lg font-black text-white"
+                numberOfLines={1}
+                style={{ letterSpacing: -0.3 }}>
+                {teamName}
+              </Text>
+              {secondaryName ? (
+                <Text className="mt-0.5 text-xs font-semibold text-white/45" numberOfLines={1}>
+                  {secondaryName}
+                </Text>
+              ) : null}
+            </View>
+          </View>
+          <View className="shrink-0">
+            <Button
+              fullWidth={false}
+              icon="pencil"
+              onPress={() => {
+                haptics.selection();
+                onEdit(member);
+              }}
+              title="Edit"
+              variant="secondary"
+            />
+          </View>
+        </View>
+      </View>
+    </Card>
+  );
+}
+
+function TeamNameEditorModal({
+  draftName,
+  error,
+  isSaving,
+  onCancel,
+  onChange,
+  onSave,
+  visible,
+}: {
+  draftName: string;
+  error?: string;
+  isSaving: boolean;
+  onCancel: () => void;
+  onChange: (value: string) => void;
+  onSave: () => void;
+  visible: boolean;
+}) {
+  return (
+    <Modal animationType="fade" onRequestClose={onCancel} transparent visible={visible}>
+      <ModalShell variant="overlay">
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          className="flex-1 justify-center bg-black/80 px-5">
+          <Card>
+            <View className="gap-5">
+              <View className="items-center gap-2">
+                <View
+                  className="h-14 w-14 items-center justify-center rounded-full border border-electric-green/40 bg-electric-green/15"
+                  style={{
+                    shadowColor: THEME_COLORS.electricGreen,
+                    shadowOffset: { width: 0, height: 0 },
+                    shadowOpacity: 0.55,
+                    shadowRadius: 16,
+                  }}>
+                  <Ionicons color={THEME_COLORS.electricGreen} name="shield-checkmark" size={22} />
+                </View>
+                <Text
+                  className="text-[10px] font-black uppercase text-electric-green"
+                  style={{ letterSpacing: 3 }}>
+                  Team Identity
+                </Text>
+                <Text
+                  className="text-center text-2xl font-black uppercase text-white"
+                  style={{ letterSpacing: -0.4 }}>
+                  Edit Team Name
+                </Text>
+                <Text className="px-2 text-center text-sm font-semibold text-white/55">
+                  This name is only for this league. Other leagues can use a different team name.
+                </Text>
+              </View>
+
+              <View className="gap-2">
+                <AppTextInput
+                  autoCapitalize="words"
+                  error={error}
+                  label="Team name"
+                  maxLength={TEAM_NAME_MAX_LENGTH}
+                  onChangeText={onChange}
+                  onSubmitEditing={onSave}
+                  returnKeyType="done"
+                  value={draftName}
+                />
+                <Text className="text-right text-[11px] font-semibold text-white/45">
+                  {draftName.trim().length}/{TEAM_NAME_MAX_LENGTH}
+                </Text>
+              </View>
+
+              <View className="flex-row gap-3">
+                <View className="flex-1">
+                  <Button
+                    disabled={isSaving}
+                    onPress={onCancel}
+                    title="Cancel"
+                    variant="secondary"
+                  />
+                </View>
+                <View className="flex-1">
+                  <Button loading={isSaving} onPress={onSave} title="Save" />
+                </View>
+              </View>
+            </View>
+          </Card>
+        </KeyboardAvoidingView>
+      </ModalShell>
+    </Modal>
+  );
+}
+
 function AwardCard({ award }: { award: WeeklyAward }) {
-  const tiedUsers = award.users.length > 1;
+  const tiedUsers = award.displayNames.length > 1;
   const displayName = tiedUsers
-    ? award.users.length <= 2
-      ? award.users.map((user) => user.display_name).join(' + ')
-      : `${award.users.length} tied`
-    : award.user?.display_name ?? 'No winner yet';
+    ? award.displayNames.length <= 2
+      ? award.displayNames.join(' + ')
+      : `${award.displayNames.length} tied`
+    : award.displayName;
 
   return (
     <View className="flex-1 rounded-2xl border border-gold/25 bg-gold/[0.06] p-3">
@@ -771,7 +940,7 @@ function LiveStandingRow({ row }: { row: WeeklyLiveStanding }) {
     <View className="flex-row items-center justify-between gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.035] px-3 py-2.5">
       <View className="flex-1">
         <Text className="text-sm font-black text-white" numberOfLines={1}>
-          {row.user?.display_name ?? 'Unknown Player'}
+          {row.displayName}
         </Text>
         <Text className="mt-0.5 text-[11px] font-semibold text-white/45">
           {row.settledPicks}/{row.pickCount} picks settled
@@ -844,8 +1013,7 @@ function WeeklyAwardsCard({
               {awards.lock.label}
             </Text>
             <Text className="mt-2 text-sm font-black text-white">
-              {awards.lock.user?.display_name ?? 'No winner yet'} ·{' '}
-              {getPickSummary(awards.lock.bet)}
+              {awards.lock.displayName} · {getPickSummary(awards.lock.bet)}
             </Text>
             {awards.lock.bet && awards.lock.bet.bet_legs.length > 1 ? (
               <View className="mt-3 gap-1.5">
@@ -1464,7 +1632,7 @@ function StandingsBoard({
           <Text
             className="flex-1 text-[10px] font-black uppercase text-white/40"
             style={{ letterSpacing: 1.5 }}>
-            Player
+            Team
           </Text>
           <Text
             className="text-[10px] font-black uppercase text-white/40"
@@ -1478,6 +1646,13 @@ function StandingsBoard({
           const isCurrentUser = standing.user_id === userId;
           const lastRow = index === detail.standings.length - 1;
           const playoffStatus = playoffStatusForStanding(detail, standing);
+          const primaryName = getDisplayName(detail, standing.user_id);
+          const secondaryName = getSecondaryDisplayName(detail, standing.user_id);
+          const standingSummary = isH2H
+            ? `Season ${formatProfit(standing.total_profit)} · Week ${
+                standing.week_number
+              } ${formatProfit(standing.weekly_profit)}`
+            : `Week ${standing.week_number} ${formatProfit(standing.weekly_profit)}`;
           return (
             <PressableScale
               key={standing.id}
@@ -1520,11 +1695,11 @@ function StandingsBoard({
                   <View className="flex-row items-center gap-2">
                     <CosmeticAvatar
                       cosmetics={cosmeticsByUserId[standing.user_id]}
-                      name={getDisplayName(detail, standing.user_id)}
+                      name={primaryName}
                       size="sm"
                     />
                     <Text className="text-base font-black text-white" numberOfLines={1}>
-                      {getDisplayName(detail, standing.user_id)}
+                      {primaryName}
                     </Text>
                     {isCurrentUser ? (
                       <View className="rounded-full border border-electric-green/40 bg-electric-green/15 px-2 py-[2px]">
@@ -1538,11 +1713,7 @@ function StandingsBoard({
                     <PlayoffStatusIcon status={playoffStatus} />
                   </View>
                   <Text className="mt-1 text-[11px] font-semibold text-white/45">
-                    {isH2H
-                      ? `Season ${formatProfit(standing.total_profit)} · Week ${
-                          standing.week_number
-                        } ${formatProfit(standing.weekly_profit)}`
-                      : `Week ${standing.week_number} ${formatProfit(standing.weekly_profit)}`}
+                    {secondaryName ? `${secondaryName} · ${standingSummary}` : standingSummary}
                   </Text>
                 </View>
                 <View className="flex-row items-center gap-2">
@@ -2132,6 +2303,7 @@ function MembersList({
           const totalProfit = standingByUserId[member.user_id] ?? 0;
           const lastRow = index === detail.members.length - 1;
           const memberName = getDisplayName(detail, member.user_id);
+          const secondaryName = getSecondaryDisplayName(detail, member.user_id);
           return (
             <PressableScale
               key={member.id}
@@ -2153,11 +2325,13 @@ function MembersList({
                 />
                 <View className="flex-1">
                   <Text className="text-base font-black text-white" numberOfLines={1}>
-                    {member.team_name}
-                  </Text>
-                  <Text className="mt-1 text-[11px] font-semibold text-white/50">
                     {memberName}
                   </Text>
+                  {secondaryName ? (
+                    <Text className="mt-1 text-[11px] font-semibold text-white/50" numberOfLines={1}>
+                      {secondaryName}
+                    </Text>
+                  ) : null}
                 </View>
                 <View className="items-end gap-1">
                   {isCommissioner ? <Badge label="Commish" tone="gold" /> : null}
@@ -2295,16 +2469,20 @@ function SharedBetCard({
 function ChatBubble({
   cosmetics,
   isMine,
+  member,
   message,
 }: {
   cosmetics?: EquippedCosmeticsByCategory;
   isMine: boolean;
+  member?: LeagueMemberRow;
   message: LeagueChatMessage;
 }) {
   const isSystem = message.message_type === 'system';
   const isBetShare = message.message_type === 'bet_share';
   const isSticker = message.message_type === 'sticker';
-  const displayName = message.user?.display_name ?? (isSystem ? 'Action Arena' : 'Player');
+  const displayName = isSystem
+    ? 'Action Arena'
+    : getLeagueMemberPrimaryName(member, message.user, 'Player');
   const metadata = isSharedBetMetadata(message.metadata) ? message.metadata : null;
   const stickerMetadata = isStickerMetadata(message.metadata) ? message.metadata : null;
 
@@ -2407,6 +2585,14 @@ function LeagueChat({
   const sendSticker = useSendLeagueChatSticker(detail.league.id, userId);
   const userCosmetics = useUserCosmetics(userId);
   const messages = chatQuery.data ?? [];
+  const memberByUserId = useMemo(
+    () =>
+      detail.members.reduce<Record<string, LeagueMemberRow>>((accumulator, member) => {
+        accumulator[member.user_id] = member;
+        return accumulator;
+      }, {}),
+    [detail.members],
+  );
   const canSend = draft.trim().length > 0 && !sendMessage.isPending;
   const stickerRows = (userCosmetics.data?.rows ?? []).filter(
     (row) => row.category === 'chat_sticker_pack',
@@ -2525,6 +2711,7 @@ function LeagueChat({
                 cosmetics={message.user_id ? cosmeticsByUserId[message.user_id] : undefined}
                 isMine={message.user_id === userId}
                 key={message.id}
+                member={message.user_id ? memberByUserId[message.user_id] : undefined}
                 message={message}
               />
             ))}
@@ -2816,7 +3003,11 @@ export default function LeagueDetailScreen() {
   const { user } = useAuth();
   const detailQuery = useLeagueDetail(resolvedLeagueId, user?.id);
   const generateSchedule = useGenerateScheduleMutation(user?.id);
+  const updateTeamName = useUpdateLeagueTeamNameMutation(user?.id);
   const [selectedWeek, setSelectedWeek] = useState<number | undefined>();
+  const [teamNameDraft, setTeamNameDraft] = useState('');
+  const [teamNameError, setTeamNameError] = useState<string | undefined>();
+  const [editingTeamMember, setEditingTeamMember] = useState<LeagueMemberRow | null>(null);
   const selectedWeekNumber = selectedWeek ?? detailQuery.data?.league.current_week ?? 1;
   const selectedWeekAwardsNumber =
     detailQuery.data && selectedWeekNumber <= detailQuery.data.league.current_week
@@ -2957,9 +3148,74 @@ export default function LeagueDetailScreen() {
   const handleStartSeason = () => {
     generateSchedule.mutate(detail.league.id);
   };
+  const openTeamNameEditor = (member: LeagueMemberRow) => {
+    setTeamNameDraft(member.team_name);
+    setTeamNameError(undefined);
+    setEditingTeamMember(member);
+  };
+  const closeTeamNameEditor = () => {
+    if (updateTeamName.isPending) {
+      return;
+    }
+
+    setEditingTeamMember(null);
+    setTeamNameError(undefined);
+  };
+  const saveTeamName = async () => {
+    if (!editingTeamMember) {
+      return;
+    }
+
+    const trimmedTeamName = teamNameDraft.trim();
+
+    if (!trimmedTeamName) {
+      setTeamNameError('Team name is required.');
+      haptics.warning();
+      return;
+    }
+
+    if (trimmedTeamName.length > TEAM_NAME_MAX_LENGTH) {
+      setTeamNameError(`Keep it to ${TEAM_NAME_MAX_LENGTH} characters or fewer.`);
+      haptics.warning();
+      return;
+    }
+
+    if (trimmedTeamName === editingTeamMember.team_name.trim()) {
+      closeTeamNameEditor();
+      return;
+    }
+
+    try {
+      await updateTeamName.mutateAsync({
+        leagueId: detail.league.id,
+        teamName: trimmedTeamName,
+        userId,
+      });
+      haptics.success();
+      setEditingTeamMember(null);
+      setTeamNameError(undefined);
+    } catch (error) {
+      haptics.error();
+      setTeamNameError(error instanceof Error ? error.message : 'Could not save team name.');
+    }
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-arena-bg">
+      <TeamNameEditorModal
+        draftName={teamNameDraft}
+        error={teamNameError}
+        isSaving={updateTeamName.isPending}
+        onCancel={closeTeamNameEditor}
+        onChange={(value) => {
+          setTeamNameDraft(value);
+          if (teamNameError) {
+            setTeamNameError(undefined);
+          }
+        }}
+        onSave={saveTeamName}
+        visible={Boolean(editingTeamMember)}
+      />
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ gap: 16, padding: 20, paddingBottom: 36 }}
@@ -2981,6 +3237,7 @@ export default function LeagueDetailScreen() {
         {/* Identity: who/what this league is, plus the week being viewed. */}
         <View className="gap-3">
           <HeroHeader detail={detail} />
+          <YourTeamCard detail={detail} onEdit={openTeamNameEditor} userId={userId} />
           <View className="items-end">
             <WeekNavigator
               maxWeek={REGULAR_SEASON_WEEKS}

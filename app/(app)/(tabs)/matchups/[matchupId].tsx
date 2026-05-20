@@ -57,12 +57,12 @@ import { haptics } from '@/lib/haptics';
 import { evaluateLiveBetStatus } from '@/lib/live-pick-status';
 import { formatBetLegLabel, formatPickTitle, getPickLogoLabel } from '@/lib/pick-labels';
 import { isParentPickLocked } from '@/lib/pick-locking';
+import { getLeagueMemberPrimaryName } from '@/lib/league-member-display';
 import type {
   BetResult,
   BetType,
   EquippedCosmeticsByCategory,
   LiveGameStateRow,
-  UserRow,
 } from '@/types/database';
 
 type Side = 'home' | 'away';
@@ -484,20 +484,19 @@ function PlayerSide({
   cosmetics,
   isLeading,
   isUser,
+  name,
   profit,
   record,
   side,
-  user,
 }: {
   cosmetics?: EquippedCosmeticsByCategory;
   isLeading: boolean;
   isUser: boolean;
+  name: string;
   profit: number;
   record: string;
   side: Side;
-  user: UserRow | null;
 }) {
-  const name = user?.display_name ?? (side === 'away' ? 'Bye Week' : 'Unknown Player');
   const accentBorder = isUser
     ? 'border-electric-green/60 bg-electric-green/15'
     : isLeading
@@ -653,6 +652,10 @@ function FightCardHeader({
   const awayProfit = detail.matchup.away_profit ?? detail.awayStanding?.weekly_profit ?? 0;
   const homeLeading = homeProfit > awayProfit;
   const awayLeading = awayProfit > homeProfit;
+  const homeName = getLeagueMemberPrimaryName(detail.homeMember, detail.homeUser, 'Home');
+  const awayName = detail.matchup.away_user_id
+    ? getLeagueMemberPrimaryName(detail.awayMember, detail.awayUser, 'Opponent')
+    : 'Bye Week';
 
   return (
     <Card tone="highlight">
@@ -688,6 +691,7 @@ function FightCardHeader({
             cosmetics={cosmeticsByUserId[detail.matchup.home_user_id]}
             isLeading={homeLeading}
             isUser={detail.matchup.home_user_id === userId}
+            name={homeName}
             profit={homeProfit}
             record={
               detail.homeStanding
@@ -699,7 +703,6 @@ function FightCardHeader({
                 : '0-0'
             }
             side="home"
-            user={detail.homeUser}
           />
           <View className="px-3">
             <View
@@ -723,6 +726,7 @@ function FightCardHeader({
             }
             isLeading={awayLeading}
             isUser={detail.matchup.away_user_id === userId}
+            name={awayName}
             profit={awayProfit}
             record={
               detail.awayStanding
@@ -736,7 +740,6 @@ function FightCardHeader({
                   : 'Bye'
             }
             side="away"
-            user={detail.awayUser}
           />
         </View>
       </View>
@@ -1484,8 +1487,10 @@ export default function MatchupDetailScreen() {
 
   const homeProfit = detail.matchup.home_profit ?? detail.homeStanding?.weekly_profit ?? 0;
   const awayProfit = detail.matchup.away_profit ?? detail.awayStanding?.weekly_profit ?? 0;
-  const homeName = detail.homeUser?.display_name ?? 'Home';
-  const awayName = detail.awayUser?.display_name ?? 'Bye Week';
+  const homeName = getLeagueMemberPrimaryName(detail.homeMember, detail.homeUser, 'Home');
+  const awayName = detail.matchup.away_user_id
+    ? getLeagueMemberPrimaryName(detail.awayMember, detail.awayUser, 'Opponent')
+    : 'Bye Week';
   const cosmeticsByUserId = cosmeticsQuery.data ?? {};
 
   const userWonMatchup = Boolean(
@@ -1509,6 +1514,7 @@ export default function MatchupDetailScreen() {
       haptics.selection();
       setDetailBet(null);
       setEditingBet(bet as PlacedBet);
+      void oddsQuery.refetch();
       return;
     }
 
@@ -1546,7 +1552,13 @@ export default function MatchupDetailScreen() {
         isSaving={updatePlacedBet.isPending}
         oddsGames={oddsQuery.data ?? []}
         placedBets={placedBets}
+        replacementLinesError={oddsQuery.error}
+        replacementLinesLoading={oddsQuery.isLoading || oddsQuery.isRefetching}
         onCancel={() => setEditingBet(null)}
+        onRetryReplacementLines={() => {
+          haptics.selection();
+          void oddsQuery.refetch();
+        }}
         onSave={handleSavePlacedBetEdit}
       />
       <ReadOnlyPickDetailModal

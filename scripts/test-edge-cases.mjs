@@ -37,6 +37,7 @@ const straightBetsSource = readProjectFile('hooks/use-straight-bets.ts');
 const betBoardSource = readProjectFile('app/(app)/(tabs)/bet-board.tsx');
 const oddsSource = readProjectFile('lib/odds-api.ts');
 const leaguesSource = readProjectFile('hooks/use-leagues.ts');
+const memberDisplaySource = readProjectFile('lib/league-member-display.ts');
 const settingsSource = readProjectFile('app/(app)/settings.tsx');
 const profileContentSource = readProjectFile('components/profile/profile-content.tsx');
 const leagueDetailSource = readProjectFile('app/(app)/(tabs)/leagues/[leagueId].tsx');
@@ -135,17 +136,41 @@ assertCheck(
 
 assertCheck(
   '27.5 long names truncate in league standings and chat',
-  hasNumberOfLinesNear(leagueDetailSource, "row.user?.display_name ?? 'Unknown Player'") &&
+  hasNumberOfLinesNear(leagueDetailSource, '{primaryName}') &&
     hasNumberOfLinesNear(leagueDetailSource, '{displayName}'),
   'league surfaces should keep long names on one line',
 );
 
 assertCheck(
   '27.5 long names truncate in leaderboard, matchup, and profile cards',
-  hasNumberOfLinesNear(leaderboardSource, '{row.member.team_name}') &&
+  hasNumberOfLinesNear(leaderboardSource, '{displayName}') &&
     hasNumberOfLinesNear(matchupSource, '{name}') &&
-    hasNumberOfLinesNear(profileContentSource, '{data.profile.display_name}'),
+    hasNumberOfLinesNear(profileContentSource, '{headerTitle}'),
   'primary profile-style surfaces should constrain display-name text',
+);
+
+assertCheck(
+  '27.5 league team names are primary with username fallback',
+  hasAll(memberDisplaySource, [
+    'getLeagueMemberPrimaryName',
+    'teamName || displayName || fallback',
+    'getLeagueMemberSecondaryName',
+  ]) &&
+    hasAll(leagueDetailSource, ['YourTeamCard', 'TeamNameEditorModal']) &&
+    hasAll(matchupSource, ['getLeagueMemberPrimaryName(detail.homeMember', 'getLeagueMemberPrimaryName(detail.awayMember']) &&
+    hasAll(leaderboardSource, ['getLeagueMemberPrimaryName(row.member', 'getLeagueMemberSecondaryName(row.member']),
+  'in-league surfaces should render team names as the primary member identifier',
+);
+
+assertCheck(
+  '27.5 users can edit per-league team names',
+  hasAll(leaguesSource, [
+    'useUpdateLeagueTeamNameMutation',
+    ".from('league_members')",
+    '.update({ team_name: trimmedTeamName })',
+    'TEAM_NAME_MAX_LENGTH',
+  ]),
+  'team-name edits should update the league_members row with client validation',
 );
 
 assertCheck(

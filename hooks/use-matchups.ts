@@ -2,6 +2,11 @@ import { useQuery } from '@tanstack/react-query';
 
 import { MINIMUM_BETS_PER_WEEK } from '@/constants/rules';
 import { calculateWeeklyAwards, type WeeklyAwards } from '@/hooks/use-profile-stats';
+import {
+  getLeagueMemberPrimaryName,
+  getLeagueMemberSecondaryName,
+  indexLeagueMembersByUserId,
+} from '@/lib/league-member-display';
 import { supabase } from '@/lib/supabase';
 import type {
   BetWithLegs,
@@ -24,10 +29,12 @@ export type MatchupPickVisibility = {
 
 export type MatchupDetail = {
   awayBets: BetWithLegs[];
+  awayMember: LeagueMemberRow | null;
   awayPickVisibility: MatchupPickVisibility;
   awayStanding: StandingRow | null;
   awayUser: UserRow | null;
   homeBets: BetWithLegs[];
+  homeMember: LeagueMemberRow | null;
   homePickVisibility: MatchupPickVisibility;
   homeStanding: StandingRow | null;
   homeUser: UserRow;
@@ -46,8 +53,11 @@ export type HomeLeagueCard = {
   league: LeagueRow;
   memberCount: number;
   opponent: UserRow | null;
+  opponentLabel: string;
+  opponentSecondaryLabel: string | null;
   thisWeekBets: BetWithLegs[];
   viewerLabel: string;
+  viewerSecondaryLabel: string | null;
   weeklyAwards: WeeklyAwards;
   weeklyProfit: number;
 };
@@ -150,19 +160,14 @@ function sortByCreatedAt(bets: BetWithLegs[]) {
   return [...bets].sort((left, right) => left.created_at.localeCompare(right.created_at));
 }
 
-function memberDisplayLabel(member: LeagueMemberRow | undefined, user: UserRow | undefined) {
-  const teamName = member?.team_name.trim();
-  const displayName = user?.display_name?.trim();
-
-  return teamName || displayName || 'You';
-}
-
 function normalizeMatchupDetail(data: unknown): MatchupDetail {
   const detail = data as MatchupDetail;
   return {
     ...detail,
     awayBets: sortByCreatedAt(detail.awayBets ?? []),
+    awayMember: detail.awayMember ?? null,
     homeBets: sortByCreatedAt(detail.homeBets ?? []),
+    homeMember: detail.homeMember ?? null,
   };
 }
 
@@ -178,7 +183,27 @@ export function useMatchupDetail(matchupId: string | undefined) {
         p_matchup_id: matchupId,
       });
 
-      return normalizeMatchupDetail(assertSupabaseResult(data, error));
+      const detail = normalizeMatchupDetail(assertSupabaseResult(data, error));
+      const memberIds = uniqueValues(
+        [detail.matchup.home_user_id, detail.matchup.away_user_id].filter(
+          (id): id is string => Boolean(id),
+        ),
+      );
+      const { data: memberData, error: memberError } = await supabase
+        .from('league_members')
+        .select('*')
+        .eq('league_id', detail.league.id)
+        .in('user_id', memberIds);
+      const members = assertSupabaseResult(memberData as LeagueMemberRow[] | null, memberError);
+      const membersById = indexLeagueMembersByUserId(members);
+
+      return {
+        ...detail,
+        awayMember: detail.matchup.away_user_id
+          ? membersById[detail.matchup.away_user_id] ?? null
+          : null,
+        homeMember: membersById[detail.matchup.home_user_id] ?? detail.homeMember ?? null,
+      };
     },
     queryKey: matchupKeys.detail(matchupId),
   });
@@ -316,7 +341,10 @@ export function useHomeDashboard(userId: string | undefined) {
                 ? currentMatchup.away_user_id
                 : currentMatchup?.home_user_id ?? null;
             const leagueMembers = members.filter((member) => member.league_id === league.id);
+            const leagueMembersById = indexLeagueMembersByUserId(leagueMembers);
             const viewerMembership = leagueMembers.find((member) => member.user_id === userId);
+            const opponentMembership = opponentId ? leagueMembersById[opponentId] : undefined;
+            const opponentUser = opponentId ? usersById[opponentId] ?? null : null;
             const thisWeekBets = sortByCreatedAt(betsForUserWeek(bets, userId, currentWeek));
             const lastWeekBets = sortByCreatedAt(betsForUserWeek(bets, userId, lastWeek));
 
@@ -330,9 +358,18 @@ export function useHomeDashboard(userId: string | undefined) {
               lastWeekStanding: standingsByKey[`${league.id}:${userId}:${lastWeek}`] ?? null,
               league,
               memberCount: leagueMembers.length,
-              opponent: opponentId ? usersById[opponentId] ?? null : null,
+              opponent: opponentUser,
+              opponentLabel: opponentId
+                ? getLeagueMemberPrimaryName(opponentMembership, opponentUser, 'Opponent')
+                : currentMatchup
+                  ? 'Bye Week'
+                  : 'Schedule Pending',
+              opponentSecondaryLabel: opponentId
+                ? getLeagueMemberSecondaryName(opponentMembership, opponentUser)
+                : null,
               thisWeekBets,
-              viewerLabel: memberDisplayLabel(viewerMembership, usersById[userId]),
+              viewerLabel: getLeagueMemberPrimaryName(viewerMembership, usersById[userId], 'You'),
+              viewerSecondaryLabel: getLeagueMemberSecondaryName(viewerMembership, usersById[userId]),
               weeklyAwards: calculateWeeklyAwards(
                 leagueBets.filter(
                   (bet) => bet.league_id === league.id && bet.week_number === awardsWeek,
@@ -341,6 +378,7 @@ export function useHomeDashboard(userId: string | undefined) {
                 standings.filter(
                   (standing) => standing.league_id === league.id && standing.week_number === awardsWeek,
                 ),
+                leagueMembersById,
               ),
               weeklyProfit: sumSettledProfit(thisWeekBets),
             };

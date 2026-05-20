@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { logAnalyticsEvent } from '@/lib/analytics';
+import { TEAM_NAME_MAX_LENGTH } from '@/lib/league-member-display';
 import { supabase } from '@/lib/supabase';
 import type {
   LeagueInsert,
@@ -21,6 +22,12 @@ export type CreateLeagueInput = {
   sport: LeagueSport;
   type: LeagueType;
   visibility: LeagueVisibility;
+};
+
+export type UpdateLeagueTeamNameInput = {
+  leagueId: string;
+  teamName: string;
+  userId: string;
 };
 
 export type LeagueSummary = {
@@ -344,6 +351,78 @@ export function useJoinLeagueMutation(userId: string | undefined) {
         queryClient.invalidateQueries({ queryKey: leagueKeys.mine(userId) }),
         queryClient.invalidateQueries({ queryKey: leagueKeys.public('') }),
         queryClient.invalidateQueries({ queryKey: leagueKeys.detail(leagueId) }),
+      ]);
+    },
+  });
+}
+
+export function useUpdateLeagueTeamNameMutation(viewerUserId: string | undefined) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: UpdateLeagueTeamNameInput) => {
+      const trimmedTeamName = input.teamName.trim();
+
+      if (!trimmedTeamName) {
+        throw new Error('Team name is required.');
+      }
+
+      if (trimmedTeamName.length > TEAM_NAME_MAX_LENGTH) {
+        throw new Error(`Team name must be ${TEAM_NAME_MAX_LENGTH} characters or fewer.`);
+      }
+
+      const { data, error } = await supabase
+        .from('league_members')
+        .update({ team_name: trimmedTeamName })
+        .eq('league_id', input.leagueId)
+        .eq('user_id', input.userId)
+        .select('*')
+        .single();
+
+      return assertSupabaseResult(data as LeagueMemberRow | null, error);
+    },
+    onMutate: async (input) => {
+      const trimmedTeamName = input.teamName.trim();
+      const detailKey = leagueKeys.detail(input.leagueId);
+
+      await queryClient.cancelQueries({ queryKey: detailKey });
+      const previousDetail = queryClient.getQueryData<LeagueDetail>(detailKey);
+
+      queryClient.setQueryData<LeagueDetail>(detailKey, (current) => {
+        if (!current) {
+          return current;
+        }
+
+        return {
+          ...current,
+          members: current.members.map((member) =>
+            member.user_id === input.userId
+              ? { ...member, team_name: trimmedTeamName }
+              : member,
+          ),
+        };
+      });
+
+      return { detailKey, previousDetail };
+    },
+    onError: (_error, _input, context) => {
+      if (context?.previousDetail) {
+        queryClient.setQueryData(context.detailKey, context.previousDetail);
+      }
+    },
+    onSuccess: async (_member, input) => {
+      logAnalyticsEvent('league_team_name_updated', {
+        league_id: input.leagueId,
+        user_id: input.userId,
+      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: leagueKeys.detail(input.leagueId) }),
+        queryClient.invalidateQueries({ queryKey: leagueKeys.mine(viewerUserId) }),
+        queryClient.invalidateQueries({ queryKey: ['home-dashboard', viewerUserId] }),
+        queryClient.invalidateQueries({ queryKey: ['leaderboard', viewerUserId] }),
+        queryClient.invalidateQueries({ queryKey: ['matchups'] }),
+        queryClient.invalidateQueries({ queryKey: ['profile-stats'] }),
+        queryClient.invalidateQueries({ queryKey: ['weekly-awards', input.leagueId] }),
       ]);
     },
   });

@@ -1,6 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   FlatList,
   KeyboardAvoidingView,
@@ -87,11 +88,12 @@ import {
 } from '@/lib/pick-labels';
 import { isBetLegLocked, isParentPickLocked } from '@/lib/pick-locking';
 import {
-  areDirectlyContradictingPicks,
-  findContradictingPick,
-  findPickContradiction,
-  getPickConflictSide,
+  areConflictingPicks,
+  findConflictingPick,
+  findPickConflict,
   formatPickConflictReason,
+  getPickConflictKind,
+  getPickConflictSide,
 } from '@/lib/pick-conflicts';
 import type {
   BetMarket,
@@ -218,7 +220,7 @@ const TOUR_STEPS: {
   },
   {
     anchor: 'middle',
-    body: 'Submit unlocks once you have at least 5 picks, exactly one Pick of the Week, no pick over 35 coins, the full 100-coin budget allocated, and no directly conflicting picks.',
+    body: 'Submit unlocks once you have at least 5 picks, exactly one Pick of the Week, no pick over 35 coins, the full 100-coin budget allocated, and no conflicting picks.',
     icon: 'checkmark-done',
     title: 'Validation rules',
   },
@@ -228,6 +230,12 @@ function marketLabel(market: BetMarket) {
   if (market === 'moneyline') return 'Winner';
   if (market === 'spread') return 'Spread';
   return 'Over/Under';
+}
+
+function conflictMarketLabel(market: BetMarket) {
+  if (market === 'moneyline') return 'moneyline';
+  if (market === 'spread') return 'spread';
+  return 'total';
 }
 
 function getSelectionLabel(selection: OddsSelection) {
@@ -555,7 +563,17 @@ function formatLegConflictLabel(leg: SlipLeg) {
 }
 
 function formatConflictShortLabel(leg: SlipLeg) {
-  return getPickConflictSide(leg);
+  const side = getPickConflictSide(leg);
+
+  if (leg.market === 'moneyline') {
+    return `${side} moneyline`;
+  }
+
+  if (leg.market === 'spread') {
+    return `${side} spread`;
+  }
+
+  return side;
 }
 
 function capitalizeSentence(value: string) {
@@ -687,6 +705,12 @@ function getUpdatedSlipBetAfterLegRemoval(bet: SlipBet, removedLegId: string): S
 }
 
 function formatAddConflictMessage(nextLeg: SlipLeg, existingLeg: SlipLeg) {
+  if (getPickConflictKind(nextLeg, existingLeg) === 'same_team_moneyline_spread') {
+    return `You already have ${getPickConflictSide(existingLeg)} on the ${conflictMarketLabel(
+      existingLeg.market,
+    )}. Same-team moneyline and spread can't be combined.`;
+  }
+
   return `Cannot add ${formatLegConflictLabel(nextLeg)}. It directly conflicts with ${formatLegConflictLabel(
     existingLeg,
   )} on ${formatMatchupLabel(nextLeg)} because ${formatPickConflictReason(
@@ -778,7 +802,7 @@ function getConflictSummaries(slipBets: SlipBet[]) {
   [...games.values()].forEach((items) => {
     items.forEach((left, leftIndex) => {
       items.slice(leftIndex + 1).forEach((right) => {
-        if (!areDirectlyContradictingPicks(left.leg, right.leg)) {
+        if (!areConflictingPicks(left.leg, right.leg)) {
           return;
         }
 
@@ -3187,6 +3211,32 @@ function ViewOnlyPill() {
   );
 }
 
+function getEditIneligibleReason(bet: PlacedBet, legs: EditingPlacedLeg[]) {
+  if (bet.result !== 'pending') {
+    return 'Settled picks can no longer be edited.';
+  }
+
+  if (legs.some((leg) => isBetLegLocked(leg))) {
+    return bet.bet_type === 'straight'
+      ? 'This pick is locked because its game has started.'
+      : 'This pick is locked because one of its games has started.';
+  }
+
+  return null;
+}
+
+function getMissingReplacementLinesMessage(mode: BetMode, selectedLeg: EditingPlacedLeg | null) {
+  if (!selectedLeg) {
+    return 'Choose a pick leg before selecting replacement lines.';
+  }
+
+  if (mode === 'straight') {
+    return `Current ${marketLabel(selectedLeg.market).toLowerCase()} lines for this pick are not published yet. Try again from this screen.`;
+  }
+
+  return 'Replacement lines for this slate are not published yet. Try again from this screen.';
+}
+
 function SettledRewardSummary({ bet }: { bet: PlacedBet }) {
   if (!isSettledPick(bet.result)) {
     return (
@@ -3450,15 +3500,21 @@ function PostSubmitEditModal({
   isSaving,
   oddsGames,
   onCancel,
+  onRetryReplacementLines,
   onSave,
   placedBets,
+  replacementLinesError,
+  replacementLinesLoading = false,
 }: {
   bet: PlacedBet | null;
   isSaving: boolean;
   oddsGames: OddsGame[];
   onCancel: () => void;
+  onRetryReplacementLines?: () => void;
   onSave: (edit: BetEditSubmission) => Promise<void>;
   placedBets: PlacedBet[];
+  replacementLinesError?: Error | null;
+  replacementLinesLoading?: boolean;
 }) {
   const [legs, setLegs] = useState<EditingPlacedLeg[]>([]);
   const [selectedLegId, setSelectedLegId] = useState<string | null>(null);
@@ -3495,6 +3551,7 @@ function PostSubmitEditModal({
   const selectedKeys = new Set(legs.map((leg) => leg.selectionKey));
   const otherLegs = getPlacedBetConflictLegs(placedBets, bet.id, oddsGames);
   const straightGame = selectedLeg ? findOddsGame(oddsGames, selectedLeg.game_id) : undefined;
+  const editIneligibleReason = getEditIneligibleReason(bet, legs);
   const changed = legs.some((leg) => {
     const original = bet.bet_legs.find((item) => item.id === leg.betLegId);
     return Boolean(
@@ -3508,7 +3565,7 @@ function PostSubmitEditModal({
           original.game_start_time !== leg.game_start_time),
     );
   });
-  const canSave = changed && !isSaving && !errorMessage;
+  const canSave = changed && !isSaving && !errorMessage && !editIneligibleReason;
 
   const replaceSelectedLeg = (game: OddsGame, selection: OddsSelection) => {
     if (!selectedLeg) {
@@ -3531,13 +3588,15 @@ function PostSubmitEditModal({
       return;
     }
 
+    // Keep the submitted coin amount fixed on swaps so players cannot use updated
+    // lines to create information-arbitrage after their weekly card is built.
     const adjustedLine =
       mode === 'teaser' && bet.teaser_points
         ? getAdjustedTeaserLine(selection, bet.teaser_points)
         : selection.line;
     const nextLeg = makeEditedPlacedLeg(selectedLeg, game, selection, adjustedLine);
     const draftLegs = legs.filter((leg) => leg.id !== selectedLeg.id);
-    const conflict = findContradictingPick([...otherLegs, ...draftLegs], nextLeg);
+    const conflict = findConflictingPick([...otherLegs, ...draftLegs], nextLeg);
 
     if (conflict) {
       haptics.warning();
@@ -3568,6 +3627,10 @@ function PostSubmitEditModal({
         ? [straightGame]
         : []
       : oddsGames;
+  const showReplacementLinesLoading = replacementLinesLoading && gameList.length === 0;
+  const showReplacementLinesError =
+    !showReplacementLinesLoading && Boolean(replacementLinesError) && gameList.length === 0;
+  const missingReplacementLinesMessage = getMissingReplacementLinesMessage(mode, selectedLeg);
 
   return (
     <Modal animationType="slide" onRequestClose={onCancel} visible={Boolean(bet)}>
@@ -3664,10 +3727,42 @@ function PostSubmitEditModal({
                 style={{ letterSpacing: 2 }}>
                 Replacement Lines
               </Text>
-              {gameList.length === 0 ? (
+              {editIneligibleReason ? (
+                <Card>
+                  <View className="flex-row items-start gap-2">
+                    <Ionicons color="rgba(255,255,255,0.58)" name="lock-closed" size={16} />
+                    <Text className="flex-1 text-sm font-semibold leading-5 text-white/58">
+                      {editIneligibleReason}
+                    </Text>
+                  </View>
+                </Card>
+              ) : showReplacementLinesLoading ? (
+                <Card>
+                  <View className="flex-row items-center gap-3">
+                    <ActivityIndicator color={accent} />
+                    <Text className="flex-1 text-sm font-semibold leading-5 text-white/58">
+                      Loading replacement lines...
+                    </Text>
+                  </View>
+                </Card>
+              ) : showReplacementLinesError ? (
+                <Card>
+                  <View className="gap-3">
+                    <View className="flex-row items-start gap-2">
+                      <Ionicons color={THEME_COLORS.coralRed} name="alert-circle" size={16} />
+                      <Text className="flex-1 text-sm font-semibold leading-5 text-coral-red">
+                        {replacementLinesError?.message ?? 'Unable to load replacement lines right now.'}
+                      </Text>
+                    </View>
+                    {onRetryReplacementLines ? (
+                      <Button title="Try Again" variant="secondary" onPress={onRetryReplacementLines} />
+                    ) : null}
+                  </View>
+                </Card>
+              ) : gameList.length === 0 ? (
                 <Card>
                   <Text className="text-sm font-semibold leading-5 text-white/55">
-                    Lines for this pick are not available right now. Pull to refresh the Pick Board and try again.
+                    {missingReplacementLinesMessage}
                   </Text>
                 </Card>
               ) : (
@@ -3709,7 +3804,9 @@ function PostSubmitEditModal({
                 <Button
                   disabled={!canSave}
                   loading={isSaving}
-                  title={changed ? 'Save Changes' : 'Choose a Swap'}
+                  title={
+                    changed ? (mode === 'straight' ? 'Confirm Swap' : 'Save Changes') : 'Choose a Swap'
+                  }
                   onPress={() => {
                     void save();
                   }}
@@ -4281,9 +4378,7 @@ export default function BetBoardScreen() {
       return null;
     }
 
-    const conflict = getConflictSources().find((item) =>
-      areDirectlyContradictingPicks(item.leg, nextLeg),
-    );
+    const conflict = getConflictSources().find((item) => areConflictingPicks(item.leg, nextLeg));
 
     if (!conflict) {
       return null;
@@ -4420,7 +4515,7 @@ export default function BetBoardScreen() {
       return currentLegs.filter((leg) => leg.selectionKey !== nextLeg.selectionKey);
     }
 
-    const conflictingLeg = findContradictingPick([...getSlipLegs(slipBets), ...currentLegs], nextLeg);
+    const conflictingLeg = findConflictingPick([...getSlipLegs(slipBets), ...currentLegs], nextLeg);
     if (conflictingLeg) {
       haptics.warning();
       setPickConflictMessage(formatAddConflictMessage(nextLeg, conflictingLeg));
@@ -4466,7 +4561,7 @@ export default function BetBoardScreen() {
 
     if (mode === 'straight') {
       const nextLeg = makeSlipLeg(game, selection);
-      const conflictingLeg = findContradictingPick(
+      const conflictingLeg = findConflictingPick(
         [...getSlipLegs(slipBets), ...parlayLegs, ...teaserLegs],
         nextLeg,
       );
@@ -4590,11 +4685,11 @@ export default function BetBoardScreen() {
       rawPotentialReward: rawReward,
       teaser_points: null,
     };
-    const contradiction = findPickContradiction(getSlipLegs(slipBets), bet.legs);
-    if (contradiction) {
+    const conflict = findPickConflict(getSlipLegs(slipBets), bet.legs);
+    if (conflict) {
       haptics.warning();
       setPickConflictMessage(
-        formatAddConflictMessage(contradiction.nextLeg, contradiction.existingLeg),
+        formatAddConflictMessage(conflict.nextLeg, conflict.existingLeg),
       );
       setSelectionConflict(null);
       return;
@@ -4638,11 +4733,11 @@ export default function BetBoardScreen() {
       potential_payout: calculatePotentialPayout(amount, odds),
       teaser_points: teaserPoints,
     };
-    const contradiction = findPickContradiction(getSlipLegs(slipBets), bet.legs);
-    if (contradiction) {
+    const conflict = findPickConflict(getSlipLegs(slipBets), bet.legs);
+    if (conflict) {
       haptics.warning();
       setPickConflictMessage(
-        formatAddConflictMessage(contradiction.nextLeg, contradiction.existingLeg),
+        formatAddConflictMessage(conflict.nextLeg, conflict.existingLeg),
       );
       setSelectionConflict(null);
       return;
@@ -4709,6 +4804,7 @@ export default function BetBoardScreen() {
 
     haptics.selection();
     setEditingPlacedBet(bet);
+    void oddsQuery.refetch();
   };
 
   const handleSavePlacedBetEdit = async (edit: BetEditSubmission) => {
@@ -5074,7 +5170,13 @@ export default function BetBoardScreen() {
         isSaving={updatePlacedBet.isPending}
         oddsGames={oddsQuery.data ?? []}
         placedBets={placedBets}
+        replacementLinesError={oddsQuery.error}
+        replacementLinesLoading={oddsQuery.isLoading || oddsQuery.isRefetching}
         onCancel={() => setEditingPlacedBet(null)}
+        onRetryReplacementLines={() => {
+          haptics.selection();
+          void oddsQuery.refetch();
+        }}
         onSave={handleSavePlacedBetEdit}
       />
 

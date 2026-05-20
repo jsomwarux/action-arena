@@ -79,15 +79,14 @@ export function Button({
         'min-h-14 items-center justify-center rounded-2xl border px-5 py-3',
         containerClasses[variant],
         fullWidth && 'w-full',
-        isDisabled && 'opacity-50',
       )}
       disabled={isDisabled}
       {...rest}
       style={({ pressed }) => [
         glowStyles[variant],
         {
-          opacity: pressed ? 0.92 : 1,
-          transform: [{ scale: pressed ? 0.96 : 1 }],
+          opacity: isDisabled ? 0.5 : pressed ? 0.92 : 1,
+          transform: [{ scale: isDisabled ? 1 : pressed ? 0.96 : 1 }],
         },
       ]}>
       {loading ? (

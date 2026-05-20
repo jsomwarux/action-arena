@@ -20,6 +20,7 @@
     "test:season-pass": "supabase db query --linked -f scripts/test-season-pass.sql",
     "test:ad-hooks": "node scripts/test-ad-hooks.mjs",
     "test:analytics-events": "node scripts/test-analytics-events.mjs",
+    "test:submit-conflicts": "supabase db query --linked -f scripts/test-submit-conflict-validation.sql",
     "test:edge-cases:source": "node scripts/test-edge-cases.mjs",
     "test:edge-cases:db": "supabase db query --linked -f scripts/test-edge-cases.sql",
     "test:edge-cases": "npm run test:edge-cases:source && npm run test:edge-cases:db",

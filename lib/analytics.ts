@@ -1,6 +1,7 @@
 export type AnalyticsEventName =
   | 'league_created'
   | 'league_joined'
+  | 'league_team_name_updated'
   | 'league_schedule_generated'
   | 'bets_placed'
   | 'bet_settled'

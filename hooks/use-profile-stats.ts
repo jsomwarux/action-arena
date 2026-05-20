@@ -2,6 +2,10 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
 import { WEEKLY_BUDGET } from '@/constants/rules';
+import {
+  getLeagueMemberPrimaryName,
+  indexLeagueMembersByUserId,
+} from '@/lib/league-member-display';
 import { supabase } from '@/lib/supabase';
 import type {
   AchievementKey,
@@ -119,6 +123,8 @@ export type LeaderboardData = {
 
 export type WeeklyAward = {
   bet: BetWithLegs | null;
+  displayName: string;
+  displayNames: string[];
   label: string;
   profit: number;
   roi: number;
@@ -127,6 +133,7 @@ export type WeeklyAward = {
 };
 
 export type WeeklyLiveStanding = {
+  displayName: string;
   pendingPicks: number;
   pickCount: number;
   profit: number;
@@ -485,7 +492,7 @@ function achievementUpserts(userId: string, bets: BetWithLegs[]) {
 }
 
 function displayNameForLeaderboardRow(row: Pick<LeaderboardRow, 'member' | 'profile'>) {
-  return row.member.team_name || row.profile?.display_name || 'Player';
+  return getLeagueMemberPrimaryName(row.member, row.profile, 'Player');
 }
 
 function compareLeaderboardRows(
@@ -935,6 +942,16 @@ export function useLeaderboardData(userId: string | undefined, selectedLeagueId:
           event: '*',
           filter: `league_id=eq.${activeLeagueId}`,
           schema: 'public',
+          table: 'league_members',
+        },
+        invalidateLeaderboard,
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          filter: `league_id=eq.${activeLeagueId}`,
+          schema: 'public',
           table: 'weekly_matchups',
         },
         invalidateLeaderboard,
@@ -962,6 +979,7 @@ export function calculateWeeklyAwards(
   bets: BetWithLegs[],
   usersById: Record<string, UserRow>,
   standings: StandingRow[] = [],
+  membersById: Record<string, LeagueMemberRow | undefined> = {},
 ): WeeklyAwards {
   type AwardDraftRow = Omit<WeeklyAward, 'users'>;
 
@@ -985,6 +1003,8 @@ export function calculateWeeklyAwards(
     accumulator[standing.user_id] = standing;
     return accumulator;
   }, {});
+  const displayNameForUser = (userId: string) =>
+    getLeagueMemberPrimaryName(membersById[userId], usersById[userId], 'Player');
 
   bets.forEach((bet) => {
     byUser.set(bet.user_id, [...(byUser.get(bet.user_id) ?? []), bet]);
@@ -1011,6 +1031,7 @@ export function calculateWeeklyAwards(
       const profit = profitForUser(userId, userBets);
 
       return {
+        displayName: displayNameForUser(userId),
         pendingPicks: userBets.filter((bet) => bet.result === 'pending').length,
         pickCount: userBets.length,
         profit,
@@ -1024,7 +1045,7 @@ export function calculateWeeklyAwards(
         return right.profit - left.profit;
       }
 
-      return (left.user?.display_name ?? '').localeCompare(right.user?.display_name ?? '');
+      return left.displayName.localeCompare(right.displayName);
     });
 
   const profitRows: AwardDraftRow[] = userIds.map((userId) => {
@@ -1032,6 +1053,8 @@ export function calculateWeeklyAwards(
     const profit = profitForUser(userId, userBets);
     return {
       bet: null,
+      displayName: displayNameForUser(userId),
+      displayNames: [],
       label: '',
       profit,
       roi: (profit / WEEKLY_BUDGET) * 100,
@@ -1049,6 +1072,7 @@ export function calculateWeeklyAwards(
 
     return {
       ...first,
+      displayNames: rows.map((row) => row.displayName),
       label: rows.length > 1 ? `${label} Tie` : label,
       users,
     };
@@ -1057,6 +1081,8 @@ export function calculateWeeklyAwards(
     .filter((bet) => bet.is_lock)
     .map((bet) => ({
       bet,
+      displayName: displayNameForUser(bet.user_id),
+      displayNames: [],
       label: '',
       profit: bet.profit ?? 0,
       roi: bet.amount > 0 ? ((bet.profit ?? 0) / bet.amount) * 100 : 0,
@@ -1140,7 +1166,7 @@ export function useWeeklyAwards(leagueId: string | undefined, weekNumber: number
       );
       const usersById = indexUsers(await fetchUsersByIds(members.map((member) => member.user_id)));
 
-      return calculateWeeklyAwards(bets, usersById, standings);
+      return calculateWeeklyAwards(bets, usersById, standings, indexLeagueMembersByUserId(members));
     },
     queryKey: profileKeys.awards(leagueId, weekNumber),
   });

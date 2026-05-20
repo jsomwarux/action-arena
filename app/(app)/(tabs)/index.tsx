@@ -265,8 +265,6 @@ function ThisWeekCard({ card }: { card: HomeLeagueCard }) {
   const isH2H = card.league.type === 'h2h';
   const needed = remainingBetsNeeded(card.betsPlaced);
   const currentMatchup = card.currentMatchup;
-  const opponentLabel =
-    card.opponent?.display_name ?? (card.currentMatchup ? 'Bye Week' : 'Schedule Pending');
   const live = hasLiveBets(card.thisWeekBets);
   const openCardDestination = () => {
     if (currentMatchup) {
@@ -345,6 +343,11 @@ function ThisWeekCard({ card }: { card: HomeLeagueCard }) {
                     style={{ letterSpacing: -0.2 }}>
                     {card.viewerLabel}
                   </Text>
+                  {card.viewerSecondaryLabel ? (
+                    <Text className="text-[11px] font-semibold text-white/45" numberOfLines={1}>
+                      {card.viewerSecondaryLabel}
+                    </Text>
+                  ) : null}
                 </View>
               </View>
               {isH2H ? (
@@ -370,8 +373,13 @@ function ThisWeekCard({ card }: { card: HomeLeagueCard }) {
                       className="text-sm font-black text-white"
                       numberOfLines={1}
                       style={{ letterSpacing: -0.2 }}>
-                      {opponentLabel}
+                      {card.opponentLabel}
                     </Text>
+                    {card.opponentSecondaryLabel ? (
+                      <Text className="text-[11px] font-semibold text-white/45" numberOfLines={1}>
+                        {card.opponentSecondaryLabel}
+                      </Text>
+                    ) : null}
                   </View>
                   <View className="h-10 w-10 items-center justify-center rounded-2xl border border-coral-red/35 bg-coral-red/10">
                     <Ionicons color={THEME_COLORS.coralRed} name="person-outline" size={16} />
@@ -685,7 +693,7 @@ function awardBetSummary(award: WeeklyAward) {
 
 function AwardTrophy({ award, kind }: { award: WeeklyAward; kind: AwardKind }) {
   const theme = AWARD_THEME[kind];
-  const winnerName = award.user?.display_name ?? 'No winner yet';
+  const winnerName = award.displayName;
   const summary = awardBetSummary(award);
 
   const trophy = (
