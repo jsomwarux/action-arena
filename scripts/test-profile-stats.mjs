@@ -46,6 +46,21 @@ Module._load = function loadWithAppStubs(request, parent, isMain) {
     return require(path.join(root, 'lib/settled-bets.ts'));
   }
 
+  if (request.startsWith('@/')) {
+    const relativePath = request.slice(2);
+    const candidates = [
+      path.join(root, `${relativePath}.ts`),
+      path.join(root, `${relativePath}.tsx`),
+      path.join(root, relativePath, 'index.ts'),
+      path.join(root, relativePath, 'index.tsx'),
+    ];
+    const match = candidates.find((candidate) => fs.existsSync(candidate));
+
+    if (match) {
+      return require(match);
+    }
+  }
+
   return originalLoad.call(this, request, parent, isMain);
 };
 
@@ -161,6 +176,120 @@ const h2hStats = calculateProfileStats(
 );
 assert.equal(`${h2hStats.wins}-${h2hStats.losses}-${h2hStats.ties}`, '5-2-2');
 assert.equal(h2hStats.winRate, 50);
+
+const seasonScopedSummary = buildProfileSummary(
+  {
+    achievements: [],
+    bets: [
+      bet({
+        amount: 100,
+        bet_type: 'straight',
+        league_id: 'league-a',
+        profit: 127,
+        result: 'win',
+        week_number: 2,
+      }),
+      bet({
+        amount: 100,
+        bet_legs: [leg(), leg()],
+        bet_type: 'parlay',
+        league_id: 'league-a',
+        profit: 118,
+        result: 'win',
+        week_number: 3,
+      }),
+      bet({
+        amount: 100,
+        bet_type: 'straight',
+        league_id: 'league-a',
+        profit: 99,
+        result: 'win',
+        week_number: 4,
+      }),
+    ],
+    leagueOptions: [],
+    leagues: [{ id: 'league-a', name: 'League A' }],
+    memberships: [],
+    profile: { id: 'target-user' },
+    standings: [
+      {
+        id: 'standing-a-w3',
+        league_id: 'league-a',
+        losses: 1,
+        rank: 1,
+        ties: 0,
+        total_profit: 245,
+        user_id: 'target-user',
+        week_number: 3,
+        weekly_profit: 118,
+        wins: 2,
+      },
+    ],
+    targetMatchups: [],
+    viewerBets: [],
+    viewerMatchups: [],
+    viewerStandings: [],
+  },
+  'league-a',
+);
+const seasonStraightBreakdown = seasonScopedSummary.betTypeBreakdowns.find(
+  (row) => row.type === 'straight',
+);
+const seasonParlayBreakdown = seasonScopedSummary.betTypeBreakdowns.find((row) => row.type === 'parlay');
+assert.equal(
+  seasonScopedSummary.stats.totalProfit,
+  245,
+  'profile season total should use the same latest standings total as leaderboard and leagues',
+);
+assert.equal(seasonScopedSummary.stats.totalSettledBets, 2);
+assert.equal(seasonScopedSummary.stats.averageProfitPerBet, 122.5);
+assert.equal(seasonStraightBreakdown?.profit, 127);
+assert.equal(seasonStraightBreakdown?.total, 1);
+assert.equal(seasonParlayBreakdown?.profit, 118);
+assert.equal(seasonParlayBreakdown?.total, 1);
+
+const allHistorySummary = buildProfileSummary(
+  {
+    achievements: [],
+    bets: [
+      bet({
+        amount: 20,
+        bet_type: 'straight',
+        league_id: 'historical-league',
+        profit: 24,
+        result: 'win',
+        week_number: 1,
+      }),
+      bet({
+        amount: 20,
+        bet_type: 'teaser',
+        league_id: 'historical-league',
+        profit: -20,
+        result: 'loss',
+        teaser_points: 6,
+        week_number: 2,
+      }),
+    ],
+    leagueOptions: [],
+    leagues: [],
+    memberships: [],
+    profile: { id: 'target-user' },
+    standings: [],
+    targetMatchups: [],
+    viewerBets: [],
+    viewerMatchups: [],
+    viewerStandings: [],
+  },
+  'all',
+);
+
+assert.equal(
+  allHistorySummary.stats.totalSettledBets,
+  2,
+  'all-league summaries should include settled own bets even when league rows are unavailable',
+);
+assert.equal(allHistorySummary.stats.totalProfit, 4);
+assert.equal(allHistorySummary.teaserBreakdowns.find((row) => row.points === 6)?.total, 1);
 
 const achievementBets = [
   ...Array.from({ length: 5 }, (_, index) =>

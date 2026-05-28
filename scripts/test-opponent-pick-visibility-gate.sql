@@ -154,7 +154,7 @@ union all
 select away_bet_id, 'VG-DAL-PHI', 'moneyline'::public.bet_market, 'Philadelphia Eagles', null::numeric, null::numeric, -140, 'pending'::public.bet_result, now() + interval '7 days', false
 from visibility_gate_context
 union all
-select prior_away_bet_id, 'VG-PRIOR', 'spread'::public.bet_market, 'Cleveland Browns +2.5', 2.5, 2.5, -110, 'pending'::public.bet_result, now() + interval '7 days', false
+select prior_away_bet_id, 'VG-PRIOR', 'spread'::public.bet_market, 'Cleveland Browns +2.5', 2.5, 2.5, -110, 'pending'::public.bet_result, now() - interval '7 days', true
 from visibility_gate_context;
 
 insert into public.league_chat_messages (
@@ -260,6 +260,12 @@ set commence_time = now() - interval '1 minute'
 from visibility_gate_context c
 where slate.league_id = c.league_id
   and slate.week_number = 2;
+
+update public.bet_legs leg
+set game_start_time = now() - interval '1 minute',
+    locked = true
+from visibility_gate_context c
+where leg.bet_id in (c.home_bet_id, c.away_bet_id);
 
 set local role authenticated;
 

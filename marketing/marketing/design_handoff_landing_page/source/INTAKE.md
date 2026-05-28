@@ -17,10 +17,10 @@
 - NativeWind (Tailwind) for styling, Reanimated for motion, Expo Haptics / Notifications / Blur.
 - Supabase (Postgres, Auth, Realtime, Edge Functions) accessed through TanStack Query hooks.
 - The Odds API for NFL odds and scores.
-- Distribution target per `app.json` and README: iOS-first (tablet supported), Android also configured.
+- Distribution target per `app.json` and README: iOS-first (tablet supported).
 
 ## Distribution model
-Native consumer mobile app — iOS-first launch via the App Store with an Android build configured in the same Expo project. No web version. [TODO: confirm whether the Android build is being submitted to Google Play at launch or held back.]
+Native consumer mobile app — iOS-first launch via the App Store. No web version.
 
 ## Monetization
 Free-to-play with planned freemium cosmetic monetization. No gameplay feature is gated behind payment — leagues, picks, matchups, chat, leaderboards, history, and profiles are all free with no caps.
@@ -141,8 +141,8 @@ First-year at a Big Ten school in a state where mobile sportsbooks are legal at 
 For this app, the following Phase 2 sections apply:
 
 - [ ] **2.1 Landing page hero** — yes — **P0**. Canonical "what is this" surface that every paid TikTok/Instagram/X click needs to land on. Also doubles as the destination for App Store reviewer external references and for the "not a sportsbook" positioning page that compliance leans on. Cannot launch without it.
-- [ ] **2.2 App Store screenshots** — yes (iOS) **P0** / yes (Android) **P1**. iOS-first launch per `app.json` and README, so iOS screenshots are required for submission. Android build is configured but Play Store submission is [TODO] in INTAKE — Android screenshots become P1 the moment that decision lands, P2 if Android holds back.
-- [ ] **2.3 App Store preview video** — yes (iOS) **P0** / yes (Android) **P2**. App Store preview video is one of the highest-leverage conversion levers in the Sports category and we already have the strongest possible asset: the `WinCelebration` moment (top-ranked in `COMPONENTS.md`). iOS preview ships with v1; Android preview waits until Play Store decision.
+- [ ] **2.2 App Store screenshots** — yes **P0**. iOS-first launch per `app.json` and README, so iOS screenshots are required for submission.
+- [ ] **2.3 App Store preview video** — yes **P0**. App Store preview video is one of the highest-leverage conversion levers in the Sports category and we already have the strongest possible asset: the `WinCelebration` moment (top-ranked in `COMPONENTS.md`). iOS preview ships with v1.
 - [ ] **2.4 Social reels (TikTok/Reels)** — yes — **P0**. TikTok + Instagram Reels is the primary acquisition channel for Priya (secondary) and Tyler (edge case), who together represent the larger addressable audience. Friend-recommendation-style creative ("my fraternity does this," "my group chat plays this") maps directly to the personas' trigger moments. Multiple cuts needed for A/B; ship at least 3 hooks at launch.
 - [ ] **2.5 X launch thread** — yes — **P0**. Marcus (primary commissioner persona) lives on Sunday-morning Sports Twitter. A launch thread with the `Bet Board` and `WinCelebration` hero clips, posted into the r/fantasyfootball / Sports Twitter ecosystem on a Friday before a marquee NFL week, is the single highest-leverage organic touch for the 30+ commissioner cohort. Quote-tweet-friendly format; pin to profile through Week 1.
 - [ ] **2.6 Email or SMS launch announcement** — **no**. Skip section. No list exists, no acquisition email infrastructure noted in the repo, and per the personas email is a dead channel for the secondary and edge audiences. Marcus would open a transactional "your league started Week 1" email *inside the product*, but that's product lifecycle, not launch marketing. Revisit post-launch only if a waitlist or referral list materializes.

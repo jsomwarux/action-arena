@@ -6,11 +6,18 @@ import type { OddsGame } from '@/lib/odds-api';
 import { supabase } from '@/lib/supabase';
 import type { Json } from '@/types/database';
 
-export function useUpcomingNflOdds() {
+export function useUpcomingNflOdds(options: { allowMockOdds?: boolean } = {}) {
+  const allowMockOdds = Boolean(options.allowMockOdds);
+
   return useQuery({
     gcTime: 1000 * 60 * 30,
-    queryFn: fetchUpcomingNflOdds,
-    queryKey: ['odds', 'nfl', 'upcoming', isUsingMockOdds ? 'mock' : 'live'],
+    queryFn: () => fetchUpcomingNflOdds({ allowMockOdds }),
+    queryKey: [
+      'odds',
+      'nfl',
+      'upcoming',
+      isUsingMockOdds && allowMockOdds ? 'mock-fixture' : 'live',
+    ],
     staleTime: 1000 * 60 * 5,
   });
 }

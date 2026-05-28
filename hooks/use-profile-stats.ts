@@ -1,11 +1,13 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
+import { PUBLIC_USER_SELECT } from '@/constants/public-user-select';
 import { WEEKLY_BUDGET } from '@/constants/rules';
 import {
   getLeagueMemberPrimaryName,
   indexLeagueMembersByUserId,
 } from '@/lib/league-member-display';
+import { fetchBetsWithLegs, fetchUserBetsWithLegs } from '@/lib/bets-with-legs';
 import { getSettledBets, isSettledBet, sumSettledProfit } from '@/lib/settled-bets';
 import { supabase } from '@/lib/supabase';
 import type {
@@ -13,12 +15,10 @@ import type {
   BetRow,
   BetResult,
   BetType,
-  Json,
   LeagueMemberRow,
   LeagueRow,
   StandingRow,
   TeaserPoints,
-  UserAchievementInsert,
   UserAchievementRow,
   UserRow,
   WeeklyMatchupRow,
@@ -224,13 +224,7 @@ function latestStanding(standings: StandingRow[]) {
   return [...standings].sort((left, right) => right.week_number - left.week_number)[0] ?? null;
 }
 
-function latestStandingAtOrBefore(standings: StandingRow[], weekNumber: number) {
-  return [...standings]
-    .filter((standing) => standing.week_number <= weekNumber)
-    .sort((left, right) => right.week_number - left.week_number)[0] ?? null;
-}
-
-function latestLeagueRecord(standings: StandingRow[]) {
+function latestStandingsByLeague(standings: StandingRow[]) {
   const latestByLeague = new Map<string, StandingRow>();
 
   standings.forEach((standing) => {
@@ -240,7 +234,17 @@ function latestLeagueRecord(standings: StandingRow[]) {
     }
   });
 
-  return [...latestByLeague.values()].reduce(
+  return latestByLeague;
+}
+
+function latestStandingAtOrBefore(standings: StandingRow[], weekNumber: number) {
+  return [...standings]
+    .filter((standing) => standing.week_number <= weekNumber)
+    .sort((left, right) => right.week_number - left.week_number)[0] ?? null;
+}
+
+function latestLeagueRecord(standings: StandingRow[]) {
+  return [...latestStandingsByLeague(standings).values()].reduce(
     (record, standing) => ({
       losses: record.losses + standing.losses,
       ties: record.ties + standing.ties,
@@ -248,6 +252,35 @@ function latestLeagueRecord(standings: StandingRow[]) {
     }),
     { losses: 0, ties: 0, wins: 0 },
   );
+}
+
+function filterBetsToLatestStandings(bets: BetWithLegs[], standings: StandingRow[]) {
+  const latestByLeague = latestStandingsByLeague(standings);
+
+  if (latestByLeague.size === 0) {
+    return bets;
+  }
+
+  return bets.filter((bet) => {
+    const latest = latestByLeague.get(bet.league_id);
+    return !latest || bet.week_number <= latest.week_number;
+  });
+}
+
+function seasonProfitFromStandings(standings: StandingRow[]) {
+  const latestByLeague = latestStandingsByLeague(standings);
+
+  if (latestByLeague.size === 0) {
+    return null;
+  }
+
+  const latestStandings = [...latestByLeague.values()];
+
+  if (!latestStandings.every((standing) => Number.isFinite(standing.total_profit))) {
+    return null;
+  }
+
+  return latestStandings.reduce((sum, standing) => sum + standing.total_profit, 0);
 }
 
 function settledBets<T extends Pick<BetRow, 'profit' | 'result'>>(bets: T[]) {
@@ -301,8 +334,9 @@ function weeklyProfitMap(bets: BetWithLegs[]) {
 }
 
 export function calculateProfileStats(bets: BetWithLegs[], standings: StandingRow[]): ProfileStats {
-  const settled = settledBets(bets);
-  const totalProfit = sumSettledBetProfit(bets);
+  const seasonBets = filterBetsToLatestStandings(bets, standings);
+  const settled = settledBets(seasonBets);
+  const totalProfit = seasonProfitFromStandings(standings) ?? sumSettledBetProfit(seasonBets);
   const totalAmount = settled.reduce((sum, bet) => sum + bet.amount, 0);
   const record = latestLeagueRecord(standings);
   const wonBets = settled.filter((bet) => bet.result === 'win').length;
@@ -311,7 +345,7 @@ export function calculateProfileStats(bets: BetWithLegs[], standings: StandingRo
 
   return {
     averageProfitPerBet: settled.length > 0 ? totalProfit / settled.length : 0,
-    currentStreak: currentBetStreak(bets),
+    currentStreak: currentBetStreak(seasonBets),
     losses: record.losses,
     roi: totalAmount > 0 ? (totalProfit / totalAmount) * 100 : 0,
     ties: record.ties,
@@ -444,48 +478,32 @@ export function buildProfileSummary(
   selectedLeagueId: string | 'all',
 ): ProfileSummary {
   const leagueIds =
-    selectedLeagueId === 'all' ? data.leagues.map((league) => league.id) : [selectedLeagueId];
+    selectedLeagueId === 'all'
+      ? uniqueValues([
+          ...data.leagues.map((league) => league.id),
+          ...data.bets.map((bet) => bet.league_id),
+          ...data.standings.map((standing) => standing.league_id),
+        ])
+      : [selectedLeagueId];
   const bets = data.bets.filter((bet) => leagueIds.includes(bet.league_id));
   const standings = data.standings.filter((standing) => leagueIds.includes(standing.league_id));
   const achievements = data.achievements.filter((achievement) => leagueIds.includes(achievement.league_id));
-  const settled = settledBets(bets);
+  const seasonBets = filterBetsToLatestStandings(bets, standings);
+  const settled = settledBets(seasonBets);
 
   return {
-    achievements: buildAchievements(bets, achievements),
+    achievements: buildAchievements(seasonBets, achievements),
     bestBet:
       [...settled].sort((left, right) => (right.profit ?? 0) - (left.profit ?? 0))[0] ?? null,
-    betTypeBreakdowns: calculateBetTypeBreakdowns(bets),
+    betTypeBreakdowns: calculateBetTypeBreakdowns(seasonBets),
     bets,
     latestStanding: latestStanding(standings),
     stats: calculateProfileStats(bets, standings),
-    teaserBreakdowns: calculateTeaserBreakdowns(bets),
-    weeklyProfits: weeklyProfitMap(bets),
+    teaserBreakdowns: calculateTeaserBreakdowns(seasonBets),
+    weeklyProfits: weeklyProfitMap(seasonBets),
     worstBet:
       [...settled].sort((left, right) => (left.profit ?? 0) - (right.profit ?? 0))[0] ?? null,
   };
-}
-
-function achievementUpserts(userId: string, bets: BetWithLegs[]) {
-  const byLeague = new Map<string, BetWithLegs[]>();
-
-  bets.forEach((bet) => {
-    byLeague.set(bet.league_id, [...(byLeague.get(bet.league_id) ?? []), bet]);
-  });
-
-  const rows: UserAchievementInsert[] = [];
-
-  byLeague.forEach((leagueBets, leagueId) => {
-    achievementKeysForBets(leagueBets).forEach((achievementKey) => {
-      rows.push({
-        achievement_key: achievementKey,
-        league_id: leagueId,
-        metadata: {} as Json,
-        user_id: userId,
-      });
-    });
-  });
-
-  return rows;
 }
 
 function displayNameForLeaderboardRow(row: Pick<LeaderboardRow, 'member' | 'profile'>) {
@@ -549,23 +567,16 @@ async function fetchUsersByIds(ids: string[]) {
     return [];
   }
 
-  const { data, error } = await supabase.from('users').select('*').in('id', userIds);
+  const { data, error } = await supabase.from('users').select(PUBLIC_USER_SELECT).in('id', userIds);
   return assertSupabaseResult(data as UserRow[] | null, error);
 }
 
 async function fetchBets(leagueIds: string[], userId: string) {
-  if (leagueIds.length === 0) {
-    return [];
-  }
+  return fetchBetsWithLegs({ leagueIds, userId });
+}
 
-  const { data, error } = await supabase
-    .from('bets')
-    .select('*, bet_legs(*)')
-    .in('league_id', leagueIds)
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false });
-
-  return assertSupabaseResult(data as BetWithLegs[] | null, error);
+async function fetchOwnBets(userId: string) {
+  return fetchUserBetsWithLegs({ userId });
 }
 
 export function useProfileData({
@@ -586,7 +597,7 @@ export function useProfileData({
 
       const { data: profileData, error: profileError } = await supabase
         .from('users')
-        .select('*')
+        .select(PUBLIC_USER_SELECT)
         .eq('id', targetUserId)
         .single();
       const profile = assertSupabaseResult(profileData as UserRow | null, profileError);
@@ -601,7 +612,13 @@ export function useProfileData({
 
       const { data: membershipData, error: membershipError } = await membershipQuery;
       const memberships = assertSupabaseResult(membershipData as LeagueMemberRow[] | null, membershipError);
-      const leagueIds = uniqueValues(memberships.map((membership) => membership.league_id));
+      const membershipLeagueIds = uniqueValues(memberships.map((membership) => membership.league_id));
+      const ownHistoricalBets =
+        targetUserId === viewerUserId && !leagueId ? await fetchOwnBets(targetUserId) : null;
+      const leagueIds = uniqueValues([
+        ...membershipLeagueIds,
+        ...(ownHistoricalBets?.map((bet) => bet.league_id) ?? []),
+      ]);
 
       if (leagueIds.length === 0) {
         return {
@@ -641,8 +658,10 @@ export function useProfileData({
           .select('*')
           .in('league_id', leagueIds)
           .eq('user_id', targetUserId),
-        fetchBets(leagueIds, targetUserId),
-        fetchBets(leagueIds, viewerUserId),
+        ownHistoricalBets ? Promise.resolve(ownHistoricalBets) : fetchBets(leagueIds, targetUserId),
+        ownHistoricalBets && targetUserId === viewerUserId
+          ? Promise.resolve(ownHistoricalBets)
+          : fetchBets(leagueIds, viewerUserId),
         supabase.from('standings').select('*').in('league_id', leagueIds).eq('user_id', viewerUserId),
         supabase
           .from('weekly_matchups')
@@ -672,15 +691,6 @@ export function useProfileData({
         viewerMatchupsResult.data as WeeklyMatchupRow[] | null,
         viewerMatchupsResult.error,
       );
-
-      if (targetUserId === viewerUserId) {
-        const upserts = achievementUpserts(targetUserId, bets);
-        if (upserts.length > 0) {
-          await supabase
-            .from('user_achievements')
-            .upsert(upserts, { onConflict: 'user_id,league_id,achievement_key' });
-        }
-      }
 
       const leagueOptions = leagues
         .sort((left, right) => left.name.localeCompare(right.name))
@@ -1144,12 +1154,8 @@ export function useWeeklyAwards(leagueId: string | undefined, weekNumber: number
         };
       }
 
-      const [betsResult, membersResult, standingsResult] = await Promise.all([
-        supabase
-          .from('bets')
-          .select('*, bet_legs(*)')
-          .eq('league_id', leagueId)
-          .eq('week_number', weekNumber),
+      const [bets, membersResult, standingsResult] = await Promise.all([
+        fetchBetsWithLegs({ ascending: true, leagueIds: [leagueId], weekNumbers: [weekNumber] }),
         supabase.from('league_members').select('*').eq('league_id', leagueId),
         supabase
           .from('standings')
@@ -1157,7 +1163,6 @@ export function useWeeklyAwards(leagueId: string | undefined, weekNumber: number
           .eq('league_id', leagueId)
           .eq('week_number', weekNumber),
       ]);
-      const bets = assertSupabaseResult(betsResult.data as BetWithLegs[] | null, betsResult.error);
       const members = assertSupabaseResult(membersResult.data as LeagueMemberRow[] | null, membersResult.error);
       const standings = assertSupabaseResult(
         standingsResult.data as StandingRow[] | null,

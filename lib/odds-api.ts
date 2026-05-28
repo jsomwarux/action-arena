@@ -56,6 +56,10 @@ export type OddsGame = {
   markets: Record<BetMarket, OddsSelection[]>;
 };
 
+export type FetchUpcomingNflOddsOptions = {
+  allowMockOdds?: boolean;
+};
+
 const ODDS_API_BASE_URL = 'https://api.the-odds-api.com/v4';
 const NFL_SPORT_KEY = 'americanfootball_nfl';
 const ODDS_API_KEY = process.env.EXPO_PUBLIC_ODDS_API_KEY;
@@ -114,8 +118,8 @@ export function normalizeOddsApiGame(game: OddsApiGame): OddsGame {
   };
 }
 
-export async function fetchUpcomingNflOdds() {
-  if (isUsingMockOdds) {
+export async function fetchUpcomingNflOdds(options: FetchUpcomingNflOddsOptions = {}) {
+  if (isUsingMockOdds && options.allowMockOdds) {
     return getMockNflOddsApiGames()
       .map(normalizeOddsApiGame)
       .filter((game) => new Date(game.commenceTime).getTime() > Date.now())

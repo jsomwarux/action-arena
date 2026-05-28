@@ -412,6 +412,9 @@ export default function LeaderboardScreen() {
     const source = leaderboardQuery.data?.rows ?? [];
     return [...source].sort((left, right) => rankForRow(left, boardView) - rankForRow(right, boardView));
   }, [boardView, leaderboardQuery.data?.rows]);
+  const hasLeaderboardResults = sortedRows.some(
+    (row) => row.standing || row.seasonProfit !== 0 || row.weeklyProfit !== 0,
+  );
 
   const podiumRows = sortedRows.slice(0, Math.min(3, sortedRows.length));
   const cosmeticsQuery = useEquippedCosmeticsForUsers(
@@ -471,7 +474,11 @@ export default function LeaderboardScreen() {
         {!leaderboardQuery.isLoading && leaderboardQuery.data && sortedRows.length > 0 ? (
           <View className="gap-5">
             {leaderboardQuery.data.leagueOptions.length > 1 ? (
-              <View className="flex-row flex-wrap gap-2">
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: 8, paddingHorizontal: 20 }}
+                style={{ marginHorizontal: -20 }}>
                 {leaderboardQuery.data.leagueOptions.map((league) => {
                   const active =
                     (selectedLeague?.id ?? leaderboardQuery.data?.leagueOptions[0]?.id) === league.id;
@@ -495,7 +502,7 @@ export default function LeaderboardScreen() {
                     </TapTarget>
                   );
                 })}
-              </View>
+              </ScrollView>
             ) : null}
 
             <SegmentedToggle
@@ -505,7 +512,23 @@ export default function LeaderboardScreen() {
               value={boardView}
             />
 
-            {podiumRows.length >= 3 ? (
+            {!hasLeaderboardResults ? (
+              <Card>
+                <View className="items-center gap-3 py-4">
+                  <View className="h-14 w-14 items-center justify-center rounded-2xl border border-cyan-accent/30 bg-cyan-accent/10">
+                    <Ionicons color={THEME_COLORS.cyanAccent} name="podium" size={24} />
+                  </View>
+                  <Text
+                    className="text-center text-xl font-black uppercase text-white"
+                    style={{ letterSpacing: -0.3 }}>
+                    No Results Yet
+                  </Text>
+                  <Text className="px-2 text-center text-sm font-semibold leading-5 text-white/55">
+                    Settled weeks will appear here once league cards resolve.
+                  </Text>
+                </View>
+              </Card>
+            ) : podiumRows.length >= 3 ? (
               <View className="flex-row items-end gap-3 pt-2">
                 {/* Silver (rank 2) on the left */}
                 <View style={{ flex: 1, paddingBottom: 16 }}>
@@ -571,56 +594,58 @@ export default function LeaderboardScreen() {
               </View>
             ) : null}
 
-            <Card padded={false} style={{ marginTop: 4 }}>
-              <View>
-                <View className="flex-row items-center gap-3 px-4 pb-2 pt-3">
-                  <Text
-                    className="w-12 text-xs font-bold uppercase text-white/55"
-                    style={{ letterSpacing: 1.2 }}>
-                    Rank
-                  </Text>
-                  <Text
-                    className="flex-1 text-xs font-bold uppercase text-white/55"
-                    style={{ letterSpacing: 1.2 }}>
-                    Team
-                  </Text>
-                  <Text
-                    className="text-xs font-bold uppercase text-white/55"
-                    style={{ letterSpacing: 1.2 }}>
-                    {boardView === 'week' ? 'Week' : 'Total'}
-                  </Text>
+            {hasLeaderboardResults ? (
+              <Card padded={false} style={{ marginTop: 4 }}>
+                <View>
+                  <View className="flex-row items-center gap-3 px-4 pb-2 pt-3">
+                    <Text
+                      className="w-12 text-xs font-bold uppercase text-white/55"
+                      style={{ letterSpacing: 1.2 }}>
+                      Rank
+                    </Text>
+                    <Text
+                      className="flex-1 text-xs font-bold uppercase text-white/55"
+                      style={{ letterSpacing: 1.2 }}>
+                      Team
+                    </Text>
+                    <Text
+                      className="text-xs font-bold uppercase text-white/55"
+                      style={{ letterSpacing: 1.2 }}>
+                      {boardView === 'week' ? 'Week' : 'Total'}
+                    </Text>
+                  </View>
+                  <View className="h-px bg-white/[0.08]" />
+                  {sortedRows.map((row, index) => {
+                    const isUser = row.member.user_id === user?.id;
+                    const isLast = index === sortedRows.length - 1;
+                    const value = valueFor(row);
+                    const rowRank = rankForRow(row, boardView);
+                    return (
+                      <StaggeredItem index={index} key={row.member.id} perItemDelay={45}>
+                        <LeaderboardListRow
+                          cosmetics={cosmeticsByUserId[row.member.user_id]}
+                          isUser={isUser}
+                          onPress={() =>
+                            router.push({
+                              pathname: '/members/[memberId]',
+                              params: {
+                                leagueId: row.member.league_id,
+                                memberId: row.member.user_id,
+                              },
+                            })
+                          }
+                          row={row}
+                          showRank={rowRank}
+                          trend={trendForRow(row, boardView)}
+                          value={value}
+                        />
+                        {!isLast ? <View className="h-px bg-white/[0.05]" /> : null}
+                      </StaggeredItem>
+                    );
+                  })}
                 </View>
-                <View className="h-px bg-white/[0.08]" />
-                {sortedRows.map((row, index) => {
-                  const isUser = row.member.user_id === user?.id;
-                  const isLast = index === sortedRows.length - 1;
-                  const value = valueFor(row);
-                  const rowRank = rankForRow(row, boardView);
-                  return (
-                    <StaggeredItem index={index} key={row.member.id} perItemDelay={45}>
-                      <LeaderboardListRow
-                        cosmetics={cosmeticsByUserId[row.member.user_id]}
-                        isUser={isUser}
-                        onPress={() =>
-                          router.push({
-                            pathname: '/members/[memberId]',
-                            params: {
-                              leagueId: row.member.league_id,
-                              memberId: row.member.user_id,
-                            },
-                          })
-                        }
-                        row={row}
-                        showRank={rowRank}
-                        trend={trendForRow(row, boardView)}
-                        value={value}
-                      />
-                      {!isLast ? <View className="h-px bg-white/[0.05]" /> : null}
-                    </StaggeredItem>
-                  );
-                })}
-              </View>
-            </Card>
+              </Card>
+            ) : null}
           </View>
         ) : null}
 

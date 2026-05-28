@@ -107,6 +107,7 @@ export default function SignupScreen() {
                 onChangeText={setPassword}
                 placeholder="At least 6 characters"
                 secureTextEntry
+                showPasswordToggle
                 textContentType="newPassword"
                 value={password}
               />
@@ -122,6 +123,26 @@ export default function SignupScreen() {
                   <Text className="text-sm font-semibold text-electric-green">{notice}</Text>
                 </View>
               ) : null}
+
+              <Text
+                className="text-center text-xs font-semibold leading-5 text-white/55"
+                style={{ letterSpacing: 0.3 }}>
+                By creating an account, you agree to our{' '}
+                <Text
+                  accessibilityRole="link"
+                  className="font-black text-electric-green"
+                  onPress={() => router.push('/terms')}>
+                  Terms of Service
+                </Text>
+                {' '}and{' '}
+                <Text
+                  accessibilityRole="link"
+                  className="font-black text-electric-green"
+                  onPress={() => router.push('/privacy')}>
+                  Privacy Policy
+                </Text>
+                .
+              </Text>
 
               <Button loading={isSubmitting} onPress={handleSignup} title="Create Account" />
 

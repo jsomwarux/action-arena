@@ -92,9 +92,18 @@ export default function LoginScreen() {
                 onChangeText={setPassword}
                 placeholder="Your password"
                 secureTextEntry
+                showPasswordToggle
                 textContentType="password"
                 value={password}
               />
+
+              <View className="-mt-2 items-end">
+                <Link href="/forgot-password" asChild>
+                  <Pressable hitSlop={8}>
+                    <Text className="text-sm font-black text-electric-green">Forgot password?</Text>
+                  </Pressable>
+                </Link>
+              </View>
 
               {error ? (
                 <View className="rounded-xl border border-coral-red/40 bg-coral-red/10 px-3 py-2">

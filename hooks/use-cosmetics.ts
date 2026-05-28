@@ -7,7 +7,6 @@ import type {
   CosmeticCatalogRow,
   EquippedCosmeticsByCategory,
   UserCosmeticRow,
-  UserRow,
 } from '@/types/database';
 
 export type UserCosmeticsState = {
@@ -65,13 +64,16 @@ export function useUserCosmetics(userId: string | undefined) {
         };
       }
 
-      const [profileResult, cosmeticsResult, catalogResult] = await Promise.all([
-        supabase.from('users').select('*').eq('id', userId).single(),
+      const [coinBalanceResult, cosmeticsResult, catalogResult] = await Promise.all([
+        supabase.rpc('get_my_arena_coin_balance'),
         supabase.from('user_cosmetics').select('*').eq('user_id', userId).order('purchased_at'),
         supabase.from('cosmetic_catalog').select('*').order('category').order('coin_cost'),
       ]);
 
-      const profile = assertSupabaseResult(profileResult.data as UserRow | null, profileResult.error);
+      const coinBalance = assertSupabaseResult(
+        coinBalanceResult.data as number | null,
+        coinBalanceResult.error,
+      );
       const rows = assertSupabaseResult(
         cosmeticsResult.data as UserCosmeticRow[] | null,
         cosmeticsResult.error,
@@ -83,7 +85,7 @@ export function useUserCosmetics(userId: string | undefined) {
 
       return {
         catalog,
-        coinBalance: profile.arena_coins,
+        coinBalance,
         equippedByCategory: toEquippedMap(rows),
         ownedByItemId: toOwnedMap(rows),
         rows,

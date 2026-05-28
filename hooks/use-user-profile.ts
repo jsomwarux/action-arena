@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
+import { PUBLIC_USER_SELECT } from '@/constants/public-user-select';
 import { supabase } from '@/lib/supabase';
 import type { UserUpdate } from '@/types/database';
 
@@ -19,7 +20,7 @@ export function useUpdateUserProfile(userId: string | undefined) {
           display_name: updates.display_name?.trim(),
         })
         .eq('id', userId)
-        .select('*')
+        .select(PUBLIC_USER_SELECT)
         .single();
 
       if (error) {

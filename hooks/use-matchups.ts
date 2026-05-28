@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
+import { PUBLIC_USER_SELECT } from '@/constants/public-user-select';
 import { MINIMUM_BETS_PER_WEEK } from '@/constants/rules';
 import { calculateWeeklyAwards, type WeeklyAwards } from '@/hooks/use-profile-stats';
 import {
@@ -7,6 +8,7 @@ import {
   getLeagueMemberSecondaryName,
   indexLeagueMembersByUserId,
 } from '@/lib/league-member-display';
+import { fetchBetsWithLegs } from '@/lib/bets-with-legs';
 import { sumSettledProfit } from '@/lib/settled-bets';
 import { supabase } from '@/lib/supabase';
 import type {
@@ -114,7 +116,7 @@ async function fetchUsersByIds(ids: string[]) {
     return [];
   }
 
-  const { data, error } = await supabase.from('users').select('*').in('id', userIds);
+  const { data, error } = await supabase.from('users').select(PUBLIC_USER_SELECT).in('id', userIds);
   return assertSupabaseResult(data as UserRow[] | null, error);
 }
 
@@ -134,15 +136,12 @@ async function fetchBetsForUsers({
     return [];
   }
 
-  const { data, error } = await supabase
-    .from('bets')
-    .select('*, bet_legs(*)')
-    .eq('league_id', leagueId)
-    .in('user_id', filteredUserIds)
-    .in('week_number', filteredWeeks)
-    .order('created_at', { ascending: true });
-
-  return assertSupabaseResult(data as BetWithLegs[] | null, error);
+  return fetchBetsWithLegs({
+    ascending: true,
+    leagueIds: [leagueId],
+    userIds: filteredUserIds,
+    weekNumbers: filteredWeeks,
+  });
 }
 
 function betsForUserWeek(
@@ -279,7 +278,7 @@ export function useHomeDashboard(userId: string | undefined) {
         ]),
       ).map(Number);
 
-      const [membersResult, standingsResult, matchupsResult, betsResult, leagueBetsResult] = await Promise.all([
+      const [membersResult, standingsResult, matchupsResult, bets, leagueBets] = await Promise.all([
         supabase.from('league_members').select('*').in('league_id', leagueIds),
         supabase
           .from('standings')
@@ -292,29 +291,13 @@ export function useHomeDashboard(userId: string | undefined) {
           .in('league_id', leagueIds)
           .or(`home_user_id.eq.${userId},away_user_id.eq.${userId}`)
           .in('week_number', weekNumbers),
-        supabase
-          .from('bets')
-          .select('*, bet_legs(*)')
-          .in('league_id', leagueIds)
-          .eq('user_id', userId)
-          .in('week_number', weekNumbers)
-          .order('created_at', { ascending: true }),
-        supabase
-          .from('bets')
-          .select('*, bet_legs(*)')
-          .in('league_id', leagueIds)
-          .in('week_number', weekNumbers)
-          .order('created_at', { ascending: true }),
+        fetchBetsWithLegs({ ascending: true, leagueIds, userId, weekNumbers }),
+        fetchBetsWithLegs({ ascending: true, leagueIds, weekNumbers }),
       ]);
 
       const members = assertSupabaseResult(membersResult.data as LeagueMemberRow[] | null, membersResult.error);
       const standings = assertSupabaseResult(standingsResult.data as StandingRow[] | null, standingsResult.error);
       const matchups = assertSupabaseResult(matchupsResult.data as WeeklyMatchupRow[] | null, matchupsResult.error);
-      const bets = assertSupabaseResult(betsResult.data as BetWithLegs[] | null, betsResult.error);
-      const leagueBets = assertSupabaseResult(
-        leagueBetsResult.data as BetWithLegs[] | null,
-        leagueBetsResult.error,
-      );
       const opponentIds = matchups
         .map((matchup) =>
           matchup.home_user_id === userId ? matchup.away_user_id : matchup.home_user_id,

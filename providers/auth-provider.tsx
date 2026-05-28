@@ -1,10 +1,18 @@
 import type { Session, User } from '@supabase/supabase-js';
 import { createContext, useEffect, useMemo, useState, type PropsWithChildren } from 'react';
 
+import {
+  createRecoverySessionFromUrl,
+  passwordResetRedirectUrl,
+} from '@/lib/auth-redirects';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 
 type AuthContextValue = {
+  completePasswordReset: (password: string) => Promise<void>;
+  createPasswordRecoverySession: (url: string) => Promise<{ email?: string }>;
   isLoading: boolean;
+  passwordResetRedirectUrl: string;
+  requestPasswordReset: (email: string) => Promise<void>;
   session: Session | null;
   signInWithPassword: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -73,7 +81,41 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const value = useMemo<AuthContextValue>(
     () => ({
+      completePasswordReset: async (password) => {
+        ensureSupabaseConfigured();
+
+        const { error } = await supabase.auth.updateUser({ password });
+
+        if (error) {
+          throw error;
+        }
+      },
+      createPasswordRecoverySession: async (url) => {
+        ensureSupabaseConfigured();
+
+        const result = await createRecoverySessionFromUrl(url);
+        const { data, error } = await supabase.auth.getSession();
+
+        if (error) {
+          throw error;
+        }
+
+        setSession(data.session);
+        return result;
+      },
       isLoading,
+      passwordResetRedirectUrl,
+      requestPasswordReset: async (email) => {
+        ensureSupabaseConfigured();
+
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: passwordResetRedirectUrl,
+        });
+
+        if (error) {
+          throw error;
+        }
+      },
       session,
       signInWithPassword: async (email, password) => {
         ensureSupabaseConfigured();

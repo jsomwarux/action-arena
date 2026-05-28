@@ -473,8 +473,8 @@ Auto-advance still cycles, but all 4 transforms cut rather than slide.
   disables auto-advance.
 - **Center card click:** No-op.
 - **Rapid clicks during transition:** Blocked by animation lock for 650ms.
-- **"GET THE APP" CTA:** Deep-links to App Store. iOS detect → App Store;
-  Android detect → Play Store; desktop → smart banner / QR.
+- **"GET THE APP" CTA:** Deep-links to App Store. Eligible mobile
+  visitors open the App Store; desktop visitors see the smart banner / QR.
 - **"SEE HOW IT WORKS" CTA (desktop):** Smooth-scrolls to `#how-it-works`
   (Section 02).
 - **Footer links:** Standard route navigation (Privacy / Terms / Press /

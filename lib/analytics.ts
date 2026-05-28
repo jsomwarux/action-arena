@@ -9,6 +9,8 @@ export type AnalyticsEventName =
   | 'profile_viewed'
   | 'chat_message_sent'
   | 'bet_shared_to_chat'
+  | 'content_report_created'
+  | 'user_blocked'
   | 'shop_viewed'
   | 'shop_item_previewed'
   | 'cosmetic_purchased'
@@ -16,8 +18,7 @@ export type AnalyticsEventName =
   | 'coin_store_viewed'
   | 'season_pass_screen_viewed'
   | 'season_pass_redeemed'
-  | 'ad_hook_triggered'
-  | 'rewarded_unlock_triggered';
+  | 'ad_hook_triggered';
 
 export type AnalyticsPayload = Record<string, boolean | number | string | null | undefined>;
 

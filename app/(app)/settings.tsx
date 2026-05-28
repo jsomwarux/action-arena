@@ -12,9 +12,14 @@ import {
   TextInput,
   ToggleRow,
 } from '@/components/ui';
-import { ACTION_ARENA_DISCLOSURE } from '@/constants/disclosure';
+import {
+  ACTION_ARENA_DISCLOSURE,
+  PRIVACY_POLICY_DOCUMENT,
+  TERMS_OF_SERVICE_DOCUMENT,
+} from '@/constants/disclosure';
 import { THEME_COLORS } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
+import { useDeleteAccount } from '@/hooks/use-delete-account';
 import { type LeagueSummary, useLeaveLeagueMutation, useMyLeagues } from '@/hooks/use-leagues';
 import {
   NOTIFICATION_PREFERENCE_LABELS,
@@ -27,15 +32,6 @@ import { useUpdateUserProfile } from '@/hooks/use-user-profile';
 import { cn } from '@/lib/cn';
 import { formatLeagueType } from '@/lib/format';
 import type { NotificationPreferencesUpdate, NotificationType } from '@/types/database';
-
-const ABOUT_NO_REAL_MONEY_TEXT =
-  'Action Arena is a free-to-play fantasy sports prediction game. No real money is paid, won, or redeemable inside the app.';
-
-const TERMS_OF_SERVICE_TEXT =
-  'Action Arena is for free-to-play fantasy sports predictions only. No real money is paid, won, or redeemable inside the app. Coins, points, standings, rewards, and league results are virtual, have no monetary value, and cannot be exchanged for money or money-equivalent prizes. League prizes, if any, are arranged by commissioners outside Action Arena.';
-
-const PRIVACY_POLICY_TEXT =
-  'Action Arena uses account, league, pick, notification, and cosmetic data to operate the app experience. We do not sell personal data, and no real-money sports operator receives app data from Action Arena.';
 
 function SettingsSkeleton() {
   return (
@@ -102,6 +98,7 @@ export default function SettingsScreen() {
   const seasonPassQuery = useSeasonPass(user?.id);
   const updatePreferences = useUpdateNotificationPreferences(user?.id);
   const updateProfile = useUpdateUserProfile(user?.id);
+  const deleteAccount = useDeleteAccount();
   const leaveLeague = useLeaveLeagueMutation(user?.id);
   const [displayName, setDisplayName] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
@@ -165,8 +162,29 @@ export default function SettingsScreen() {
     );
   };
 
-  const showAboutModal = (title: string, message: string) => {
-    Alert.alert(title, message);
+  const confirmDeleteAccount = () => {
+    Alert.alert(
+      'Delete account permanently?',
+      'This permanently deletes your Action Arena account, profile, league memberships, picks, cosmetics, notifications, and other account data. This cannot be undone.',
+      [
+        { style: 'cancel', text: 'Cancel' },
+        {
+          onPress: async () => {
+            try {
+              await deleteAccount.mutateAsync();
+              router.replace('/login');
+            } catch (error) {
+              Alert.alert(
+                'Could not delete account',
+                error instanceof Error ? error.message : 'Try again.',
+              );
+            }
+          },
+          style: 'destructive',
+          text: 'Delete Account',
+        },
+      ],
+    );
   };
 
   return (
@@ -307,9 +325,9 @@ export default function SettingsScreen() {
                   About
                 </Text>
                 <View className="rounded-2xl border border-white/[0.07] bg-white/[0.04] p-3">
-                  <Text className="text-sm font-bold text-white">About Action Arena</Text>
+                  <Text className="text-sm font-bold text-white">{ACTION_ARENA_DISCLOSURE.title}</Text>
                   <Text className="mt-1 text-xs font-medium leading-5 text-white/50">
-                    {ABOUT_NO_REAL_MONEY_TEXT}
+                    {ACTION_ARENA_DISCLOSURE.summary}
                   </Text>
                   <Button
                     onPress={() =>
@@ -320,18 +338,12 @@ export default function SettingsScreen() {
                   />
                 </View>
                 <View className="rounded-2xl border border-white/[0.07] bg-white/[0.04] p-3">
-                  <Text className="text-sm font-bold text-white">{ACTION_ARENA_DISCLOSURE.title}</Text>
-                  <Text className="mt-1 text-xs font-medium leading-5 text-white/50">
-                    {ACTION_ARENA_DISCLOSURE.body}
-                  </Text>
-                </View>
-                <View className="rounded-2xl border border-white/[0.07] bg-white/[0.04] p-3">
                   <Text className="text-sm font-bold text-white">Terms of Service</Text>
                   <Text className="mt-1 text-xs font-medium leading-5 text-white/50">
-                    {TERMS_OF_SERVICE_TEXT}
+                    {TERMS_OF_SERVICE_DOCUMENT.summary}
                   </Text>
                   <Button
-                    onPress={() => showAboutModal('Terms of Service', TERMS_OF_SERVICE_TEXT)}
+                    onPress={() => router.push('/terms')}
                     title="View Terms"
                     variant="secondary"
                   />
@@ -339,10 +351,10 @@ export default function SettingsScreen() {
                 <View className="rounded-2xl border border-white/[0.07] bg-white/[0.04] p-3">
                   <Text className="text-sm font-bold text-white">Privacy Policy</Text>
                   <Text className="mt-1 text-xs font-medium leading-5 text-white/50">
-                    {PRIVACY_POLICY_TEXT}
+                    {PRIVACY_POLICY_DOCUMENT.summary}
                   </Text>
                   <Button
-                    onPress={() => showAboutModal('Privacy Policy', PRIVACY_POLICY_TEXT)}
+                    onPress={() => router.push('/privacy')}
                     title="View Privacy Policy"
                     variant="secondary"
                   />
@@ -350,13 +362,44 @@ export default function SettingsScreen() {
               </View>
             </Card>
 
-            <Button
-              onPress={() => {
-                void signOut();
-              }}
-              title="Sign Out"
-              variant="destructive"
-            />
+            <Card>
+              <View className="gap-3">
+                <Text
+                  className="text-[11px] font-semibold uppercase text-coral-red"
+                  style={{ letterSpacing: 1.2 }}>
+                  Account Access
+                </Text>
+                <Button
+                  onPress={() => {
+                    void signOut();
+                  }}
+                  title="Sign Out"
+                  variant="secondary"
+                />
+                <View className="rounded-2xl border border-coral-red/30 bg-coral-red/10 p-3">
+                  <View className="flex-row items-start gap-3">
+                    <View className="h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-coral-red/30 bg-coral-red/15">
+                      <Ionicons color={THEME_COLORS.coralRed} name="trash" size={18} />
+                    </View>
+                    <View className="min-w-0 flex-1 gap-2">
+                      <Text className="text-sm font-bold text-white">Delete Account</Text>
+                      <Text className="text-xs font-medium leading-5 text-white/55">
+                        Permanently remove your account and account data from Action Arena.
+                      </Text>
+                    </View>
+                  </View>
+                  <View className="mt-3">
+                    <Button
+                      disabled={deleteAccount.isPending}
+                      loading={deleteAccount.isPending}
+                      onPress={confirmDeleteAccount}
+                      title="Delete Account"
+                      variant="destructive"
+                    />
+                  </View>
+                </View>
+              </View>
+            </Card>
           </>
         ) : null}
 

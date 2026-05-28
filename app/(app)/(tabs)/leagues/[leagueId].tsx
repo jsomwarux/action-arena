@@ -4,6 +4,7 @@ import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Alert,
   KeyboardAvoidingView,
   Modal,
   type NativeScrollEvent,
@@ -39,6 +40,7 @@ import { getCosmeticItem } from '@/constants/cosmetics';
 import { haptics } from '@/lib/haptics';
 import { THEME_COLORS } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
+import { useBlockUserMutation, useReportContentMutation } from '@/hooks/use-content-moderation';
 import { useEquippedCosmeticsForUsers, useUserCosmetics } from '@/hooks/use-cosmetics';
 import {
   type LeagueChatMessage,
@@ -1078,20 +1080,27 @@ function FutureWeekAwardsCard({ weekNumber }: { weekNumber: number }) {
 }
 
 function MatchupPlaceholderCard({
+  hasWeekSchedule,
   weekNumber,
   weekStatus,
 }: {
+  hasWeekSchedule?: boolean;
   weekNumber: number;
   weekStatus: WeekViewStatus;
 }) {
   const isFutureWeek = weekStatus === 'future';
   const isPastWeek = weekStatus === 'past';
-  const title = isFutureWeek
+  const isByeWeek = Boolean(hasWeekSchedule) && !isFutureWeek;
+  const title = isByeWeek
+    ? `Week ${weekNumber} Bye`
+    : isFutureWeek
     ? `Week ${weekNumber} Schedule Pending`
     : isPastWeek
       ? `Week ${weekNumber} Matchup Missing`
       : `No Week ${weekNumber} Matchup Assigned`;
-  const description = isFutureWeek
+  const description = isByeWeek
+    ? 'No head-to-head game is assigned for your team this week. Your league schedule is still intact.'
+    : isFutureWeek
     ? 'The matchup card will appear here once the league schedule is generated.'
     : isPastWeek
       ? 'No head-to-head matchup was saved for your team in this week.'
@@ -2322,9 +2331,13 @@ function ScheduleList({
 function MembersList({
   cosmeticsByUserId,
   detail,
+  onMemberActions,
+  userId,
 }: {
   cosmeticsByUserId: Record<string, EquippedCosmeticsByCategory>;
   detail: LeagueDetail;
+  onMemberActions: (member: LeagueMemberRow) => void;
+  userId: string;
 }) {
   const router = useRouter();
   const standingByUserId = useMemo(
@@ -2345,9 +2358,15 @@ function MembersList({
           const lastRow = index === detail.members.length - 1;
           const memberName = getDisplayName(detail, member.user_id);
           const secondaryName = getSecondaryDisplayName(detail, member.user_id);
+          const canModerateMember = member.user_id !== userId;
           return (
             <PressableScale
               key={member.id}
+              onLongPress={() => {
+                if (canModerateMember) {
+                  onMemberActions(member);
+                }
+              }}
               onPress={() =>
                 router.push({
                   pathname: '/members/[memberId]',
@@ -2381,6 +2400,17 @@ function MembersList({
                     style={{ letterSpacing: -0.2 }}>
                     {formatProfit(totalProfit)}
                   </Text>
+                  {canModerateMember ? (
+                    <Pressable
+                      accessibilityLabel={`Report or block ${memberName}`}
+                      accessibilityRole="button"
+                      hitSlop={8}
+                      onPress={() => onMemberActions(member)}>
+                      <View className="h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/[0.04]">
+                        <Ionicons color="rgba(255,255,255,0.55)" name="flag" size={12} />
+                      </View>
+                    </Pressable>
+                  ) : null}
                 </View>
               </View>
             </PressableScale>
@@ -2451,8 +2481,10 @@ function SharedBetCard({
 
           {/* Legs: each row reserves a fixed slot for the odds on the right and
               gives the team logo + label the remaining `flex-1` space. The
-              label truncates with an ellipsis so long lines (e.g. teaser line
-              shifts) never widen the row. */}
+              label wraps onto a second line when needed (e.g. teaser line
+              shifts like "Dallas Cowboys +2.5 → +8.5") so both the original
+              and adjusted value stay visible instead of truncating. The logo
+              and odds anchor to the first line via `items-start`. */}
           <View className="mt-3 gap-1.5">
             {metadata.legs.map((leg, index) => {
               if (!isBetMarket(leg.market)) {
@@ -2469,14 +2501,14 @@ function SharedBetCard({
               return (
                 <View
                   key={`${leg.selection}-${index}`}
-                  className="flex-row items-center justify-between gap-2">
-                  <View className="min-w-0 flex-1 flex-row items-center gap-2">
+                  className="flex-row items-start justify-between gap-2">
+                  <View className="min-w-0 flex-1 flex-row items-start gap-2">
                     {leg.market !== 'over_under' ? (
                       <NflTeamLogo size={20} teamName={getPickLogoLabel(labelLeg)} />
                     ) : null}
                     <Text
-                      className="min-w-0 flex-1 text-xs font-semibold text-white/75"
-                      numberOfLines={1}>
+                      className="min-w-0 flex-1 text-xs font-semibold leading-tight text-white/75"
+                      numberOfLines={2}>
                       {formatBetLegLabel(labelLeg, { betType: metadata.betType })}
                     </Text>
                   </View>
@@ -2488,12 +2520,14 @@ function SharedBetCard({
             })}
           </View>
 
-          {/* Footer: the coins-played label can shrink/truncate so the reward
-              total on the right always stays inside the card. */}
-          <View className="mt-3 flex-row items-center justify-between gap-2 border-t border-white/[0.08] pt-3">
+          {/* Footer: the coins-played label wraps onto a second line when it
+              can't sit beside the reward total, so the full "X COINS PLAYED"
+              label always reads while the reward stays inside the card.
+              `items-start` keeps the reward anchored to the first line. */}
+          <View className="mt-3 flex-row items-start justify-between gap-2 border-t border-white/[0.08] pt-3">
             <Text
-              className="min-w-0 shrink text-[10px] font-black uppercase text-white/45"
-              numberOfLines={1}
+              className="min-w-0 shrink text-[10px] font-black uppercase leading-tight text-white/45"
+              numberOfLines={2}
               style={{ letterSpacing: 1.4 }}>
               {formatCurrency(metadata.amount)} played
             </Text>
@@ -2512,11 +2546,13 @@ function ChatBubble({
   isMine,
   member,
   message,
+  onOpenActions,
 }: {
   cosmetics?: EquippedCosmeticsByCategory;
   isMine: boolean;
   member?: LeagueMemberRow;
   message: LeagueChatMessage;
+  onOpenActions: (message: LeagueChatMessage, displayName: string) => void;
 }) {
   const isSystem = message.message_type === 'system';
   const isBetShare = message.message_type === 'bet_share';
@@ -2542,8 +2578,15 @@ function ChatBubble({
   }
 
   return (
-    <View
-      className={cn('flex-row items-end gap-2', isMine ? 'justify-end' : 'justify-start')}>
+    <Pressable
+      delayLongPress={350}
+      onLongPress={() => {
+        if (!isMine) {
+          onOpenActions(message, displayName);
+        }
+      }}>
+      <View
+        className={cn('flex-row items-end gap-2', isMine ? 'justify-end' : 'justify-start')}>
       {!isMine ? (
         <CosmeticAvatar cosmetics={cosmetics} name={displayName} size="sm" />
       ) : null}
@@ -2591,18 +2634,36 @@ function ChatBubble({
           </Text>
         )}
         {isBetShare && metadata ? <SharedBetCard cosmetics={cosmetics} metadata={metadata} /> : null}
-        <Text
+        <View
           className={cn(
-            'mt-1.5 text-[10px] font-semibold',
-            isMine ? 'text-electric-green/60 self-end' : 'text-white/40',
+            'mt-1.5 flex-row items-center gap-2',
+            isMine ? 'justify-end' : 'justify-between',
           )}>
-          {getShortTime(message.created_at)}
-        </Text>
+          {!isMine ? (
+            <Pressable
+              accessibilityLabel={`Report or block ${displayName}`}
+              accessibilityRole="button"
+              hitSlop={8}
+              onPress={() => onOpenActions(message, displayName)}>
+              <View className="h-6 w-6 items-center justify-center rounded-full border border-white/10 bg-white/[0.04]">
+                <Ionicons color="rgba(255,255,255,0.5)" name="flag" size={11} />
+              </View>
+            </Pressable>
+          ) : null}
+          <Text
+            className={cn(
+              'text-[10px] font-semibold',
+              isMine ? 'text-electric-green/60 self-end' : 'text-white/40',
+            )}>
+            {getShortTime(message.created_at)}
+          </Text>
+        </View>
       </View>
       {isMine ? (
         <CosmeticAvatar cosmetics={cosmetics} name={displayName} size="sm" />
       ) : null}
-    </View>
+      </View>
+    </Pressable>
   );
 }
 
@@ -2622,6 +2683,8 @@ function LeagueChat({
   const scrollRef = useRef<ScrollView>(null);
   const previousMessageCount = useRef(0);
   const chatQuery = useLeagueChat(detail.league.id, limit);
+  const reportContent = useReportContentMutation(userId);
+  const blockUser = useBlockUserMutation(userId);
   const sendMessage = useSendLeagueChatMessage(detail.league.id, userId);
   const sendSticker = useSendLeagueChatSticker(detail.league.id, userId);
   const userCosmetics = useUserCosmetics(userId);
@@ -2638,6 +2701,84 @@ function LeagueChat({
   const stickerRows = (userCosmetics.data?.rows ?? []).filter(
     (row) => row.category === 'chat_sticker_pack',
   );
+
+  const reportChatMessage = async (message: LeagueChatMessage, displayName: string) => {
+    if (!message.user_id) {
+      return;
+    }
+
+    try {
+      await reportContent.mutateAsync({
+        contentSnapshot: {
+          body: message.body,
+          created_at: message.created_at,
+          message_type: message.message_type,
+          metadata: message.metadata,
+          user_display_name: displayName,
+          user_id: message.user_id,
+        },
+        leagueId: detail.league.id,
+        reportedUserId: message.user_id,
+        targetId: message.id,
+        targetType: 'chat_message',
+      });
+      haptics.success();
+      Alert.alert('Report sent', 'This message was flagged for moderation review.');
+    } catch (error) {
+      haptics.error();
+      Alert.alert('Could not report message', error instanceof Error ? error.message : 'Try again.');
+    }
+  };
+
+  const confirmBlockUser = (blockedUserId: string, displayName: string) => {
+    Alert.alert(
+      `Block ${displayName}?`,
+      "You won't see their chat messages anymore. Other league members can still see them.",
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          onPress: () => {
+            void (async () => {
+              try {
+                await blockUser.mutateAsync(blockedUserId);
+                haptics.success();
+                Alert.alert('User blocked', `${displayName}'s messages are hidden for you.`);
+              } catch (error) {
+                haptics.error();
+                Alert.alert(
+                  'Could not block user',
+                  error instanceof Error ? error.message : 'Try again.',
+                );
+              }
+            })();
+          },
+          style: 'destructive',
+          text: 'Block',
+        },
+      ],
+    );
+  };
+
+  const openMessageActions = (message: LeagueChatMessage, displayName: string) => {
+    if (!message.user_id || message.user_id === userId) {
+      return;
+    }
+
+    Alert.alert(displayName, 'Choose a moderation action for this message.', [
+      {
+        onPress: () => {
+          void reportChatMessage(message, displayName);
+        },
+        text: 'Report Message',
+      },
+      {
+        onPress: () => confirmBlockUser(message.user_id as string, displayName),
+        style: 'destructive',
+        text: 'Block User',
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
 
   const submitMessage = async () => {
     if (!canSend) {
@@ -2754,6 +2895,7 @@ function LeagueChat({
                 key={message.id}
                 member={message.user_id ? memberByUserId[message.user_id] : undefined}
                 message={message}
+                onOpenActions={openMessageActions}
               />
             ))}
           </ScrollView>
@@ -2933,6 +3075,7 @@ function TabContent({
   cosmeticsByUserId,
   detail,
   hasSeasonStandings,
+  onMemberActions,
   onStartSeason,
   selectedWeekSettled,
   selectedWeekNumber,
@@ -2946,6 +3089,7 @@ function TabContent({
   cosmeticsByUserId: Record<string, EquippedCosmeticsByCategory>;
   detail: LeagueDetail;
   hasSeasonStandings: boolean;
+  onMemberActions: (member: LeagueMemberRow) => void;
   onStartSeason: () => void;
   selectedWeekSettled: boolean;
   selectedWeekNumber: number;
@@ -2980,7 +3124,12 @@ function TabContent({
         />
       ) : null}
       {tab === 'members' ? (
-        <MembersList cosmeticsByUserId={cosmeticsByUserId} detail={detail} />
+        <MembersList
+          cosmeticsByUserId={cosmeticsByUserId}
+          detail={detail}
+          onMemberActions={onMemberActions}
+          userId={userId}
+        />
       ) : null}
       {tab === 'chat' ? (
         <LeagueChat cosmeticsByUserId={cosmeticsByUserId} detail={detail} userId={userId} />
@@ -2989,7 +3138,13 @@ function TabContent({
   );
 }
 
-function HeroHeader({ detail }: { detail: LeagueDetail }) {
+function HeroHeader({
+  detail,
+  onReportLeague,
+}: {
+  detail: LeagueDetail;
+  onReportLeague: () => void;
+}) {
   const isPrivate = detail.league.visibility === 'private';
   return (
     <View className="gap-2">
@@ -3001,12 +3156,23 @@ function HeroHeader({ detail }: { detail: LeagueDetail }) {
           League HQ
         </Text>
       </View>
-      <Text
-        className="text-2xl font-extrabold text-white"
-        style={{ letterSpacing: -0.4 }}
-        numberOfLines={2}>
-        {detail.league.name}
-      </Text>
+      <View className="flex-row items-start gap-2">
+        <Text
+          className="min-w-0 flex-1 text-2xl font-extrabold text-white"
+          style={{ letterSpacing: -0.4 }}
+          numberOfLines={2}>
+          {detail.league.name}
+        </Text>
+        <Pressable
+          accessibilityLabel="Report league name"
+          accessibilityRole="button"
+          hitSlop={8}
+          onPress={onReportLeague}>
+          <View className="h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.04]">
+            <Ionicons color="rgba(255,255,255,0.6)" name="flag" size={15} />
+          </View>
+        </Pressable>
+      </View>
       <View className="flex-row flex-wrap items-center gap-2">
         <Badge
           label={formatLeagueType(detail.league.type)}
@@ -3047,6 +3213,8 @@ export default function LeagueDetailScreen() {
   const { user } = useAuth();
   const detailQuery = useLeagueDetail(resolvedLeagueId, user?.id);
   const generateSchedule = useGenerateScheduleMutation(user?.id);
+  const reportContent = useReportContentMutation(user?.id);
+  const blockUser = useBlockUserMutation(user?.id);
   const updateTeamName = useUpdateLeagueTeamNameMutation(user?.id);
   const [selectedWeek, setSelectedWeek] = useState<number | undefined>();
   const [teamNameDraft, setTeamNameDraft] = useState('');
@@ -3203,6 +3371,111 @@ export default function LeagueDetailScreen() {
   const handleStartSeason = () => {
     generateSchedule.mutate(detail.league.id);
   };
+  const reportLeagueName = () => {
+    Alert.alert('Report league name?', 'This flags the public league identity for review.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        onPress: () => {
+          void (async () => {
+            try {
+              await reportContent.mutateAsync({
+                contentSnapshot: {
+                  commissioner_id: detail.league.commissioner_id,
+                  description: detail.league.description,
+                  name: detail.league.name,
+                  visibility: detail.league.visibility,
+                },
+                leagueId: detail.league.id,
+                reportedUserId: detail.league.commissioner_id,
+                targetId: detail.league.id,
+                targetType: 'league',
+              });
+              haptics.success();
+              Alert.alert('Report sent', 'This league name was flagged for moderation review.');
+            } catch (error) {
+              haptics.error();
+              Alert.alert('Could not report league', error instanceof Error ? error.message : 'Try again.');
+            }
+          })();
+        },
+        style: 'destructive',
+        text: 'Report',
+      },
+    ]);
+  };
+  const confirmBlockMember = (member: LeagueMemberRow, displayName: string) => {
+    Alert.alert(
+      `Block ${displayName}?`,
+      "You won't see their chat messages anymore. Other league members can still see them.",
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          onPress: () => {
+            void (async () => {
+              try {
+                await blockUser.mutateAsync(member.user_id);
+                haptics.success();
+                Alert.alert('User blocked', `${displayName}'s messages are hidden for you.`);
+              } catch (error) {
+                haptics.error();
+                Alert.alert(
+                  'Could not block user',
+                  error instanceof Error ? error.message : 'Try again.',
+                );
+              }
+            })();
+          },
+          style: 'destructive',
+          text: 'Block',
+        },
+      ],
+    );
+  };
+  const reportMemberDisplayName = async (member: LeagueMemberRow, displayName: string) => {
+    const profile = detail.profilesById[member.user_id];
+
+    try {
+      await reportContent.mutateAsync({
+        contentSnapshot: {
+          display_name: profile?.display_name ?? null,
+          team_name: member.team_name,
+          user_display_name: displayName,
+          user_id: member.user_id,
+        },
+        leagueId: detail.league.id,
+        reportedUserId: member.user_id,
+        targetId: member.id,
+        targetType: 'league_member',
+      });
+      haptics.success();
+      Alert.alert('Report sent', 'This display name was flagged for moderation review.');
+    } catch (error) {
+      haptics.error();
+      Alert.alert('Could not report member', error instanceof Error ? error.message : 'Try again.');
+    }
+  };
+  const openMemberActions = (member: LeagueMemberRow) => {
+    if (member.user_id === userId) {
+      return;
+    }
+
+    const displayName = getDisplayName(detail, member.user_id);
+
+    Alert.alert(displayName, 'Choose a moderation action for this member.', [
+      {
+        onPress: () => {
+          void reportMemberDisplayName(member, displayName);
+        },
+        text: 'Report Display Name',
+      },
+      {
+        onPress: () => confirmBlockMember(member, displayName),
+        style: 'destructive',
+        text: 'Block User',
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
   const openTeamNameEditor = (member: LeagueMemberRow) => {
     setTeamNameDraft(member.team_name);
     setTeamNameError(undefined);
@@ -3291,7 +3564,7 @@ export default function LeagueDetailScreen() {
 
         {/* Identity: who/what this league is, plus the week being viewed. */}
         <View className="gap-3">
-          <HeroHeader detail={detail} />
+          <HeroHeader detail={detail} onReportLeague={reportLeagueName} />
           <YourTeamCard detail={detail} onEdit={openTeamNameEditor} userId={userId} />
           <View className="items-end">
             <WeekNavigator
@@ -3326,7 +3599,13 @@ export default function LeagueDetailScreen() {
             />
           </PressableScale>
         ) : detail.league.type === 'h2h' ? (
-          <MatchupPlaceholderCard weekNumber={selectedWeekNumber} weekStatus={selectedWeekStatus} />
+          <MatchupPlaceholderCard
+            hasWeekSchedule={detail.matchups.some(
+              (matchup) => matchup.week_number === selectedWeekNumber,
+            )}
+            weekNumber={selectedWeekNumber}
+            weekStatus={selectedWeekStatus}
+          />
         ) : null}
 
         {/* Standings hub: the current-week snapshot, the section tabs, and the
@@ -3344,6 +3623,7 @@ export default function LeagueDetailScreen() {
             cosmeticsByUserId={cosmeticsByUserId}
             detail={selectedDetail}
             hasSeasonStandings={detail.standings.length > 0}
+            onMemberActions={openMemberActions}
             onStartSeason={handleStartSeason}
             selectedWeekSettled={selectedWeekSettled}
             selectedWeekNumber={selectedWeekNumber}

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { PUBLIC_USER_SELECT } from '@/constants/public-user-select';
 import { logAnalyticsEvent } from '@/lib/analytics';
 import { TEAM_NAME_MAX_LENGTH } from '@/lib/league-member-display';
 import { supabase } from '@/lib/supabase';
@@ -23,6 +24,23 @@ export type CreateLeagueInput = {
   type: LeagueType;
   visibility: LeagueVisibility;
 };
+
+export const LEAGUE_NAME_MAX_LENGTH = 50;
+export const LEAGUE_NAME_MIN_LENGTH = 2;
+
+export function getLeagueNameValidationError(name: string) {
+  const trimmedName = name.trim();
+
+  if (trimmedName.length < LEAGUE_NAME_MIN_LENGTH) {
+    return `League name needs at least ${LEAGUE_NAME_MIN_LENGTH} characters.`;
+  }
+
+  if (trimmedName.length > LEAGUE_NAME_MAX_LENGTH) {
+    return `League name must be ${LEAGUE_NAME_MAX_LENGTH} characters or fewer.`;
+  }
+
+  return undefined;
+}
 
 export type UpdateLeagueTeamNameInput = {
   leagueId: string;
@@ -104,7 +122,8 @@ async function fetchRowsByIds<T extends { id: string }>(
     return [];
   }
 
-  const { data, error } = await supabase.from(table).select('*').in('id', uniqueValues(ids));
+  const columns = table === 'users' ? PUBLIC_USER_SELECT : '*';
+  const { data, error } = await supabase.from(table).select(columns).in('id', uniqueValues(ids));
   return assertSupabaseResult(data as T[] | null, error);
 }
 
@@ -171,18 +190,21 @@ export function usePublicLeagues(search: string) {
 
       const [members, commissioners] = await Promise.all([
         leagueIds.length > 0
-          ? supabase.from('league_members').select('*').in('league_id', leagueIds)
+          ? supabase.rpc('public_league_member_counts', { p_league_ids: leagueIds })
           : Promise.resolve({ data: [], error: null }),
         fetchRowsByIds<UserRow>('users', commissionerIds),
       ]);
 
-      const memberRows = assertSupabaseResult(members.data, members.error);
+      const memberRows = assertSupabaseResult(
+        members.data as { league_id: string; member_count: number }[] | null,
+        members.error,
+      );
       const commissionerById = indexUsers(commissioners);
 
       return publicLeagues.map((league) => ({
         commissioner: commissionerById[league.commissioner_id] ?? null,
         league,
-        memberCount: memberRows.filter((member) => member.league_id === league.id).length,
+        memberCount: memberRows.find((member) => member.league_id === league.id)?.member_count ?? 0,
       }));
     },
     queryKey: leagueKeys.public(search.trim()),
@@ -297,6 +319,12 @@ export function useCreateLeagueMutation(userId: string | undefined) {
 
   return useMutation({
     mutationFn: async (input: CreateLeagueInput) => {
+      const nameError = getLeagueNameValidationError(input.name);
+
+      if (nameError) {
+        throw new Error(nameError);
+      }
+
       const { data, error } = await supabase.rpc('create_league', {
         p_max_members: input.maxMembers,
         p_name: input.name.trim(),

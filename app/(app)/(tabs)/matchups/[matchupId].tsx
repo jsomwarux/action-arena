@@ -551,7 +551,7 @@ function PlayerSide({
         </View>
         <Text
           className="w-full text-center text-base font-black text-white"
-          numberOfLines={2}
+          numberOfLines={1}
           style={{ letterSpacing: -0.3 }}>
           {name}
         </Text>

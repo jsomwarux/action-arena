@@ -84,9 +84,13 @@ assertCheck(
 );
 
 assertCheck(
-  '27.2 mock odds remain available when mock mode is enabled',
-  hasAll(oddsSource, ['if (isUsingMockOdds)', 'getMockNflOddsApiGames()', 'normalizeOddsApiGame']),
-  'mock mode should bypass live API failures',
+  '27.2 mock odds are gated to fixture callers',
+  hasAll(oddsSource, [
+    'isUsingMockOdds && options.allowMockOdds',
+    'getMockNflOddsApiGames()',
+    'normalizeOddsApiGame',
+  ]),
+  'mock mode should only bypass live API failures for explicit fixture/demo calls',
 );
 
 assertCheck(
@@ -145,7 +149,7 @@ assertCheck(
   '27.5 long names truncate in leaderboard, matchup, and profile cards',
   hasNumberOfLinesNear(leaderboardSource, '{displayName}') &&
     hasNumberOfLinesNear(matchupSource, '{name}') &&
-    hasNumberOfLinesNear(profileContentSource, '{headerTitle}'),
+    hasNumberOfLinesNear(profileContentSource, '{profileHeaderTitle}'),
   'primary profile-style surfaces should constrain display-name text',
 );
 
