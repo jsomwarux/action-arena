@@ -7,6 +7,7 @@ import {
   getLeagueMemberSecondaryName,
   indexLeagueMembersByUserId,
 } from '@/lib/league-member-display';
+import { sumSettledProfit } from '@/lib/settled-bets';
 import { supabase } from '@/lib/supabase';
 import type {
   BetWithLegs,
@@ -144,16 +145,20 @@ async function fetchBetsForUsers({
   return assertSupabaseResult(data as BetWithLegs[] | null, error);
 }
 
-function betsForUserWeek(bets: BetWithLegs[], userId: string | null, weekNumber: number) {
+function betsForUserWeek(
+  bets: BetWithLegs[],
+  leagueId: string,
+  userId: string | null,
+  weekNumber: number,
+) {
   if (!userId) {
     return [];
   }
 
-  return bets.filter((bet) => bet.user_id === userId && bet.week_number === weekNumber);
-}
-
-function sumSettledProfit(bets: BetWithLegs[]) {
-  return bets.reduce((total, bet) => total + (bet.profit ?? 0), 0);
+  return bets.filter(
+    (bet) =>
+      bet.league_id === leagueId && bet.user_id === userId && bet.week_number === weekNumber,
+  );
 }
 
 function sortByCreatedAt(bets: BetWithLegs[]) {
@@ -345,8 +350,12 @@ export function useHomeDashboard(userId: string | undefined) {
             const viewerMembership = leagueMembers.find((member) => member.user_id === userId);
             const opponentMembership = opponentId ? leagueMembersById[opponentId] : undefined;
             const opponentUser = opponentId ? usersById[opponentId] ?? null : null;
-            const thisWeekBets = sortByCreatedAt(betsForUserWeek(bets, userId, currentWeek));
-            const lastWeekBets = sortByCreatedAt(betsForUserWeek(bets, userId, lastWeek));
+            const thisWeekBets = sortByCreatedAt(
+              betsForUserWeek(bets, league.id, userId, currentWeek),
+            );
+            const lastWeekBets = sortByCreatedAt(
+              betsForUserWeek(bets, league.id, userId, lastWeek),
+            );
 
             return {
               betsPlaced: thisWeekBets.length,

@@ -6,6 +6,7 @@ import {
   getLeagueMemberPrimaryName,
   indexLeagueMembersByUserId,
 } from '@/lib/league-member-display';
+import { getSettledBets, isSettledBet, sumSettledProfit } from '@/lib/settled-bets';
 import { supabase } from '@/lib/supabase';
 import type {
   AchievementKey,
@@ -249,16 +250,12 @@ function latestLeagueRecord(standings: StandingRow[]) {
   );
 }
 
-function isSettledBet(bet: Pick<BetRow, 'profit' | 'result'>) {
-  return bet.result !== 'pending' && bet.profit !== null;
-}
-
 function settledBets<T extends Pick<BetRow, 'profit' | 'result'>>(bets: T[]) {
-  return bets.filter((bet) => bet.result !== 'pending' && bet.profit !== null);
+  return getSettledBets(bets);
 }
 
 function sumSettledBetProfit<T extends Pick<BetRow, 'profit' | 'result'>>(bets: T[]) {
-  return settledBets(bets).reduce((sum, bet) => sum + (bet.profit ?? 0), 0);
+  return sumSettledProfit(bets);
 }
 
 function recordFromBets(bets: BetWithLegs[]) {
@@ -985,6 +982,7 @@ export function calculateWeeklyAwards(
 
   const settled = settledBets(bets);
   const hasBets = bets.length > 0;
+  const hasPendingBets = bets.some((bet) => bet.result === 'pending');
   const hasResolvedStandings = standings.some(
     (standing) =>
       standing.weekly_profit !== 0 ||
@@ -992,7 +990,8 @@ export function calculateWeeklyAwards(
       standing.losses !== 0 ||
       standing.ties !== 0,
   );
-  const isFullySettled = hasResolvedStandings || (hasBets && bets.every((bet) => bet.result !== 'pending'));
+  const isFullySettled =
+    !hasPendingBets && (hasResolvedStandings || (hasBets && settled.length === bets.length));
   const userIds = uniqueValues([
     ...Object.keys(usersById),
     ...bets.map((bet) => bet.user_id),
@@ -1077,15 +1076,15 @@ export function calculateWeeklyAwards(
       users,
     };
   };
-  const lockRows: AwardDraftRow[] = bets
-    .filter((bet) => bet.is_lock)
+  const lockRows: AwardDraftRow[] = settled
+    .filter((bet) => bet.is_lock && bet.profit > 0)
     .map((bet) => ({
       bet,
       displayName: displayNameForUser(bet.user_id),
       displayNames: [],
       label: '',
-      profit: bet.profit ?? 0,
-      roi: bet.amount > 0 ? ((bet.profit ?? 0) / bet.amount) * 100 : 0,
+      profit: bet.profit,
+      roi: bet.amount > 0 ? (bet.profit / bet.amount) * 100 : 0,
       user: usersById[bet.user_id] ?? null,
     }));
   const topLockProfit =
@@ -1094,7 +1093,7 @@ export function calculateWeeklyAwards(
       : null;
   const lockAwardRows =
     topLockProfit === null
-      ? lockRows.slice(0, 1)
+      ? []
       : lockRows.filter((row) => row.profit === topLockProfit);
   const lockAward = makeAward('Pick of the Week', lockAwardRows);
 

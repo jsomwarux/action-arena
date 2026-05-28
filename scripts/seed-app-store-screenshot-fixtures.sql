@@ -465,6 +465,65 @@ values
   ('00000000-0000-0000-0000-000000031434'::uuid, 'appstore_w03_det_chi', 'moneyline', 'Detroit Lions', null, null, -110, 'win', now() - interval '1 day', true),
   ('00000000-0000-0000-0000-000000031435'::uuid, 'appstore_w03_mia_ne', 'moneyline', 'Miami Dolphins', null, null, -110, 'loss', now() - interval '1 day', true);
 
+insert into public.bets (
+  id,
+  user_id,
+  league_id,
+  week_number,
+  bet_type,
+  amount,
+  odds,
+  potential_payout,
+  result,
+  profit,
+  teaser_points,
+  is_lock,
+  created_at
+)
+select
+  bet.bet_id,
+  pg_temp.screenshot_user(bet.slot),
+  '00000000-0000-0000-0000-000000031001'::uuid,
+  2,
+  bet.bet_type,
+  bet.amount,
+  bet.odds,
+  bet.potential_payout,
+  bet.result,
+  bet.profit,
+  bet.teaser_points,
+  bet.is_lock,
+  now() - interval '8 days' + (bet.slot::text || ' minutes')::interval
+from (
+  values
+    ('00000000-0000-0000-0000-000000031501'::uuid, 1, 'straight'::public.bet_type, 20::numeric, 120, 44::numeric, 'win'::public.bet_result, 20::numeric, null::numeric, true),
+    ('00000000-0000-0000-0000-000000031502'::uuid, 1, 'straight'::public.bet_type, 20::numeric, -110, 38::numeric, 'win'::public.bet_result, 18::numeric, null::numeric, false),
+    ('00000000-0000-0000-0000-000000031503'::uuid, 1, 'straight'::public.bet_type, 20::numeric, 105, 41::numeric, 'win'::public.bet_result, 12::numeric, null::numeric, false),
+    ('00000000-0000-0000-0000-000000031504'::uuid, 1, 'straight'::public.bet_type, 20::numeric, -115, 37::numeric, 'loss'::public.bet_result, -8::numeric, null::numeric, false),
+    ('00000000-0000-0000-0000-000000031505'::uuid, 1, 'straight'::public.bet_type, 20::numeric, -110, 38::numeric, 'push'::public.bet_result, 0::numeric, null::numeric, false),
+
+    ('00000000-0000-0000-0000-000000031511'::uuid, 2, 'straight'::public.bet_type, 20::numeric, 120, 44::numeric, 'win'::public.bet_result, 36::numeric, null::numeric, true),
+    ('00000000-0000-0000-0000-000000031512'::uuid, 2, 'parlay'::public.bet_type, 20::numeric, 232, 66::numeric, 'win'::public.bet_result, 46::numeric, null::numeric, false),
+    ('00000000-0000-0000-0000-000000031513'::uuid, 2, 'straight'::public.bet_type, 20::numeric, -105, 39::numeric, 'win'::public.bet_result, 38::numeric, null::numeric, false),
+    ('00000000-0000-0000-0000-000000031514'::uuid, 2, 'straight'::public.bet_type, 20::numeric, 105, 41::numeric, 'win'::public.bet_result, 41::numeric, null::numeric, false),
+    ('00000000-0000-0000-0000-000000031515'::uuid, 2, 'straight'::public.bet_type, 20::numeric, -110, 38::numeric, 'loss'::public.bet_result, -10::numeric, null::numeric, false)
+) as bet(bet_id, slot, bet_type, amount, odds, potential_payout, result, profit, teaser_points, is_lock);
+
+insert into public.bet_legs (bet_id, game_id, market, selection, original_line, adjusted_line, leg_odds, result, game_start_time, locked)
+values
+  ('00000000-0000-0000-0000-000000031501'::uuid, 'appstore_w03_dal_phi', 'moneyline', 'Dallas Cowboys', null, null, 120, 'win', now() - interval '8 days', true),
+  ('00000000-0000-0000-0000-000000031502'::uuid, 'appstore_w03_tb_no', 'spread', 'Tampa Bay Buccaneers -2.5', -2.5, -2.5, -110, 'win', now() - interval '8 days', true),
+  ('00000000-0000-0000-0000-000000031503'::uuid, 'appstore_w03_was_nyg', 'over_under', 'Under 40.5', 40.5, 40.5, 105, 'win', now() - interval '8 days', true),
+  ('00000000-0000-0000-0000-000000031504'::uuid, 'appstore_w03_min_gb', 'moneyline', 'Minnesota Vikings', null, null, -115, 'loss', now() - interval '8 days', true),
+  ('00000000-0000-0000-0000-000000031505'::uuid, 'appstore_w03_bal_pit', 'over_under', 'Over 42.5', 42.5, 42.5, -110, 'push', now() - interval '8 days', true),
+
+  ('00000000-0000-0000-0000-000000031511'::uuid, 'appstore_w03_dal_phi', 'moneyline', 'Dallas Cowboys', null, null, 120, 'win', now() - interval '8 days', true),
+  ('00000000-0000-0000-0000-000000031512'::uuid, 'appstore_w03_tb_no', 'moneyline', 'Tampa Bay Buccaneers', null, null, -135, 'win', now() - interval '8 days', true),
+  ('00000000-0000-0000-0000-000000031512'::uuid, 'appstore_w03_was_nyg', 'over_under', 'Under 38.5', 38.5, 38.5, -110, 'win', now() - interval '8 days', true),
+  ('00000000-0000-0000-0000-000000031513'::uuid, 'appstore_w03_buf_nyj', 'moneyline', 'Buffalo Bills', null, null, -105, 'win', now() - interval '8 days', true),
+  ('00000000-0000-0000-0000-000000031514'::uuid, 'appstore_w03_sf_sea', 'moneyline', 'San Francisco 49ers', null, null, 105, 'win', now() - interval '8 days', true),
+  ('00000000-0000-0000-0000-000000031515'::uuid, 'appstore_w03_mia_ne', 'spread', 'Miami Dolphins -3.5', -3.5, -3.5, -110, 'loss', now() - interval '8 days', true);
+
 select jsonb_build_object(
   'leagues', jsonb_build_array(
     jsonb_build_object(

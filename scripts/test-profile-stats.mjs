@@ -42,6 +42,10 @@ Module._load = function loadWithAppStubs(request, parent, isMain) {
     return require(path.join(root, 'lib/league-member-display.ts'));
   }
 
+  if (request === '@/lib/settled-bets') {
+    return require(path.join(root, 'lib/settled-bets.ts'));
+  }
+
   return originalLoad.call(this, request, parent, isMain);
 };
 
@@ -327,5 +331,83 @@ assert.equal(weeklyAwards.coldStreak?.profit, -100);
 assert.equal(weeklyAwards.lock?.label, 'Pick of the Week');
 assert.equal(weeklyAwards.lock?.profit, 90);
 assert.equal(weeklyAwards.lock?.bet?.bet_legs.length, 3);
+
+const pendingLockAwards = calculateWeeklyAwards(
+  [
+    bet({
+      amount: 20,
+      bet_legs: [leg({ result: 'pending' }), leg({ result: 'pending' })],
+      bet_type: 'teaser',
+      is_lock: true,
+      profit: null,
+      result: 'pending',
+    }),
+  ],
+  awardUsersById,
+  [
+    {
+      league_id: 'league-a',
+      losses: 0,
+      ties: 0,
+      user_id: 'award-user-1',
+      week_number: 1,
+      weekly_profit: 0,
+      wins: 0,
+    },
+  ],
+);
+assert.equal(pendingLockAwards.isFullySettled, false);
+assert.equal(pendingLockAwards.lock, null);
+
+const pendingWithResolvedStandingAwards = calculateWeeklyAwards(
+  [
+    bet({
+      amount: 20,
+      is_lock: true,
+      profit: null,
+      result: 'pending',
+    }),
+  ],
+  awardUsersById,
+  [
+    {
+      league_id: 'league-a',
+      losses: 0,
+      ties: 0,
+      user_id: 'award-user-1',
+      week_number: 1,
+      weekly_profit: 25,
+      wins: 1,
+    },
+  ],
+);
+assert.equal(pendingWithResolvedStandingAwards.isFullySettled, false);
+assert.equal(pendingWithResolvedStandingAwards.sharpest, null);
+assert.equal(pendingWithResolvedStandingAwards.lock, null);
+
+const zeroProfitLockAwards = calculateWeeklyAwards(
+  [
+    bet({
+      amount: 20,
+      is_lock: true,
+      profit: 0,
+      result: 'push',
+    }),
+  ],
+  awardUsersById,
+  [
+    {
+      league_id: 'league-a',
+      losses: 0,
+      ties: 0,
+      user_id: 'award-user-1',
+      week_number: 1,
+      weekly_profit: 0,
+      wins: 0,
+    },
+  ],
+);
+assert.equal(zeroProfitLockAwards.isFullySettled, true);
+assert.equal(zeroProfitLockAwards.lock, null);
 
 console.log('Profile stats and achievements regression tests passed.');
