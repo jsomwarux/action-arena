@@ -227,18 +227,18 @@ select
 from (
   values
     (1, 1, 1, 0, 82::numeric, 82::numeric, 1),
-    (2, 1, 0, 1, -24::numeric, -24::numeric, 6),
+    (2, 1, 0, 1, -24::numeric, -24::numeric, 7),
     (3, 1, 1, 0, 36::numeric, 36::numeric, 3),
     (4, 1, 1, 0, 24::numeric, 24::numeric, 4),
     (5, 1, 1, 0, 48::numeric, 48::numeric, 2),
     (6, 1, 0, 1, -12::numeric, -12::numeric, 5),
-    (7, 1, 0, 1, -18::numeric, -18::numeric, 7),
+    (7, 1, 0, 1, -18::numeric, -18::numeric, 6),
     (8, 1, 0, 1, -30::numeric, -30::numeric, 8),
     (9, 1, 0, 1, -42::numeric, -42::numeric, 9),
     (10, 1, 0, 1, -55::numeric, -55::numeric, 10),
 
-    (1, 2, 2, 0, 42::numeric, 124::numeric, 1),
-    (2, 2, 1, 1, 151::numeric, 127::numeric, 2),
+    (1, 2, 2, 0, 55.18::numeric, 137.18::numeric, 1),
+    (2, 2, 1, 1, 102.51::numeric, 78.51::numeric, 2),
     (3, 2, 1, 1, -28::numeric, 8::numeric, 6),
     (4, 2, 2, 0, 50::numeric, 74::numeric, 3),
     (5, 2, 1, 1, -8::numeric, 40::numeric, 4),
@@ -248,15 +248,15 @@ from (
     (9, 2, 0, 2, -18::numeric, -60::numeric, 9),
     (10, 2, 0, 2, -12::numeric, -67::numeric, 10),
 
-    (1, 3, 3, 0, 64::numeric, 188::numeric, 2),
-    (2, 3, 2, 1, 118::numeric, 245::numeric, 1),
-    (3, 3, 1, 2, 35::numeric, 43::numeric, 5),
-    (4, 3, 2, 1, 32::numeric, 106::numeric, 3),
+    (1, 3, 3, 0, 55.64::numeric, 192.82::numeric, 1),
+    (2, 3, 2, 1, 99.69::numeric, 178.20::numeric, 2),
+    (3, 3, 1, 2, 47.12::numeric, 55.12::numeric, 5),
+    (4, 3, 2, 1, 33.86::numeric, 107.86::numeric, 3),
     (5, 3, 2, 1, 48::numeric, 88::numeric, 4),
     (6, 3, 1, 2, -6::numeric, 6::numeric, 6),
     (7, 3, 2, 1, 12::numeric, 4::numeric, 7),
-    (8, 3, 0, 3, -18::numeric, -46::numeric, 8),
-    (9, 3, 1, 2, -32::numeric, -92::numeric, 9),
+    (8, 3, 0, 3, -18::numeric, -46::numeric, 9),
+    (9, 3, 1, 2, -32::numeric, -92::numeric, 8),
     (10, 3, 0, 3, -44::numeric, -111::numeric, 10)
 ) as row_data(slot, week_number, wins, losses, weekly_profit, total_profit, rank)
 join screenshot_users users on users.slot = row_data.slot;
@@ -276,9 +276,9 @@ insert into public.weekly_matchups (
 select *
 from (
   values
-    ('00000000-0000-0000-0000-000000031201'::uuid, '00000000-0000-0000-0000-000000031001'::uuid, 2, pg_temp.screenshot_user(1), pg_temp.screenshot_user(3), 84::numeric, -26::numeric, pg_temp.screenshot_user(1), false, false),
-    ('00000000-0000-0000-0000-000000031301'::uuid, '00000000-0000-0000-0000-000000031001'::uuid, 3, pg_temp.screenshot_user(2), pg_temp.screenshot_user(4), 118::numeric, 32::numeric, pg_temp.screenshot_user(2), false, false),
-    ('00000000-0000-0000-0000-000000031302'::uuid, '00000000-0000-0000-0000-000000031001'::uuid, 3, pg_temp.screenshot_user(1), pg_temp.screenshot_user(3), 64::numeric, 35::numeric, pg_temp.screenshot_user(1), false, false),
+    ('00000000-0000-0000-0000-000000031201'::uuid, '00000000-0000-0000-0000-000000031001'::uuid, 2, pg_temp.screenshot_user(1), pg_temp.screenshot_user(3), 55.18::numeric, -28::numeric, pg_temp.screenshot_user(1), false, false),
+    ('00000000-0000-0000-0000-000000031301'::uuid, '00000000-0000-0000-0000-000000031001'::uuid, 3, pg_temp.screenshot_user(2), pg_temp.screenshot_user(4), 99.69::numeric, 33.86::numeric, pg_temp.screenshot_user(2), false, false),
+    ('00000000-0000-0000-0000-000000031302'::uuid, '00000000-0000-0000-0000-000000031001'::uuid, 3, pg_temp.screenshot_user(1), pg_temp.screenshot_user(3), 55.64::numeric, 47.12::numeric, pg_temp.screenshot_user(1), false, false),
     ('00000000-0000-0000-0000-000000031303'::uuid, '00000000-0000-0000-0000-000000031001'::uuid, 3, pg_temp.screenshot_user(5), pg_temp.screenshot_user(6), 48::numeric, -6::numeric, pg_temp.screenshot_user(5), false, false),
     ('00000000-0000-0000-0000-000000031304'::uuid, '00000000-0000-0000-0000-000000031001'::uuid, 3, pg_temp.screenshot_user(7), pg_temp.screenshot_user(8), 12::numeric, -18::numeric, pg_temp.screenshot_user(7), false, false),
     ('00000000-0000-0000-0000-000000031305'::uuid, '00000000-0000-0000-0000-000000031001'::uuid, 3, pg_temp.screenshot_user(9), pg_temp.screenshot_user(10), -32::numeric, -44::numeric, pg_temp.screenshot_user(9), false, false)
@@ -381,28 +381,28 @@ create temporary table screenshot_bets (
 
 insert into screenshot_bets values
   ('00000000-0000-0000-0000-000000031401'::uuid, 2, 'straight', 20, 120, 44, 'win', 36, null, true),
-  ('00000000-0000-0000-0000-000000031402'::uuid, 2, 'parlay', 20, 232, 66, 'win', 46, null, false),
-  ('00000000-0000-0000-0000-000000031403'::uuid, 2, 'teaser', 20, -110, 38, 'win', 18, 6, false),
-  ('00000000-0000-0000-0000-000000031404'::uuid, 2, 'straight', 20, -110, 38, 'loss', -20, null, false),
-  ('00000000-0000-0000-0000-000000031405'::uuid, 2, 'straight', 20, -105, 39, 'win', 38, null, false),
+  ('00000000-0000-0000-0000-000000031402'::uuid, 2, 'parlay', 20, 232, 66.46, 'win', 46.46, null, false),
+  ('00000000-0000-0000-0000-000000031403'::uuid, 2, 'teaser', 20, -110, 38.18, 'win', 18.18, 6, false),
+  ('00000000-0000-0000-0000-000000031404'::uuid, 2, 'straight', 20, -110, 38.18, 'loss', -20, null, false),
+  ('00000000-0000-0000-0000-000000031405'::uuid, 2, 'straight', 20, -105, 39.05, 'win', 19.05, null, false),
 
-  ('00000000-0000-0000-0000-000000031411'::uuid, 4, 'straight', 20, -110, 38, 'win', 18, null, false),
-  ('00000000-0000-0000-0000-000000031412'::uuid, 4, 'straight', 20, 125, 45, 'win', 25, null, true),
-  ('00000000-0000-0000-0000-000000031413'::uuid, 4, 'straight', 20, -110, 38, 'loss', -20, null, false),
-  ('00000000-0000-0000-0000-000000031414'::uuid, 4, 'teaser', 20, -110, 38, 'win', 18, 6, false),
-  ('00000000-0000-0000-0000-000000031415'::uuid, 4, 'straight', 20, -110, 38, 'loss', -9, null, false),
+  ('00000000-0000-0000-0000-000000031411'::uuid, 4, 'straight', 20, -110, 38.18, 'win', 18.18, null, false),
+  ('00000000-0000-0000-0000-000000031412'::uuid, 4, 'straight', 20, 125, 45, 'win', 37.5, null, true),
+  ('00000000-0000-0000-0000-000000031413'::uuid, 4, 'straight', 20, -110, 38.18, 'loss', -20, null, false),
+  ('00000000-0000-0000-0000-000000031414'::uuid, 4, 'teaser', 20, -110, 38.18, 'win', 18.18, 6, false),
+  ('00000000-0000-0000-0000-000000031415'::uuid, 4, 'straight', 20, -110, 38.18, 'loss', -20, null, false),
 
-  ('00000000-0000-0000-0000-000000031421'::uuid, 1, 'straight', 20, 115, 43, 'win', 34, null, true),
-  ('00000000-0000-0000-0000-000000031422'::uuid, 1, 'parlay', 20, 210, 62, 'win', 42, null, false),
-  ('00000000-0000-0000-0000-000000031423'::uuid, 1, 'straight', 20, -110, 38, 'loss', -20, null, false),
-  ('00000000-0000-0000-0000-000000031424'::uuid, 1, 'straight', 20, -105, 39, 'win', 38, null, false),
-  ('00000000-0000-0000-0000-000000031425'::uuid, 1, 'straight', 20, -110, 38, 'loss', -30, null, false),
+  ('00000000-0000-0000-0000-000000031421'::uuid, 1, 'straight', 20, 115, 43, 'win', 34.5, null, true),
+  ('00000000-0000-0000-0000-000000031422'::uuid, 1, 'parlay', 20, 210, 62.09, 'win', 42.09, null, false),
+  ('00000000-0000-0000-0000-000000031423'::uuid, 1, 'straight', 20, -110, 38.18, 'loss', -20, null, false),
+  ('00000000-0000-0000-0000-000000031424'::uuid, 1, 'straight', 20, -105, 39.05, 'win', 19.05, null, false),
+  ('00000000-0000-0000-0000-000000031425'::uuid, 1, 'straight', 20, -110, 38.18, 'loss', -20, null, false),
 
-  ('00000000-0000-0000-0000-000000031431'::uuid, 3, 'straight', 20, -110, 38, 'win', 18, null, false),
-  ('00000000-0000-0000-0000-000000031432'::uuid, 3, 'straight', 20, 120, 44, 'win', 24, null, true),
-  ('00000000-0000-0000-0000-000000031433'::uuid, 3, 'straight', 20, -110, 38, 'loss', -20, null, false),
-  ('00000000-0000-0000-0000-000000031434'::uuid, 3, 'parlay', 20, 165, 53, 'win', 33, null, false),
-  ('00000000-0000-0000-0000-000000031435'::uuid, 3, 'straight', 20, -110, 38, 'loss', -20, null, false);
+  ('00000000-0000-0000-0000-000000031431'::uuid, 3, 'straight', 20, -110, 38.18, 'win', 18.18, null, false),
+  ('00000000-0000-0000-0000-000000031432'::uuid, 3, 'straight', 20, 120, 44, 'win', 36, null, true),
+  ('00000000-0000-0000-0000-000000031433'::uuid, 3, 'straight', 20, -110, 38.18, 'loss', -20, null, false),
+  ('00000000-0000-0000-0000-000000031434'::uuid, 3, 'parlay', 20, 165, 52.94, 'win', 32.94, null, false),
+  ('00000000-0000-0000-0000-000000031435'::uuid, 3, 'straight', 20, -110, 38.18, 'loss', -20, null, false);
 
 insert into public.bets (
   id,
@@ -449,11 +449,12 @@ values
   ('00000000-0000-0000-0000-000000031412'::uuid, 'appstore_w03_det_chi', 'moneyline', 'Detroit Lions', null, null, 125, 'win', now() - interval '1 day', true),
   ('00000000-0000-0000-0000-000000031413'::uuid, 'appstore_w03_mia_ne', 'spread', 'Miami Dolphins -3.5', -3.5, -3.5, -110, 'loss', now() - interval '1 day', true),
   ('00000000-0000-0000-0000-000000031414'::uuid, 'appstore_w03_dal_phi', 'over_under', 'Over 44.5', 44.5, 38.5, -110, 'win', now() - interval '1 day', true),
+  ('00000000-0000-0000-0000-000000031414'::uuid, 'appstore_w03_bal_pit', 'spread', 'Pittsburgh Steelers +11.5', 5.5, 11.5, -110, 'win', now() - interval '1 day', true),
   ('00000000-0000-0000-0000-000000031415'::uuid, 'appstore_w03_tb_no', 'spread', 'New Orleans Saints +3.5', 3.5, 3.5, -110, 'loss', now() - interval '1 day', true),
 
   ('00000000-0000-0000-0000-000000031421'::uuid, 'appstore_w03_tb_no', 'moneyline', 'Tampa Bay Buccaneers', null, null, 115, 'win', now() - interval '1 day', true),
   ('00000000-0000-0000-0000-000000031422'::uuid, 'appstore_w03_was_nyg', 'moneyline', 'Washington Commanders', null, null, -125, 'win', now() - interval '1 day', true),
-  ('00000000-0000-0000-0000-000000031422'::uuid, 'appstore_w03_min_gb', 'moneyline', 'Green Bay Packers', null, null, -135, 'win', now() - interval '1 day', true),
+  ('00000000-0000-0000-0000-000000031422'::uuid, 'appstore_w03_min_gb', 'moneyline', 'Green Bay Packers', null, null, -138, 'win', now() - interval '1 day', true),
   ('00000000-0000-0000-0000-000000031423'::uuid, 'appstore_w03_bal_pit', 'over_under', 'Under 41.5', 41.5, 41.5, -110, 'loss', now() - interval '1 day', true),
   ('00000000-0000-0000-0000-000000031424'::uuid, 'appstore_w03_kc_den', 'moneyline', 'Kansas City Chiefs', null, null, -105, 'win', now() - interval '1 day', true),
   ('00000000-0000-0000-0000-000000031425'::uuid, 'appstore_w03_buf_nyj', 'spread', 'New York Jets +3.5', 3.5, 3.5, -110, 'loss', now() - interval '1 day', true),
@@ -461,8 +462,8 @@ values
   ('00000000-0000-0000-0000-000000031431'::uuid, 'appstore_w03_dal_phi', 'moneyline', 'Philadelphia Eagles', null, null, -110, 'win', now() - interval '1 day', true),
   ('00000000-0000-0000-0000-000000031432'::uuid, 'appstore_w03_tb_no', 'moneyline', 'New Orleans Saints', null, null, 120, 'win', now() - interval '1 day', true),
   ('00000000-0000-0000-0000-000000031433'::uuid, 'appstore_w03_was_nyg', 'over_under', 'Over 38.5', 38.5, 38.5, -110, 'loss', now() - interval '1 day', true),
-  ('00000000-0000-0000-0000-000000031434'::uuid, 'appstore_w03_sf_sea', 'moneyline', 'San Francisco 49ers', null, null, -115, 'win', now() - interval '1 day', true),
-  ('00000000-0000-0000-0000-000000031434'::uuid, 'appstore_w03_det_chi', 'moneyline', 'Detroit Lions', null, null, -110, 'win', now() - interval '1 day', true),
+  ('00000000-0000-0000-0000-000000031434'::uuid, 'appstore_w03_sf_sea', 'moneyline', 'San Francisco 49ers', null, null, -170, 'win', now() - interval '1 day', true),
+  ('00000000-0000-0000-0000-000000031434'::uuid, 'appstore_w03_det_chi', 'moneyline', 'Detroit Lions', null, null, -150, 'win', now() - interval '1 day', true),
   ('00000000-0000-0000-0000-000000031435'::uuid, 'appstore_w03_mia_ne', 'moneyline', 'Miami Dolphins', null, null, -110, 'loss', now() - interval '1 day', true);
 
 insert into public.bets (
@@ -496,17 +497,17 @@ select
   now() - interval '8 days' + (bet.slot::text || ' minutes')::interval
 from (
   values
-    ('00000000-0000-0000-0000-000000031501'::uuid, 1, 'straight'::public.bet_type, 20::numeric, 120, 44::numeric, 'win'::public.bet_result, 20::numeric, null::numeric, true),
-    ('00000000-0000-0000-0000-000000031502'::uuid, 1, 'straight'::public.bet_type, 20::numeric, -110, 38::numeric, 'win'::public.bet_result, 18::numeric, null::numeric, false),
-    ('00000000-0000-0000-0000-000000031503'::uuid, 1, 'straight'::public.bet_type, 20::numeric, 105, 41::numeric, 'win'::public.bet_result, 12::numeric, null::numeric, false),
-    ('00000000-0000-0000-0000-000000031504'::uuid, 1, 'straight'::public.bet_type, 20::numeric, -115, 37::numeric, 'loss'::public.bet_result, -8::numeric, null::numeric, false),
-    ('00000000-0000-0000-0000-000000031505'::uuid, 1, 'straight'::public.bet_type, 20::numeric, -110, 38::numeric, 'push'::public.bet_result, 0::numeric, null::numeric, false),
+    ('00000000-0000-0000-0000-000000031501'::uuid, 1, 'straight'::public.bet_type, 20::numeric, 120, 44::numeric, 'win'::public.bet_result, 36::numeric, null::numeric, true),
+    ('00000000-0000-0000-0000-000000031502'::uuid, 1, 'straight'::public.bet_type, 20::numeric, -110, 38.18::numeric, 'win'::public.bet_result, 18.18::numeric, null::numeric, false),
+    ('00000000-0000-0000-0000-000000031503'::uuid, 1, 'straight'::public.bet_type, 20::numeric, 105, 41::numeric, 'win'::public.bet_result, 21::numeric, null::numeric, false),
+    ('00000000-0000-0000-0000-000000031504'::uuid, 1, 'straight'::public.bet_type, 20::numeric, -115, 37.39::numeric, 'loss'::public.bet_result, -20::numeric, null::numeric, false),
+    ('00000000-0000-0000-0000-000000031505'::uuid, 1, 'straight'::public.bet_type, 20::numeric, -110, 38.18::numeric, 'push'::public.bet_result, 0::numeric, null::numeric, false),
 
     ('00000000-0000-0000-0000-000000031511'::uuid, 2, 'straight'::public.bet_type, 20::numeric, 120, 44::numeric, 'win'::public.bet_result, 36::numeric, null::numeric, true),
-    ('00000000-0000-0000-0000-000000031512'::uuid, 2, 'parlay'::public.bet_type, 20::numeric, 232, 66::numeric, 'win'::public.bet_result, 46::numeric, null::numeric, false),
-    ('00000000-0000-0000-0000-000000031513'::uuid, 2, 'straight'::public.bet_type, 20::numeric, -105, 39::numeric, 'win'::public.bet_result, 38::numeric, null::numeric, false),
-    ('00000000-0000-0000-0000-000000031514'::uuid, 2, 'straight'::public.bet_type, 20::numeric, 105, 41::numeric, 'win'::public.bet_result, 41::numeric, null::numeric, false),
-    ('00000000-0000-0000-0000-000000031515'::uuid, 2, 'straight'::public.bet_type, 20::numeric, -110, 38::numeric, 'loss'::public.bet_result, -10::numeric, null::numeric, false)
+    ('00000000-0000-0000-0000-000000031512'::uuid, 2, 'parlay'::public.bet_type, 20::numeric, 232, 66.46::numeric, 'win'::public.bet_result, 46.46::numeric, null::numeric, false),
+    ('00000000-0000-0000-0000-000000031513'::uuid, 2, 'straight'::public.bet_type, 20::numeric, -105, 39.05::numeric, 'win'::public.bet_result, 19.05::numeric, null::numeric, false),
+    ('00000000-0000-0000-0000-000000031514'::uuid, 2, 'straight'::public.bet_type, 20::numeric, 105, 41::numeric, 'win'::public.bet_result, 21::numeric, null::numeric, false),
+    ('00000000-0000-0000-0000-000000031515'::uuid, 2, 'straight'::public.bet_type, 20::numeric, -110, 38.18::numeric, 'loss'::public.bet_result, -20::numeric, null::numeric, false)
 ) as bet(bet_id, slot, bet_type, amount, odds, potential_payout, result, profit, teaser_points, is_lock);
 
 insert into public.bet_legs (bet_id, game_id, market, selection, original_line, adjusted_line, leg_odds, result, game_start_time, locked)
@@ -515,7 +516,7 @@ values
   ('00000000-0000-0000-0000-000000031502'::uuid, 'appstore_w03_tb_no', 'spread', 'Tampa Bay Buccaneers -2.5', -2.5, -2.5, -110, 'win', now() - interval '8 days', true),
   ('00000000-0000-0000-0000-000000031503'::uuid, 'appstore_w03_was_nyg', 'over_under', 'Under 40.5', 40.5, 40.5, 105, 'win', now() - interval '8 days', true),
   ('00000000-0000-0000-0000-000000031504'::uuid, 'appstore_w03_min_gb', 'moneyline', 'Minnesota Vikings', null, null, -115, 'loss', now() - interval '8 days', true),
-  ('00000000-0000-0000-0000-000000031505'::uuid, 'appstore_w03_bal_pit', 'over_under', 'Over 42.5', 42.5, 42.5, -110, 'push', now() - interval '8 days', true),
+  ('00000000-0000-0000-0000-000000031505'::uuid, 'appstore_w03_bal_pit', 'over_under', 'Over 42', 42, 42, -110, 'push', now() - interval '8 days', true),
 
   ('00000000-0000-0000-0000-000000031511'::uuid, 'appstore_w03_dal_phi', 'moneyline', 'Dallas Cowboys', null, null, 120, 'win', now() - interval '8 days', true),
   ('00000000-0000-0000-0000-000000031512'::uuid, 'appstore_w03_tb_no', 'moneyline', 'Tampa Bay Buccaneers', null, null, -135, 'win', now() - interval '8 days', true),

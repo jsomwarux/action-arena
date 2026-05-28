@@ -200,6 +200,75 @@ begin
 end;
 $$;
 
+create or replace function pg_temp.assert_straight_bet_economics(
+  p_name text,
+  p_bet_label text
+)
+returns void
+language plpgsql
+as $$
+declare
+  bet_record record;
+  expected_profit numeric;
+  expected_outcome numeric;
+  actual_outcome numeric;
+  lock_multiplier numeric := 1;
+begin
+  select b.amount, b.is_lock, b.profit, b.result, bl.leg_odds
+  into bet_record
+  from public.bets b
+  join test_bets tb on tb.id = b.id
+  join public.bet_legs bl on bl.bet_id = b.id
+  where tb.label = p_bet_label
+  limit 1;
+
+  if bet_record.is_lock and bet_record.result in ('win', 'loss') then
+    lock_multiplier := 1.5;
+  end if;
+
+  if bet_record.result = 'win' then
+    expected_profit := round(
+      (public.payout_from_american(bet_record.amount, bet_record.leg_odds) - bet_record.amount)
+        * lock_multiplier,
+      2
+    );
+    expected_outcome := bet_record.amount + expected_profit;
+    actual_outcome := bet_record.amount + coalesce(bet_record.profit, 0);
+  elsif bet_record.result = 'loss' then
+    expected_profit := round(-bet_record.amount * lock_multiplier, 2);
+    expected_outcome := 0;
+    actual_outcome := 0;
+  elsif bet_record.result = 'push' then
+    expected_profit := 0;
+    expected_outcome := bet_record.amount;
+    actual_outcome := bet_record.amount;
+  else
+    expected_profit := null;
+    expected_outcome := null;
+    actual_outcome := null;
+  end if;
+
+  perform pg_temp.record_result(
+    p_name,
+    bet_record.result <> 'pending'
+      and expected_profit is not null
+      and abs(coalesce(bet_record.profit, 999999) - expected_profit) < 0.005
+      and abs(coalesce(actual_outcome, 999999) - expected_outcome) < 0.005
+      and abs((actual_outcome - bet_record.amount) - coalesce(bet_record.profit, 999999)) < 0.005,
+    format(
+      'amount=%s odds=%s result=%s expected outcome/profit=%s/%s, got outcome/profit=%s/%s',
+      coalesce(bet_record.amount::text, 'null'),
+      coalesce(bet_record.leg_odds::text, 'null'),
+      coalesce(bet_record.result::text, 'null'),
+      coalesce(expected_outcome::text, 'null'),
+      coalesce(expected_profit::text, 'null'),
+      coalesce(actual_outcome::text, 'null'),
+      coalesce(bet_record.profit::text, 'null')
+    )
+  );
+end;
+$$;
+
 create or replace function pg_temp.assert_leg_eval(
   p_name text,
   p_market text,
@@ -584,6 +653,10 @@ select pg_temp.assert_bet('settled half-point total miss is loss', 'straight_hal
 select pg_temp.assert_bet('settled whole-number total exact score is push', 'straight_whole_total_push', 'push', 0);
 select pg_temp.assert_bet('lock multiplier on win', 'lock_win', 'win', 15);
 select pg_temp.assert_bet('lock multiplier on loss', 'lock_loss', 'loss', -15);
+select pg_temp.assert_straight_bet_economics('settled economics: win outcome equals played plus American-odds profit', 'straight_half_spread_win');
+select pg_temp.assert_straight_bet_economics('settled economics: loss outcome is zero and profit is negative stake', 'straight_half_spread_loss');
+select pg_temp.assert_straight_bet_economics('settled economics: push returns stake with zero profit', 'straight_whole_total_push');
+select pg_temp.assert_straight_bet_economics('settled economics: Pick of the Week win applies 1.5x profit', 'lock_win');
 select pg_temp.assert_bet('parlay all-win', 'parlay_all_win', 'win', 60);
 select pg_temp.assert_bet('parlay one-loss', 'parlay_one_loss', 'loss', -20);
 select pg_temp.assert_bet('parlay one-push recalculation', 'parlay_one_push_recalculation', 'win', 60);

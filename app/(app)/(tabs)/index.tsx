@@ -190,13 +190,13 @@ function ActionNeeded({ cards }: { cards: HomeLeagueCard[] }) {
                     <View className="flex-1 gap-1">
                       <Text
                         className="text-base font-black uppercase text-white"
-                        numberOfLines={1}
+                        numberOfLines={2}
                         style={{ letterSpacing: -0.3 }}>
                         {card.league.name}
                       </Text>
                       <View className="flex-row items-center gap-2">
                         <Text className="text-sm font-semibold text-white/70">
-                          {needed} more {needed === 1 ? 'pick' : 'picks'} until lineup is ready
+                          {needed} more {needed === 1 ? 'pick' : 'picks'} until your card is ready
                         </Text>
                       </View>
                     </View>
@@ -272,15 +272,15 @@ function ThisWeekCard({ card }: { card: HomeLeagueCard }) {
     <PressableScale accessibilityRole="button" onPress={openCardDestination}>
       <Card>
         <View className="gap-4">
-          <View className="flex-row items-start justify-between gap-3">
-            <View className="flex-1 gap-2">
-              <Text
-                className="text-xl font-black uppercase text-white"
-                numberOfLines={1}
-                style={{ letterSpacing: -0.3 }}>
-                {card.league.name}
-              </Text>
-              <View className="flex-row flex-wrap gap-2">
+          <View className="gap-3">
+            <Text
+              className="text-xl font-black uppercase text-white"
+              numberOfLines={2}
+              style={{ letterSpacing: -0.3 }}>
+              {card.league.name}
+            </Text>
+            <View className="flex-row items-end justify-between gap-3">
+              <View className="flex-1 flex-row flex-wrap items-center gap-2">
                 <Badge label={formatLeagueType(card.league.type)} tone={isH2H ? 'cyan' : 'gold'} />
                 <Badge label={`Week ${card.league.current_week}`} tone="green" />
                 {live ? (
@@ -294,21 +294,21 @@ function ThisWeekCard({ card }: { card: HomeLeagueCard }) {
                   </View>
                 ) : null}
               </View>
-            </View>
-            <View className="items-end">
-              <Text
-                className="text-[10px] font-black uppercase text-white/45"
-                style={{ letterSpacing: 1.4 }}>
-                Profit
-              </Text>
-              <AnimatedNumber
-                className={cn('mt-1 text-2xl font-black', getProfitTone(card.weeklyProfit))}
-                decimals={0}
-                prefix={card.weeklyProfit < 0 ? '-' : '+'}
-                suffix=" coins"
-                style={{ letterSpacing: -0.5 }}
-                value={Math.abs(card.weeklyProfit)}
-              />
+              <View className="items-end">
+                <Text
+                  className="text-[10px] font-black uppercase text-white/45"
+                  style={{ letterSpacing: 1.4 }}>
+                  Profit
+                </Text>
+                <AnimatedNumber
+                  className={cn('mt-1 text-2xl font-black', getProfitTone(card.weeklyProfit))}
+                  decimals={0}
+                  prefix={card.weeklyProfit < 0 ? '-' : '+'}
+                  suffix=" coins"
+                  style={{ letterSpacing: -0.5 }}
+                  value={Math.abs(card.weeklyProfit)}
+                />
+              </View>
             </View>
           </View>
 
@@ -561,9 +561,9 @@ function RecentResultCard({ card }: { card: HomeLeagueCard }) {
           )}
         />
         <View className="gap-4 p-4">
-          <View className="flex-row items-center justify-between gap-3">
-            <View className="flex-1">
-              <View className="flex-row items-center gap-2">
+          <View className="gap-2">
+            <View className="flex-row items-center justify-between gap-3">
+              <View className="flex-1 flex-row items-center gap-2">
                 <Ionicons
                   color={
                     isWin
@@ -584,30 +584,31 @@ function RecentResultCard({ card }: { card: HomeLeagueCard }) {
                         ? 'text-coral-red'
                         : 'text-white/55',
                   )}
+                  numberOfLines={1}
                   style={{ letterSpacing: 1.6 }}>
                   Week {Math.max(1, card.league.current_week - 1)} · {outcome}
                 </Text>
               </View>
-              <Text
-                className="mt-1 text-base font-black text-white"
-                numberOfLines={1}
-                style={{ letterSpacing: -0.3 }}>
-                {card.league.name}
-              </Text>
+              {lastProfit !== null ? (
+                <Text
+                  className={cn('text-2xl font-black', getProfitTone(lastProfit))}
+                  style={{ letterSpacing: -0.5 }}>
+                  {formatProfit(lastProfit)}
+                </Text>
+              ) : (
+                <Text
+                  className="text-[10px] font-black uppercase text-white/45"
+                  style={{ letterSpacing: 1.4 }}>
+                  No Result
+                </Text>
+              )}
             </View>
-            {lastProfit !== null ? (
-              <Text
-                className={cn('text-2xl font-black', getProfitTone(lastProfit))}
-                style={{ letterSpacing: -0.5 }}>
-                {formatProfit(lastProfit)}
-              </Text>
-            ) : (
-              <Text
-                className="text-[10px] font-black uppercase text-white/45"
-                style={{ letterSpacing: 1.4 }}>
-                No Result
-              </Text>
-            )}
+            <Text
+              className="text-base font-black text-white"
+              numberOfLines={2}
+              style={{ letterSpacing: -0.3 }}>
+              {card.league.name}
+            </Text>
           </View>
 
           <View className="gap-2">
@@ -848,7 +849,7 @@ function WeeklyAwardsSection({ cards }: { cards: HomeLeagueCard[] }) {
         <StaggeredItem index={index} key={card.league.id} perItemDelay={70}>
           <Card>
           <View className="gap-4">
-            <View className="flex-row items-center justify-between gap-3">
+            <View className="gap-2">
               <View className="flex-row items-center gap-2">
                 <Ionicons color={THEME_COLORS.gold} name="ribbon" size={14} />
                 <Text
@@ -858,8 +859,8 @@ function WeeklyAwardsSection({ cards }: { cards: HomeLeagueCard[] }) {
                 </Text>
               </View>
               <Text
-                className="text-sm font-black text-white"
-                numberOfLines={1}
+                className="text-base font-black text-white"
+                numberOfLines={2}
                 style={{ letterSpacing: -0.3 }}>
                 {card.league.name}
               </Text>

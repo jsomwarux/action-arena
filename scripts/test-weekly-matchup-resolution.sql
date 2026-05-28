@@ -243,12 +243,12 @@ join public.standings no_pick
 where matchup.id = '00000000-0000-0000-0000-000000014102'::uuid;
 
 select pg_temp.record_result(
-  '14.5 H2H records total profit and ranks stay accurate over three weeks',
+  '14.5 H2H standings rank by record before total profit over three weeks',
   count(*) = 4
     and bool_and(
       (user_id = pg_temp.test_user(1) and wins = 2 and losses = 0 and ties = 1 and total_profit = 60 and rank = 1)
-      or (user_id = pg_temp.test_user(3) and wins = 1 and losses = 1 and ties = 1 and total_profit = 8 and rank = 2)
-      or (user_id = pg_temp.test_user(2) and wins = 2 and losses = 1 and ties = 0 and total_profit = 4 and rank = 3)
+      or (user_id = pg_temp.test_user(2) and wins = 2 and losses = 1 and ties = 0 and total_profit = 4 and rank = 2)
+      or (user_id = pg_temp.test_user(3) and wins = 1 and losses = 1 and ties = 1 and total_profit = 8 and rank = 3)
       or (user_id = pg_temp.test_user(4) and wins = 0 and losses = 3 and ties = 0 and total_profit = -300 and rank = 4)
     ),
   coalesce(jsonb_agg(jsonb_build_object('user', user_id, 'rank', rank, 'w', wins, 'l', losses, 't', ties, 'weekly', weekly_profit, 'total', total_profit) order by rank)::text, '[]')

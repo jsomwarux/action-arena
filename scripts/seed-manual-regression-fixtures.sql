@@ -445,15 +445,15 @@ select
 from qa_manual_leagues league_fixture
 join (
   values
-    ('00000000-0000-0000-0000-000000021411'::uuid, 1, 1, 'straight'::public.bet_type, 20::numeric, 100, 40::numeric, 8::numeric, false, 90),
-    ('00000000-0000-0000-0000-000000021412'::uuid, 1, 2, 'straight'::public.bet_type, 20::numeric, 100, 40::numeric, 9::numeric, false, 89),
-    ('00000000-0000-0000-0000-000000021413'::uuid, 1, 3, 'straight'::public.bet_type, 20::numeric, 100, 40::numeric, 10::numeric, false, 88),
-    ('00000000-0000-0000-0000-000000021414'::uuid, 1, 4, 'straight'::public.bet_type, 20::numeric, 100, 40::numeric, 11::numeric, false, 87),
+    ('00000000-0000-0000-0000-000000021411'::uuid, 1, 1, 'straight'::public.bet_type, 20::numeric, 100, 40::numeric, 20::numeric, false, 90),
+    ('00000000-0000-0000-0000-000000021412'::uuid, 1, 2, 'straight'::public.bet_type, 20::numeric, 100, 40::numeric, 20::numeric, false, 89),
+    ('00000000-0000-0000-0000-000000021413'::uuid, 1, 3, 'straight'::public.bet_type, 20::numeric, 100, 40::numeric, 20::numeric, false, 88),
+    ('00000000-0000-0000-0000-000000021414'::uuid, 1, 4, 'straight'::public.bet_type, 20::numeric, 100, 40::numeric, 20::numeric, false, 87),
     ('00000000-0000-0000-0000-000000021415'::uuid, 1, 5, 'parlay'::public.bet_type, 20::numeric, 175, 55::numeric, 35::numeric, false, 86),
-    ('00000000-0000-0000-0000-000000021421'::uuid, 2, 1, 'straight'::public.bet_type, 20::numeric, 100, 40::numeric, 7::numeric, false, 85),
+    ('00000000-0000-0000-0000-000000021421'::uuid, 2, 1, 'straight'::public.bet_type, 20::numeric, 100, 40::numeric, 20::numeric, false, 85),
     ('00000000-0000-0000-0000-000000021422'::uuid, 2, 6, 'parlay'::public.bet_type, 20::numeric, 250, 70::numeric, 50::numeric, false, 84),
     ('00000000-0000-0000-0000-000000021423'::uuid, 2, 7, 'parlay'::public.bet_type, 20::numeric, 300, 80::numeric, 60::numeric, false, 83),
-    ('00000000-0000-0000-0000-000000021431'::uuid, 3, 8, 'straight'::public.bet_type, 35::numeric, 800, 315::numeric, 280::numeric, true, 82),
+    ('00000000-0000-0000-0000-000000021431'::uuid, 3, 8, 'straight'::public.bet_type, 35::numeric, 800, 315::numeric, 420::numeric, true, 82),
     ('00000000-0000-0000-0000-000000021441'::uuid, 4, 9, 'parlay'::public.bet_type, 20::numeric, 160, 52::numeric, 32::numeric, false, 81)
 ) as bet(
   bet_id,

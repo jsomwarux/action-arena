@@ -10,6 +10,8 @@ export const DEFAULT_MIN_LEAGUE_MEMBERS = 2;
 export const DEFAULT_LEAGUE_SEASON_WEEKS = 17;
 export const NFL_REGULAR_SEASON_WEEKS = 14;
 export const NFL_PLAYOFF_WEEKS = 3;
+export const TEASER_MIN_LEGS: TeaserLegCount = 2;
+export const TEASER_MAX_LEGS: TeaserLegCount = 4;
 
 export const TEASER_ODDS_LOOKUP: Record<TeaserLegCount, Record<TeaserPoints, number>> = {
   2: {

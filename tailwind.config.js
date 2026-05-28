@@ -17,6 +17,8 @@ module.exports = {
         'arena-surface': '#111827',
         bronze: '#CD7F32',
         'bronze-text': '#E8A268',
+        silver: '#C0C0C0',
+        'silver-text': '#E5E7EB',
         'coral-red': '#FF4757',
         'cyan-accent': '#18DCFF',
         'electric-green': '#00FF87',

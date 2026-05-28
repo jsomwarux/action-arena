@@ -158,15 +158,15 @@ select
 from season_awards_context context
 join (
   values
-    ('00000000-0000-0000-0000-000000022101'::uuid, 1, 1, 'straight'::public.bet_type, 20::numeric, 100, 40::numeric, 8::numeric, false, 100),
-    ('00000000-0000-0000-0000-000000022102'::uuid, 1, 2, 'straight'::public.bet_type, 20::numeric, 100, 40::numeric, 9::numeric, false, 99),
-    ('00000000-0000-0000-0000-000000022103'::uuid, 1, 3, 'straight'::public.bet_type, 20::numeric, 100, 40::numeric, 10::numeric, false, 98),
-    ('00000000-0000-0000-0000-000000022104'::uuid, 1, 4, 'straight'::public.bet_type, 20::numeric, 100, 40::numeric, 11::numeric, false, 97),
+    ('00000000-0000-0000-0000-000000022101'::uuid, 1, 1, 'straight'::public.bet_type, 20::numeric, 100, 40::numeric, 20::numeric, false, 100),
+    ('00000000-0000-0000-0000-000000022102'::uuid, 1, 2, 'straight'::public.bet_type, 20::numeric, 100, 40::numeric, 20::numeric, false, 99),
+    ('00000000-0000-0000-0000-000000022103'::uuid, 1, 3, 'straight'::public.bet_type, 20::numeric, 100, 40::numeric, 20::numeric, false, 98),
+    ('00000000-0000-0000-0000-000000022104'::uuid, 1, 4, 'straight'::public.bet_type, 20::numeric, 100, 40::numeric, 20::numeric, false, 97),
     ('00000000-0000-0000-0000-000000022105'::uuid, 1, 5, 'parlay'::public.bet_type, 20::numeric, 175, 55::numeric, 35::numeric, false, 96),
-    ('00000000-0000-0000-0000-000000022201'::uuid, 2, 1, 'straight'::public.bet_type, 20::numeric, 100, 40::numeric, 7::numeric, false, 95),
+    ('00000000-0000-0000-0000-000000022201'::uuid, 2, 1, 'straight'::public.bet_type, 20::numeric, 100, 40::numeric, 20::numeric, false, 95),
     ('00000000-0000-0000-0000-000000022202'::uuid, 2, 6, 'parlay'::public.bet_type, 20::numeric, 250, 70::numeric, 50::numeric, false, 94),
     ('00000000-0000-0000-0000-000000022203'::uuid, 2, 7, 'parlay'::public.bet_type, 20::numeric, 300, 80::numeric, 60::numeric, false, 93),
-    ('00000000-0000-0000-0000-000000022301'::uuid, 3, 8, 'straight'::public.bet_type, 35::numeric, 800, 315::numeric, 280::numeric, true, 92),
+    ('00000000-0000-0000-0000-000000022301'::uuid, 3, 8, 'straight'::public.bet_type, 35::numeric, 800, 315::numeric, 420::numeric, true, 92),
     ('00000000-0000-0000-0000-000000022401'::uuid, 4, 9, 'parlay'::public.bet_type, 20::numeric, 160, 52::numeric, 32::numeric, false, 91)
 ) as bet(
   bet_id,
@@ -286,8 +286,8 @@ left join lateral (
 select pg_temp.record_result(
   '22.1 Biggest Single Pick includes profit and pick details',
   award.item ->> 'user_id' = pg_temp.test_user(3)::text
-    and (award.item ->> 'metric')::numeric = 280
-    and award.item ->> 'value_label' = '+280 coins'
+    and (award.item ->> 'metric')::numeric = 420
+    and award.item ->> 'value_label' = '+420 coins'
     and award.item ->> 'bet_id' = '00000000-0000-0000-0000-000000022301'
     and award.item #>> '{bet,bet_type}' = 'straight'
     and (award.item #>> '{bet,amount}')::numeric = 35

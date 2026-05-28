@@ -354,6 +354,29 @@ begin
   );
 
   perform pg_temp.expect_submission(
+    'blocks one-leg teaser submission',
+    jsonb_build_array(
+      pg_temp.bet(
+        'teaser',
+        20,
+        false,
+        jsonb_build_array(
+          pg_temp.leg('DAL-PHI', 'over_under', 'Over 44.5', 44.5, 38.5, -110)
+        ),
+        -110,
+        38.18,
+        6
+      ),
+      pg_temp.filler_bet(1, true),
+      pg_temp.filler_bet(2),
+      pg_temp.filler_bet(3),
+      pg_temp.filler_bet(4)
+    ),
+    false,
+    array['Teasers must have 2 to 4 legs']
+  );
+
+  perform pg_temp.expect_submission(
     'blocks POTW Team A ML plus Team A spread straight',
     jsonb_build_array(
       pg_temp.straight('DAL-PHI', 'moneyline', 'Dallas Cowboys', null, null, 120, true),
