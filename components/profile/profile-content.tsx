@@ -435,7 +435,10 @@ function HeroStats({ summary }: { summary: ProfileSummary }) {
               Season Profit
             </Text>
             <Text
+              adjustsFontSizeToFit
               className="mt-1"
+              minimumFontScale={0.55}
+              numberOfLines={1}
               style={{
                 color: profitColor,
                 fontSize: 56,
@@ -490,8 +493,11 @@ function StatTile({
         {label}
       </Text>
       <Text
-        className={cn('mt-1.5 text-xl font-black text-white', accent)}
-        style={{ letterSpacing: -0.4, lineHeight: 24 }}>
+        adjustsFontSizeToFit
+        className={cn('mt-1.5 text-lg font-black text-white', accent)}
+        minimumFontScale={0.75}
+        numberOfLines={2}
+        style={{ letterSpacing: -0.4, lineHeight: 22 }}>
         {value}
       </Text>
     </View>
