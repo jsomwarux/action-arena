@@ -1,6 +1,6 @@
 -- Idempotent App Store screenshot fixtures.
--- Creates one global-week-exempt league with marketable leaderboard standings
--- and completed winning matchups for the first two likely capture users:
+-- Creates global-week-exempt leagues with marketable pick-board, lineup,
+-- leaderboard, and completed winning matchup states for the first two likely capture users:
 -- appreview@actionarena.app and jsomwarux@yahoo.com.
 
 begin;
@@ -49,7 +49,13 @@ $$;
 
 delete from public.leagues
 where id = '00000000-0000-0000-0000-000000031001'::uuid
-   or name = 'App Store Screenshot League';
+   or id = '00000000-0000-0000-0000-000000031101'::uuid
+   or id = '00000000-0000-0000-0000-000000031102'::uuid
+   or name in (
+     'App Store Screenshot League',
+     'Sunday Card League',
+     'Lineup Builder League'
+   );
 
 delete from public.live_game_states
 where game_id like 'appstore_%';
@@ -70,7 +76,92 @@ insert into public.leagues (
   season_year,
   current_week,
   status,
-  settings
+  settings,
+  created_at
+)
+values
+  (
+    '00000000-0000-0000-0000-000000031101'::uuid,
+    'Sunday Card League',
+    'Polished capture fixture for the Pick Board hook shot.',
+    pg_temp.screenshot_user(1),
+    'h2h',
+    'private',
+    'SUNCAR',
+    10,
+    'nfl',
+    2099,
+    3,
+    'active',
+    jsonb_build_object(
+      'global_week_exempt', true,
+      'global_week_test_fixture', true,
+      'app_store_screenshot_fixture', true,
+      'app_store_capture_mode', 'hook_prefill'
+    ),
+    now()
+  ),
+  (
+    '00000000-0000-0000-0000-000000031102'::uuid,
+    'Lineup Builder League',
+    'Polished capture fixture for the filled weekly lineup shot.',
+    pg_temp.screenshot_user(1),
+    'h2h',
+    'private',
+    'LINBUD',
+    10,
+    'nfl',
+    2099,
+    3,
+    'active',
+    jsonb_build_object(
+      'global_week_exempt', true,
+      'global_week_test_fixture', true,
+      'app_store_screenshot_fixture', true,
+      'app_store_capture_mode', 'lineup_prefill'
+    ),
+    now() - interval '1 second'
+  );
+
+insert into public.league_members (league_id, user_id, team_name, joined_at)
+select
+  fixture.league_id,
+  users.id,
+  case users.slot
+    when 1 then 'Review Rebels'
+    when 2 then 'Sunday Syndicate'
+    when 3 then 'North End Picks'
+    when 4 then 'Fourth Quarter Club'
+    when 5 then 'Primetime Pulse'
+    when 6 then 'Red Zone Runners'
+    when 7 then 'Gridiron Guild'
+    when 8 then 'Victory Formation'
+    when 9 then 'Pocket Passers'
+    else 'Two-Minute Drill'
+  end,
+  now() + (users.slot::text || ' seconds')::interval
+from screenshot_users users
+cross join (
+  values
+    ('00000000-0000-0000-0000-000000031101'::uuid),
+    ('00000000-0000-0000-0000-000000031102'::uuid)
+) as fixture(league_id);
+
+insert into public.leagues (
+  id,
+  name,
+  description,
+  commissioner_id,
+  type,
+  visibility,
+  invite_code,
+  max_members,
+  sport,
+  season_year,
+  current_week,
+  status,
+  settings,
+  created_at
 )
 values (
   '00000000-0000-0000-0000-000000031001'::uuid,
@@ -89,7 +180,8 @@ values (
     'global_week_exempt', true,
     'global_week_test_fixture', true,
     'app_store_screenshot_fixture', true
-  )
+  ),
+  now() - interval '2 seconds'
 );
 
 insert into public.league_members (league_id, user_id, team_name, joined_at)
@@ -374,11 +466,28 @@ values
   ('00000000-0000-0000-0000-000000031435'::uuid, 'appstore_w03_mia_ne', 'moneyline', 'Miami Dolphins', null, null, -110, 'loss', now() - interval '1 day', true);
 
 select jsonb_build_object(
-  'league', jsonb_build_object(
-    'id', '00000000-0000-0000-0000-000000031001',
-    'name', 'App Store Screenshot League',
-    'invite_code', 'APPSTR',
-    'current_week', 3
+  'leagues', jsonb_build_array(
+    jsonb_build_object(
+      'id', '00000000-0000-0000-0000-000000031101',
+      'name', 'Sunday Card League',
+      'invite_code', 'SUNCAR',
+      'capture_mode', 'hook_prefill',
+      'current_week', 3
+    ),
+    jsonb_build_object(
+      'id', '00000000-0000-0000-0000-000000031102',
+      'name', 'Lineup Builder League',
+      'invite_code', 'LINBUD',
+      'capture_mode', 'lineup_prefill',
+      'current_week', 3
+    ),
+    jsonb_build_object(
+      'id', '00000000-0000-0000-0000-000000031001',
+      'name', 'App Store Screenshot League',
+      'invite_code', 'APPSTR',
+      'capture_mode', 'settled_results',
+      'current_week', 3
+    )
   ),
   'users', (
     select jsonb_agg(

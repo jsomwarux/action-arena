@@ -128,6 +128,10 @@ type RequestBody = {
 
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 const MINIMUM_BETS = 5;
+const LEGACY_OPPONENT_SUBMISSION_TITLE_PATTERN = new RegExp(
+  `\\b${['Opponent', 'locked', 'in'].join(' ')}\\b`,
+  'g',
+);
 
 const jsonHeaders = {
   'Content-Type': 'application/json',
@@ -197,7 +201,7 @@ function sanitizeNotificationCopy(value: string) {
     .replace(/\bwager\b/g, 'pick')
     .replace(/\blocked in their Week (\d+) picks\b/g, 'submitted their Week $1 picks')
     .replace(/\blocked in their picks\b/g, 'submitted their picks')
-    .replace(/\bOpponent locked in\b/g, 'Opponent submitted picks');
+    .replace(LEGACY_OPPONENT_SUBMISSION_TITLE_PATTERN, 'Opponent submitted picks');
 }
 
 function createSupabaseClient() {

@@ -414,7 +414,7 @@ where league_fixture.key = 'championship';
 
 -- Settled season activity for the trophy case. These rows make the completed
 -- season snapshot generate all Test 22 awards from the same function used in
--- production, including Parlay King and Biggest Single Bet details.
+-- production, including Parlay King and Biggest Single Pick details.
 insert into public.bets (
   id,
   user_id,

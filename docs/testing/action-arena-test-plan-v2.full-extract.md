@@ -908,7 +908,7 @@ Test each achievement by manufacturing the right scenario:
 1. Win 5 bets in a row → Verify: "Hot Streak" achievement unlocks with gold styling.
 2. Win a bet at +300 odds or longer → Verify: "Underdog Hunter" unlocks.
 3. Win every bet in a single week → Verify: "Perfect Week" unlocks.
-4. Win 5 weeks with positive proﬁt in a row → Verify: "Budget Master" unlocks.
+4. Win 5 weeks with positive proﬁt in a row → Verify: "Strategy Master" unlocks.
 5. Hit a 4+ leg parlay → Verify: "Parlay King" unlocks.
 6. Hit 3 teasers in a single week → Verify: "Teaser Genius" unlocks.
 7. Verify: Achievements you haven't earned are visible but grayed out / locked — you can see
@@ -937,13 +937,13 @@ Your row is visually highlighted (green accent or diﬀerent background).
 3. A player who moved DOWN → Verify: Red down arrow.
 4. A player who stayed the same → Verify: Gray dash or no arrow.
 Test 18: Weekly Awards
-18.1 — Sharpest Bettor
+18.1 — Top Performer
 1. After settling a week, look for weekly awards (on the league detail screen or Home
 dashboard).
 2. Calculate ROI for each player: (weekly proﬁt ÷ $100 wagered) × 100.
-3. Verify: The player with the highest ROI is named "Sharpest Bettor."
-18.2 — Degen of the Week
-1. Verify: The player with the worst (most negative) ROI is named "Degen of the Week."
+3. Verify: The player with the highest ROI is named "Top Performer."
+18.2 — Cold Streak
+1. Verify: The player with the worst (most negative) ROI is named "Cold Streak."
 18.3 — Lock of the Week Award
 1. Verify: The single Lock bet with the highest proﬁt across all league members is shown as
 "Lock of the Week."
@@ -971,25 +971,25 @@ rare moment).
 19.3 — Matchup Result
 1. Settle all bets and run weekly resolution.
 2. Verify: Both players get a notiﬁcation with the matchup result ("You beat [opponent]
-$45.20 to -$12.00" or "You lost to [opponent]").
-19.4 — Bets Not Placed Reminder
+45 coins to -12 coins" or "You lost to [opponent]").
+19.4 — Picks Not Placed Reminder
 1. Advance to a new week.
-2. Player 4 does not place any bets.
+2. Player 4 does not place any picks.
 3. Wait for the reminder timing (24 hours before ﬁrst game, per the app logic).
-4. Verify: Player 4 gets a reminder notiﬁcation to place bets.
-19.5 — Opponent Locked In
-1. Player 2 locks in their bets.
-2. Verify: Player 1 (their H2H opponent) gets a notiﬁcation: "[Player 2] locked in their bets."
+4. Verify: Player 4 gets a reminder notiﬁcation to place picks.
+19.5 — Opponent Submitted Picks
+1. Player 2 submits their lineup.
+2. Verify: Player 1 (their H2H opponent) gets a notiﬁcation: "[Player 2] submitted their Week X picks."
 
 --- PAGE 31 ---
 
 19.6 — Notiﬁcation Preferences
 1. Go to Settings → Notiﬁcation Preferences.
-2. Turn OFF "Bet Won" notiﬁcations.
-3. Win a bet.
+2. Turn OFF "Pick Won" notiﬁcations.
+3. Win a pick.
 4. Verify: NO notiﬁcation ﬁres for the win.
-5. Turn "Bet Won" back ON.
-6. Win another bet.
+5. Turn "Pick Won" back ON.
+6. Win another pick.
 7. Verify: Notiﬁcation ﬁres again.
 Test 20: League Chat
 20.1 — Sending and Receiving Messages
@@ -999,15 +999,15 @@ Test 20: League Chat
 4. Verify: The message appears on Player 2's screen in real-time WITHOUT Player 2 having to
 refresh or pull down.
 20.2 — System Messages
-1. Player 1 locks in their weekly bets.
+1. Player 1 submits their weekly lineup.
 2. Open the league chat.
-3. Verify: A system message appears: "[Player 1] locked in their bets for Week X." This
+3. Verify: A system message appears: "[Player 1] submitted their picks for Week X." This
 message should look diﬀerent from regular user messages (centered, smaller, muted text).
-20.3 — Sharing a Bet to Chat
-1. From bet history or the locked bet board, ﬁnd a bet and look for a "Share to Chat" option.
+20.3 — Sharing a Pick to Chat
+1. From pick history or the locked pick board, ﬁnd a pick and look for a "Share to Chat" option.
 2. Tap it.
 3. Verify: A rich card appears in the chat showing:
-Bet type badge (amber for parlay, cyan for teaser, etc.)
+Pick type badge (amber for parlay, cyan for teaser, etc.)
 Selection(s)
 Odds
 Amount
@@ -1434,8 +1434,8 @@ Leaderboard & Awards:
  Rankings match standings
  Weekly view works
  Trend arrows display correctly
- Sharpest Bettor awarded correctly
- Degen of the Week awarded correctly
+ Top Performer awarded correctly
+ Cold Streak awarded correctly
  Lock of the Week award shows correct bet
 Social:
  Chat messages send and receive in real-time
@@ -1443,11 +1443,11 @@ Social:
  Shared bet cards render correctly with type badges and Lock eﬀects
  Chat stickers work (if purchased)
 Notiﬁcations:
- Bet won notiﬁcation ﬁres
+ Pick won notiﬁcation ﬁres
  Parlay leg progress notiﬁcations ﬁre
  Matchup result notiﬁcation ﬁres
- Bets not placed reminder ﬁres
- Opponent locked in notiﬁcation ﬁres
+ Picks not placed reminder ﬁres
+ Opponent submitted picks notiﬁcation ﬁres
  Notiﬁcation preferences respected
 
 --- PAGE 45 ---

@@ -16,7 +16,7 @@ import { logAnalyticsEvent } from '@/lib/analytics';
 import { cn } from '@/lib/cn';
 import { haptics } from '@/lib/haptics';
 
-const PASS_PRICE = '$9.99';
+const PASS_STATUS_LABEL = 'Coming Soon';
 
 const PASS_FEATURES: {
   body: string;
@@ -37,10 +37,10 @@ const PASS_FEATURES: {
     title: 'Advanced Analytics Dashboard',
   },
   {
-    body: 'See new weekly matchups 30 minutes before free users every week. Build your card before the Bet Board opens.',
+    body: 'See new weekly matchups 30 minutes before free users every week. Build your card before the Pick Board opens.',
     highlight: '30-minute head start',
     icon: 'time',
-    title: 'Early Bet Board Access',
+    title: 'Early Pick Board Access',
   },
   {
     body: 'No ad placements once the ad SDK arrives. For now, the app simply hides all ad hooks for pass holders.',
@@ -56,17 +56,17 @@ function HeroPriceTag() {
       <Text
         className="text-[10px] font-semibold uppercase text-gold/80"
         style={{ letterSpacing: 1 }}>
-        Per Season
+        Launch
       </Text>
       <Text
-        className="text-3xl font-extrabold text-white"
+        className="text-xl font-extrabold text-white"
         style={{ letterSpacing: -0.6 }}>
-        {PASS_PRICE}
+        {PASS_STATUS_LABEL}
       </Text>
       <Text
         className="text-[10px] font-semibold uppercase text-gold"
         style={{ letterSpacing: 1 }}>
-        One payment
+        Code access now
       </Text>
     </View>
   );
@@ -381,7 +381,7 @@ export default function SeasonPassScreen() {
                 />
                 <Button
                   onPress={showPurchasePlaceholder}
-                  title={`Buy Season Pass · ${PASS_PRICE}`}
+                  title="Buy Pass · Soon"
                   variant="secondary"
                 />
                 <Text className="text-[11px] font-medium text-white/45">
@@ -401,7 +401,7 @@ export default function SeasonPassScreen() {
           <Text
             className="mt-0.5 text-base font-bold text-white"
             style={{ letterSpacing: -0.2 }}>
-            Four perks · {PASS_PRICE} flat
+            Four perks · launch-ready preview
           </Text>
         </View>
 

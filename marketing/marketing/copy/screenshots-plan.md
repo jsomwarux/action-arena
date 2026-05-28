@@ -1,13 +1,14 @@
 # Action Arena App Store Screenshots Plan
 
-Updated after simulator review on May 19, 2026.
+Updated after simulator review on May 28, 2026.
 
 ## Capture Data Now Available
 
-I seeded a dedicated fixture in the linked Supabase project:
+I seeded three dedicated fixtures in the linked Supabase project:
 
-- League: `App Store Screenshot League`
-- Invite code: `APPSTR`
+- Shot 1 league: `Sunday Card League` (`SUNCAR`) - open Pick Board with one prefilled Straight pick, `20/100 coins`, `1/5 picks`, and no submitted lineup.
+- Shot 2 league: `Lineup Builder League` (`LINBUD`) - open Pick Board with a prefilled mixed lineup: 3 Straights, 1 locked Parlay, 1 Teaser, `5/5 picks`, `100 coins`, `0 coins` remaining.
+- Shot 3/4 league: `App Store Screenshot League` (`APPSTR`) - settled league with realistic leaderboard and completed winning matchups.
 - Current week: `Week 3`
 - Leaderboard hero row: `Sunday Syndicate`, `+245 coins`, rank 1
 - Other podium rows: `Review Rebels`, `+188 coins`; `Fourth Quarter Club`, `+106 coins`
@@ -32,25 +33,27 @@ Use this instead of the selected Parlay Builder frame. Your Screenshot 1 proves 
 
 Best state:
 
-- League: `Test H2H League`, or any open league where you can still build picks.
-- Pick type: `Straight`, not `Parlay`.
-- Weekly budget visible.
-- First game card visible with team matchup and pick buttons.
+- League: `Sunday Card League`.
+- Pick type: `Straight`.
+- One Straight pick from a later game is already in the lineup so the bottom sheet reads `1` / `Build your weekly card` / `80 coins`.
+- Weekly budget card shows `20 coins / 100 coins` and `1/5 picks`.
+- First game card is visible with `Dallas Cowboys @ Philadelphia Eagles`, with neither side showing a conflict/error state.
 - Lineup sheet collapsed.
-- No amount modal, tour overlay, or empty parlay builder dominating the bottom.
+- No amount modal, tour overlay, or empty Parlay Builder dominating the bottom.
 
 Step-by-step:
 
-1. Launch the simulator and log in.
-2. Tap `Picks`.
-3. If the selected league is `App Store Screenshot League`, switch the Active League picker back to `Test H2H League` because the screenshot fixture is already settled/submitted.
-4. Select `Straight`.
-5. Keep Week 2 if that is the open week with available games.
-6. Drag the page slightly upward until the first actual game card appears below the budget tracker.
-7. Keep the bottom Lineup sheet collapsed.
-8. Capture when the screen is settled.
+1. Re-seed the fixtures if needed: `npx supabase db query --linked -f scripts/seed-app-store-screenshot-fixtures.sql`.
+2. Launch the app and log in as your capture account.
+3. Tap `Picks`.
+4. In `Active League`, select `Sunday Card League` if it is not already selected.
+5. Confirm the `Straight` pick type is selected.
+6. Wait for the auto-prefill to settle. The bottom sheet should show `1`, and the weekly budget should show `20 coins / 100 coins`. The prefilled pick is intentionally from a later game so the visible Cowboys/Eagles card stays clean.
+7. Keep the Lineup sheet collapsed.
+8. Scroll the Pick Board just enough that the first matchup card is fully readable under the budget card. It is okay if the large `Pick Board` page title scrolls offscreen; preserve `Pick Type`, `Active League`, budget, and the complete first game card.
+9. Capture after all number animations settle.
 
-Frame note: The ideal frame has `Pick Board`, `Weekly Budget`, and the top of the first real matchup. Avoid a frame where the visible bottom is mostly `Parlay Builder 0/6 legs`.
+Frame note: The ideal frame shows the user has already started building a weekly card. It should not look empty, it should not show `Test H2H League`, and no visible pick button should have a red conflict treatment.
 
 ## Screenshot 2 - Mechanic
 
@@ -64,27 +67,26 @@ Use Screenshot 3 as the model, not Screenshot 2. Screenshot 2 is clean, but thre
 
 Best state:
 
+- League: `Lineup Builder League`.
 - Expanded lineup sheet.
 - Header shows `5/5 picks · 100 coins` and `Remaining 0 coins`.
-- One Straight card at the top.
-- One 2-leg Parlay card fully visible.
-- Teaser card peeking at the bottom.
-- One pick marked as Pick of the Week so the gold lock treatment appears.
+- One Straight card is partially visible at the top.
+- One locked 2-leg Parlay card is fully visible and framed as the hero interaction.
+- Teaser card peeks at the bottom.
+- The Parlay is marked Pick of the Week so the gold treatment appears.
 
 Step-by-step:
 
-1. Open `Picks`.
-2. Select `Test H2H League` or another unsubmitted open league.
-3. Add one Straight pick for `20 coins`.
-4. Add one 2-leg Parlay for `20 coins`.
-5. Add one 2-leg Teaser for `20 coins`.
-6. Add two more Straight picks for `20 coins` each.
-7. Expand the Lineup sheet.
-8. Tap `Mark as Pick of the Week (1.5x)` on the top Straight card or the Parlay card.
-9. Scroll the Lineup sheet so the top Straight card and the full Parlay card are visible, with the Teaser card starting at the bottom.
-10. Capture after the gold lock highlight settles.
+1. Tap `Picks`.
+2. Open the `Active League` picker and select `Lineup Builder League`.
+3. Wait for the auto-prefill to settle. The bottom sheet should automatically expand and show `5/5 picks · 100 coins`, `Remaining 0 coins`.
+4. Do not submit the card.
+5. In the expanded Lineup sheet, scroll slightly until the first Straight card is clipped at the top and the locked `2-leg Parlay` is fully visible.
+6. Confirm the Parlay has the gold Pick of the Week treatment and `Tap to Unpick`.
+7. Confirm the Teaser card is just peeking at the bottom of the frame.
+8. Capture after the gold highlight and number animations settle.
 
-Frame note: If the lock badge makes the first card too tall, put the lock on the Parlay card and frame the Parlay as the hero card. Do not use an all-Straight lineup for the final App Store screenshot unless the mixed lineup becomes visually cramped.
+Frame note: This is intentionally the "one Straight + one locked Parlay + Teaser peek" composition. It reads faster than three straight bets and shows the app's range in one frame.
 
 ## Screenshot 3 - Social / Proof
 
@@ -138,7 +140,8 @@ Step-by-step if logged in as `jsomwarux@yahoo.com`:
 3. Make sure the Week Navigator is on `Week 3`.
 4. Open the current matchup card for `Sunday Syndicate` vs `Fourth Quarter Club`.
 5. The win celebration should auto-fire the first time the matchup opens.
-6. Capture 300-700 ms after the celebration starts, when particles are visible but the matchup is still readable.
+6. If it already fired before, tap the gold `You Won` pill to replay it.
+7. Capture 300-700 ms after the celebration starts, when particles are visible but the matchup is still readable.
 
 Step-by-step if logged in as `appreview@actionarena.app`:
 
@@ -146,13 +149,15 @@ Step-by-step if logged in as `appreview@actionarena.app`:
 2. Open `App Store Screenshot League`.
 3. Make sure the Week Navigator is on `Week 3`.
 4. Open the current matchup card for `Review Rebels` vs `North End Picks`.
-5. Capture the win celebration or settled result.
+5. If the celebration already fired before, tap the gold `You Won` pill to replay it.
+6. Capture the win celebration or settled result.
 
 If the celebration does not fire:
 
-1. Delete the app from the simulator or erase app data to clear the local `action-arena.win-celebration.<matchupId>` flag.
-2. Reinstall/reopen the app.
-3. Open the same matchup again.
+1. Tap the gold `You Won` pill at the top of Matchup Detail.
+2. Wait for the overlay to begin.
+3. Capture during the 300-700 ms peak.
+4. If the pill does not replay it, delete the app from the simulator or erase app data to clear the local `action-arena.win-celebration.<matchupId>` flag, then reopen the same matchup.
 
 Frame note: A clean settled-result frame is acceptable if the celebration obscures too much. The important read is "I beat my friend and gained virtual coins."
 
@@ -169,21 +174,23 @@ Your Screenshot 4 is the screen I meant as the compliance fallback. It is correc
 Best state:
 
 - Disclosure card fully visible.
+- Action Arena wordmark visible inside the phone frame.
 - Shield icon visible.
-- `How Action Arena Works` title visible.
+- Card headline: `Free To Play. No Real Money.`
 - Body copy readable enough to show "free-to-play", "virtual", "no monetary value", and "No real money".
+- Pills visible: `Virtual Coins` and `No Cash Out`.
 
 Step-by-step:
 
-1. Open Settings / About / disclosure entry if available, or trigger the one-time disclosure with a fresh account/session.
-2. Stay on the disclosure screen.
-3. Capture the settled state.
-4. In the App Store composed screenshot, add the external headline `No Real Money. All Rivalry.` and the Action Arena wordmark above or below the phone frame.
+1. Open the disclosure screen from Settings / About. If it is not linked there, navigate to the app route `/disclosure?source=settings` in the simulator dev flow.
+2. Stay on the disclosure screen. Do not tap `Got It`.
+3. Confirm the card shows the Action Arena wordmark, shield icon, `Free To Play. No Real Money.`, the shorter disclosure paragraph, and the two compliance pills.
+4. Capture the settled state.
+5. In the App Store composed screenshot, use the external headline `No Real Money. All Rivalry.`.
 
 Best final-composition option:
 
 - Use the disclosure screen as the phone content.
-- Add `Action Arena` wordmark outside the phone in the App Store screenshot layout.
 - Add a short compliance line outside the phone: `Free to play. Virtual coins only. No real money.`
 
 ## Final Recommended 5-Shot Order

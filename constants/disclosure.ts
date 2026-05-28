@@ -2,6 +2,6 @@ export const ACTION_ARENA_DISCLOSURE_METADATA_KEY = 'action_arena_disclosure_see
 
 export const ACTION_ARENA_DISCLOSURE = {
   body:
-    'Action Arena is a free-to-play fantasy sports prediction game. The coins, points, and standings shown in the app are virtual and have no monetary value. No real money changes hands inside the app. If your league offers prizes, those are arranged and settled by your league commissioner outside of Action Arena. Action Arena is not affiliated with any sportsbook or gambling operator.',
+    'Action Arena is a free-to-play fantasy sports prediction game. Coins, points, standings, and cosmetics are virtual and have no monetary value. No real money is paid, won, or redeemable inside the app, and there are no redemption features or links to real-money sports operators. Any league prizes are arranged outside Action Arena by commissioners.',
   title: 'How Action Arena Works',
 } as const;

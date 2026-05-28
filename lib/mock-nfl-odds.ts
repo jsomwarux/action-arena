@@ -49,8 +49,8 @@ export type MockNflScore = {
   homeTeam: string;
 };
 
-const MOCK_BOOKMAKER_KEY = 'draftkings';
-const MOCK_BOOKMAKER_TITLE = 'DraftKings';
+const MOCK_BOOKMAKER_KEY = 'arena-lines';
+const MOCK_BOOKMAKER_TITLE = 'Arena Lines';
 
 const MOCK_SLOT_SCHEDULE: Record<MockGameSlot, MockGameSlotDefinition> = {
   mon_night: { dayOffset: 5, hourUtc: 0, minuteUtc: 15 },

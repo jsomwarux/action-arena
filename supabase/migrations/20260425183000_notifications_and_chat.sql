@@ -398,7 +398,7 @@ begin
 
   perform public.post_system_chat_message(
     new.league_id,
-    coalesce(profile.display_name, 'A player') || ' locked in their bets for Week ' || new.week_number,
+    coalesce(profile.display_name, 'A player') || ' submitted their picks for Week ' || new.week_number,
     jsonb_build_object('event', 'bets_locked', 'userId', new.user_id, 'weekNumber', new.week_number),
     'bets_locked:' || new.league_id::text || ':' || new.week_number || ':' || new.user_id::text
   );
@@ -420,8 +420,8 @@ begin
       perform public.enqueue_notification(
         opponent_id,
         'opponent_bets_locked',
-        'Opponent locked in',
-        coalesce(profile.display_name, 'Your opponent') || ' locked in their Week ' || new.week_number || ' bets.',
+        'Opponent submitted picks',
+        coalesce(profile.display_name, 'Your opponent') || ' submitted their Week ' || new.week_number || ' picks.',
         jsonb_build_object('type', 'matchup', 'matchupId', matchup.id, 'leagueId', new.league_id),
         new.league_id,
         null,
@@ -450,6 +450,8 @@ declare
   away_profile public.users;
   home_body text;
   away_body text;
+  home_profit_text text;
+  away_profit_text text;
 begin
   if new.home_profit is null or new.away_profit is null then
     return new;
@@ -462,17 +464,20 @@ begin
   select * into home_profile from public.users where id = new.home_user_id;
   select * into away_profile from public.users where id = new.away_user_id;
 
+  home_profit_text := round(new.home_profit)::text || ' coins';
+  away_profit_text := round(new.away_profit)::text || ' coins';
+
   home_body := case
     when new.winner_id = new.home_user_id then 'You beat ' || coalesce(away_profile.display_name, 'your opponent')
     when new.winner_id = new.away_user_id then 'You lost to ' || coalesce(away_profile.display_name, 'your opponent')
     else 'You tied ' || coalesce(away_profile.display_name, 'your opponent')
-  end || ' $' || to_char(new.home_profit, 'FM999999990.00') || ' to $' || to_char(new.away_profit, 'FM999999990.00');
+  end || ' ' || home_profit_text || ' to ' || away_profit_text;
 
   away_body := case
     when new.winner_id = new.away_user_id then 'You beat ' || coalesce(home_profile.display_name, 'your opponent')
     when new.winner_id = new.home_user_id then 'You lost to ' || coalesce(home_profile.display_name, 'your opponent')
     else 'You tied ' || coalesce(home_profile.display_name, 'your opponent')
-  end || ' $' || to_char(new.away_profit, 'FM999999990.00') || ' to $' || to_char(new.home_profit, 'FM999999990.00');
+  end || ' ' || away_profit_text || ' to ' || home_profit_text;
 
   perform public.enqueue_notification(
     new.home_user_id,

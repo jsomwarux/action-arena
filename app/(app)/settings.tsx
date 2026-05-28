@@ -28,6 +28,15 @@ import { cn } from '@/lib/cn';
 import { formatLeagueType } from '@/lib/format';
 import type { NotificationPreferencesUpdate, NotificationType } from '@/types/database';
 
+const ABOUT_NO_REAL_MONEY_TEXT =
+  'Action Arena is a free-to-play fantasy sports prediction game. No real money is paid, won, or redeemable inside the app.';
+
+const TERMS_OF_SERVICE_TEXT =
+  'Action Arena is for free-to-play fantasy sports predictions only. No real money is paid, won, or redeemable inside the app. Coins, points, standings, rewards, and league results are virtual, have no monetary value, and cannot be exchanged for money or money-equivalent prizes. League prizes, if any, are arranged by commissioners outside Action Arena.';
+
+const PRIVACY_POLICY_TEXT =
+  'Action Arena uses account, league, pick, notification, and cosmetic data to operate the app experience. We do not sell personal data, and no real-money sports operator receives app data from Action Arena.';
+
 function SettingsSkeleton() {
   return (
     <View className="gap-4">
@@ -156,6 +165,10 @@ export default function SettingsScreen() {
     );
   };
 
+  const showAboutModal = (title: string, message: string) => {
+    Alert.alert(title, message);
+  };
+
   return (
     <ScreenWrapper className="pb-0">
       <ScrollView
@@ -276,7 +289,7 @@ export default function SettingsScreen() {
                   {hasSeasonPass ? 'Season Pass Active' : 'Action Arena Plus'}
                 </Text>
                 <Text className="text-sm font-medium text-white/60">
-                  Season Pass unlocks exclusive cosmetics, advanced analytics, early Bet Board access, and future ad-free hooks.
+                  Season Pass unlocks exclusive cosmetics, advanced analytics, early Pick Board access, and future ad-free hooks.
                 </Text>
                 <Button
                   onPress={() => router.push('/season-pass')}
@@ -296,7 +309,7 @@ export default function SettingsScreen() {
                 <View className="rounded-2xl border border-white/[0.07] bg-white/[0.04] p-3">
                   <Text className="text-sm font-bold text-white">About Action Arena</Text>
                   <Text className="mt-1 text-xs font-medium leading-5 text-white/50">
-                    Action Arena is a free-to-play fantasy sports prediction game. No real money changes hands inside the app.
+                    {ABOUT_NO_REAL_MONEY_TEXT}
                   </Text>
                   <Button
                     onPress={() =>
@@ -315,19 +328,24 @@ export default function SettingsScreen() {
                 <View className="rounded-2xl border border-white/[0.07] bg-white/[0.04] p-3">
                   <Text className="text-sm font-bold text-white">Terms of Service</Text>
                   <Text className="mt-1 text-xs font-medium leading-5 text-white/50">
-                    Action Arena is for free-to-play fantasy sports predictions only. No real
-                    money changes hands inside the app. Coins, points, standings, rewards, and
-                    league results are virtual, have no monetary value, and cannot be redeemed
-                    for cash or cash-equivalent prizes. League prizes, if any, are arranged by
-                    commissioners outside of Action Arena.
+                    {TERMS_OF_SERVICE_TEXT}
                   </Text>
+                  <Button
+                    onPress={() => showAboutModal('Terms of Service', TERMS_OF_SERVICE_TEXT)}
+                    title="View Terms"
+                    variant="secondary"
+                  />
                 </View>
                 <View className="rounded-2xl border border-white/[0.07] bg-white/[0.04] p-3">
                   <Text className="text-sm font-bold text-white">Privacy Policy</Text>
                   <Text className="mt-1 text-xs font-medium leading-5 text-white/50">
-                    We use account, league, pick, notification, and cosmetic data to operate the app
-                    experience during development.
+                    {PRIVACY_POLICY_TEXT}
                   </Text>
+                  <Button
+                    onPress={() => showAboutModal('Privacy Policy', PRIVACY_POLICY_TEXT)}
+                    title="View Privacy Policy"
+                    variant="secondary"
+                  />
                 </View>
               </View>
             </Card>

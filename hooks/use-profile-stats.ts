@@ -170,7 +170,7 @@ export const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
   {
     description: 'Post positive weekly profit five weeks in a row.',
     key: 'budget_master',
-    title: 'Budget Master',
+    title: 'Strategy Master',
   },
   {
     description: 'Hit a parlay with four or more legs.',

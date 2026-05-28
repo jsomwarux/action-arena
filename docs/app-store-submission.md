@@ -16,16 +16,16 @@ Commissioners can run private or public leagues, track weekly matchups, view pic
 Action Arena is built for the fantasy sports category. League prizes, if any, are arranged outside the app by league commissioners.
 
 ## Categories
-Primary: Sports
+Primary Category: Sports
 
-Secondary: Games
+Secondary Category: Games
 
-Do not select any gambling category or gambling subcategory.
+Use Sports as the primary category and keep the metadata framed around fantasy sports prediction leagues.
 
 ## Keywords
 fantasy sports, fantasy football, sports prediction, fantasy league, NFL fantasy, weekly matchups, sports picks
 
-Avoid: betting, bet, wager, sportsbook, odds
+Compliance note: keywords intentionally use fantasy sports and prediction language only.
 
-## Age Rating
-Submit as 12+ minimum. Apple may adjust if they decide the prediction mechanics require it; do not preemptively submit as 17+.
+## Age Rating Recommendation
+12+. Apple may adjust if they decide the prediction mechanics require it; do not preemptively submit as 17+.

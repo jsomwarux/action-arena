@@ -575,12 +575,13 @@ function ProfitTug({
 
   const diff = homeProfit - awayProfit;
   const leader = diff > 0 ? homeName : diff < 0 ? awayName : null;
+  const compactDiff = formatProfit(diff).replace(' coins', '');
 
   return (
     <Card>
       <View className="gap-4">
-        <View className="flex-row items-center justify-between">
-          <View>
+        <View className="flex-row items-center justify-between gap-3">
+          <View className="min-w-0 flex-1">
             <Text
               className="text-[10px] font-black uppercase text-white/45"
               style={{ letterSpacing: 1.8 }}>
@@ -595,7 +596,7 @@ function ProfitTug({
           </View>
           <View
             className={cn(
-              'rounded-full border px-3 py-1',
+              'shrink-0 rounded-full border px-3 py-1',
               diff > 0
                 ? 'border-electric-green/40 bg-electric-green/15'
                 : diff < 0
@@ -607,8 +608,9 @@ function ProfitTug({
                 'text-[10px] font-black uppercase',
                 diff > 0 ? 'text-electric-green' : diff < 0 ? 'text-coral-red' : 'text-white/55',
               )}
-              style={{ letterSpacing: 1.5 }}>
-              {formatProfit(diff)}
+              numberOfLines={1}
+              style={{ letterSpacing: 1.2 }}>
+              {compactDiff}
             </Text>
           </View>
         </View>
@@ -620,15 +622,21 @@ function ProfitTug({
           </View>
         </View>
 
-        <View className="flex-row items-center justify-between">
-          <View className="flex-row items-center gap-2">
+        <View className="flex-row items-center justify-between gap-3">
+          <View className="min-w-0 flex-1 flex-row items-center gap-2">
             <View className="h-2 w-2 rounded-full bg-electric-green" />
-            <Text className="text-[11px] font-black uppercase text-white/55" style={{ letterSpacing: 1.2 }}>
+            <Text
+              className="min-w-0 flex-1 text-[11px] font-black uppercase text-white/55"
+              numberOfLines={1}
+              style={{ letterSpacing: 1.2 }}>
               {homeName} {formatProfit(homeProfit)}
             </Text>
           </View>
-          <View className="flex-row items-center gap-2">
-            <Text className="text-[11px] font-black uppercase text-white/55" style={{ letterSpacing: 1.2 }}>
+          <View className="min-w-0 flex-1 flex-row items-center justify-end gap-2">
+            <Text
+              className="min-w-0 flex-1 text-right text-[11px] font-black uppercase text-white/55"
+              numberOfLines={1}
+              style={{ letterSpacing: 1.2 }}>
               {awayName} {formatProfit(awayProfit)}
             </Text>
             <View className="h-2 w-2 rounded-full bg-coral-red" />
@@ -1333,6 +1341,7 @@ export default function MatchupDetailScreen() {
       : 'action-arena.win-celebration.pending',
   );
   const [celebrationVisible, setCelebrationVisible] = useState(false);
+  const [celebrationReplayKey, setCelebrationReplayKey] = useState(0);
   const [editingBet, setEditingBet] = useState<PlacedBet | null>(null);
   const [detailBet, setDetailBet] = useState<{
     bet: BetWithLegs;
@@ -1536,11 +1545,23 @@ export default function MatchupDetailScreen() {
     }
   };
 
+  const replayWinCelebration = () => {
+    if (!userWonMatchupForEffect) {
+      return;
+    }
+
+    haptics.success();
+    setCelebrationVisible(false);
+    setCelebrationReplayKey((current) => current + 1);
+    void celebrationFlag.reset();
+    requestAnimationFrame(() => setCelebrationVisible(true));
+  };
+
   return (
     <ScreenWrapper className="px-0 pb-0 pt-0">
       <WinCelebration
         cosmetics={userId ? cosmeticsByUserId[userId] : undefined}
-        fireKey={resolvedMatchupId}
+        fireKey={`${resolvedMatchupId}:${celebrationReplayKey}`}
         onComplete={() => {
           setCelebrationVisible(false);
           void celebrationFlag.markComplete();
@@ -1585,21 +1606,29 @@ export default function MatchupDetailScreen() {
         <View className="flex-row items-center justify-end">
           <View className="flex-row items-center gap-2">
             {userWonMatchup ? (
-              <View
-                className="flex-row items-center gap-1.5 rounded-full border border-gold/50 bg-gold/15 px-3 py-2"
-                style={{
-                  shadowColor: THEME_COLORS.gold,
-                  shadowOffset: { width: 0, height: 0 },
-                  shadowOpacity: 0.5,
-                  shadowRadius: 10,
-                }}>
-                <Ionicons color={THEME_COLORS.gold} name="trophy" size={12} />
-                <Text
-                  className="text-[10px] font-black uppercase text-gold"
-                  style={{ letterSpacing: 1.5 }}>
-                  You Won
-                </Text>
-              </View>
+              <Pressable
+                accessibilityHint="Replays the win celebration"
+                accessibilityLabel="Replay win celebration"
+                accessibilityRole="button"
+                hitSlop={8}
+                onPress={replayWinCelebration}
+                style={({ pressed }) => ({ opacity: pressed ? 0.78 : 1 })}>
+                <View
+                  className="flex-row items-center gap-1.5 rounded-full border border-gold/50 bg-gold/15 px-3 py-2"
+                  style={{
+                    shadowColor: THEME_COLORS.gold,
+                    shadowOffset: { width: 0, height: 0 },
+                    shadowOpacity: 0.5,
+                    shadowRadius: 10,
+                  }}>
+                  <Ionicons color={THEME_COLORS.gold} name="trophy" size={12} />
+                  <Text
+                    className="text-[10px] font-black uppercase text-gold"
+                    style={{ letterSpacing: 1.5 }}>
+                    You Won
+                  </Text>
+                </View>
+              </Pressable>
             ) : null}
             <WeekNavigator
               maxWeek={REGULAR_SEASON_WEEKS}

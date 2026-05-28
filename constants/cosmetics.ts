@@ -28,9 +28,9 @@ export const DEFAULT_ARENA_COINS = 500;
 export const CURRENT_SEASON_YEAR = new Date().getFullYear();
 
 export const COIN_PACKS: CoinPack[] = [
-  { coins: 500, id: 'coins_500', label: 'Starter Stack', priceLabel: '4.99 USD' },
-  { coins: 1200, id: 'coins_1200', label: 'Playmaker Pack', priceLabel: '9.99 USD' },
-  { coins: 2800, id: 'coins_2800', label: 'Commissioner Vault', priceLabel: '19.99 USD' },
+  { coins: 500, id: 'coins_500', label: 'Starter Stack', priceLabel: 'Soon' },
+  { coins: 1200, id: 'coins_1200', label: 'Playmaker Pack', priceLabel: 'Soon' },
+  { coins: 2800, id: 'coins_2800', label: 'Commissioner Vault', priceLabel: 'Soon' },
 ];
 
 export const COSMETIC_CATEGORY_LABELS: Record<CosmeticCategory, string> = {

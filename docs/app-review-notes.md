@@ -18,18 +18,19 @@ Email: appreview@actionarena.app
 
 Password: ActionArenaReview2026!
 
-Seeded demo data: App Review Demo League (`da74152d-2864-4a17-bbca-0a1acc492d55`) includes two demo members, three settled weeks of pick history, completed matchup results, standings, and an open Week 4 so reviewers can see the Pick Board and Lineup flow.
+Seeded demo data: the demo account is permanent and belongs to multiple seeded leagues. Use Lineup Builder League for the current-week walkthrough; it includes 10 members, an active Week 3 slate, and open Pick Board data for building a lineup. Use App Store Screenshot League for settled matchup detail data, and QA Manual Regression - Championship Snapshot for settled historical pick results across Weeks 1-5 when reviewing Pick History, standings, awards, and profile stats.
 
-## Review Path
+## Reviewer Walkthrough
 1. Log in with the demo account.
 2. Confirm the one-time "How Action Arena Works" disclosure if it appears.
-3. Open Leagues and enter the demo league.
-4. Open Pick Board.
+3. Open Leagues and enter Lineup Builder League.
+4. Open Pick Board from the league screen or the main tab.
 5. Add straight, parlay, and teaser picks to the Lineup.
 6. Review the Lineup and submit picks.
 7. Open Pick History from Profile or the league screen.
-8. Open a matchup detail screen to see submitted picks and virtual coin scoring.
-9. Open Settings > About to view the permanent no-real-money disclosure and Terms summary.
+8. Open App Store Screenshot League, then open a matchup detail screen to see submitted picks and virtual coin scoring.
+9. Open QA Manual Regression - Championship Snapshot if you want additional settled historical weeks.
+10. Open Settings > About to view the permanent no-real-money disclosure and Terms summary.
 
 ## Reviewer Notes
 Action Arena uses sports data and virtual values to score fantasy prediction leagues. No real money is wagered or won in Action Arena. The app is not affiliated with any sportsbook or gambling operator and contains no external sportsbook destination links.

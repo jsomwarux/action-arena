@@ -195,7 +195,7 @@ begin
 
   select jsonb_build_object(
     'award_key', 'biggest_single_bet',
-    'award_label', 'Biggest Single Bet',
+    'award_label', 'Biggest Single Pick',
     'user_id', b.user_id,
     'metric', b.profit,
     'value_label', case

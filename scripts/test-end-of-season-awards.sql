@@ -284,7 +284,7 @@ left join lateral (
 ) award on true;
 
 select pg_temp.record_result(
-  '22.1 Biggest Single Bet includes profit and bet details',
+  '22.1 Biggest Single Pick includes profit and pick details',
   award.item ->> 'user_id' = pg_temp.test_user(3)::text
     and (award.item ->> 'metric')::numeric = 280
     and award.item ->> 'value_label' = '+280 coins'

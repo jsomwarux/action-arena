@@ -35,7 +35,13 @@ export function useLocalFlag(key: string) {
     await AsyncStorage.setItem(key, 'true');
   };
 
+  const reset = async () => {
+    setValue(false);
+    await AsyncStorage.removeItem(key);
+  };
+
   return {
+    reset,
     isLoading,
     markComplete,
     value,

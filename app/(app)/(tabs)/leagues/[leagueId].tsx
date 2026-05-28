@@ -1144,6 +1144,14 @@ function getSeasonAwardValueLabel(award: SeasonAward) {
   return award.value_label;
 }
 
+function getSeasonAwardDisplayLabel(award: SeasonAward) {
+  if (award.award_key === 'biggest_single_bet') {
+    return 'Biggest Single Pick';
+  }
+
+  return award.award_label;
+}
+
 function ChampionBanner({
   championName,
   championRecord,
@@ -1319,7 +1327,7 @@ function MvpAwardCard({
           <Text
             className="text-[11px] font-black uppercase text-gold"
             style={{ letterSpacing: 1.8 }}>
-            {award.award_label}
+            {getSeasonAwardDisplayLabel(award)}
           </Text>
           <Text
             className="text-xl font-black uppercase text-white"
@@ -1359,7 +1367,7 @@ function SeasonAwardCard({
         className={cn('mt-2 text-[10px] font-black uppercase', palette.labelClass)}
         style={{ letterSpacing: 1.5 }}
         numberOfLines={2}>
-        {award.award_label}
+        {getSeasonAwardDisplayLabel(award)}
       </Text>
       <Text
         className="mt-1 text-sm font-black text-white"
@@ -1389,7 +1397,7 @@ function BiggestSingleBetAwardCard({
     ? bet.bet_type === 'straight'
       ? titleCaseBetType(bet.bet_type)
       : `${bet.legs.length}-Leg ${titleCaseBetType(bet.bet_type)}`
-    : 'Bet details unavailable';
+    : 'Pick details unavailable';
 
   return (
     <View className="rounded-2xl border border-white/12 bg-white/[0.04] p-4">
@@ -1401,7 +1409,7 @@ function BiggestSingleBetAwardCard({
           <Text
             className="text-[10px] font-black uppercase text-amber-accent"
             style={{ letterSpacing: 1.6 }}>
-            {award.award_label}
+            {getSeasonAwardDisplayLabel(award)}
           </Text>
           <Text
             className="text-base font-black text-white"
@@ -1429,7 +1437,7 @@ function BiggestSingleBetAwardCard({
             </Text>
           ) : null}
           <Text className="text-xs font-semibold text-white/55">
-            {formatCurrency(bet.amount)} risked · Reward {formatCurrency(bet.potential_payout)}
+            {formatCurrency(bet.amount)} played · Reward {formatCurrency(bet.potential_payout)}
           </Text>
           {bet.legs.length > 0 ? (
             <View className="gap-1.5">

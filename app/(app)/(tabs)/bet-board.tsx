@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -99,6 +99,7 @@ import type {
   BetMarket,
   BetType,
   EquippedCosmeticsByCategory,
+  Json,
   LeagueRow,
   LiveGameStateRow,
   TeaserLegCount,
@@ -135,6 +136,8 @@ type EditingPlacedLeg = SlipLeg & {
   betLegId: string;
   locked: boolean;
 };
+
+type AppStoreCaptureMode = 'hook_prefill' | 'lineup_prefill';
 
 type ValidationState = {
   errors: string[];
@@ -883,6 +886,163 @@ function getValidationState(slipBets: SlipBet[]): ValidationState {
     errors: [...new Set(errors)],
     warnings: [...new Set(warnings)],
   };
+}
+
+function isJsonRecord(value: Json | null | undefined): value is { [key: string]: Json | undefined } {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function getAppStoreCaptureMode(league: LeagueRow | undefined): AppStoreCaptureMode | null {
+  if (!isJsonRecord(league?.settings)) {
+    return null;
+  }
+
+  const mode = league.settings.app_store_capture_mode;
+  return mode === 'hook_prefill' || mode === 'lineup_prefill' ? mode : null;
+}
+
+function findCaptureGame(oddsGames: OddsGame[], gameId: string) {
+  return oddsGames.find((game) => game.id === gameId) ?? null;
+}
+
+function findCaptureSelection(game: OddsGame | null, market: BetMarket, selectionName: string) {
+  return game?.markets[market].find((selection) => selection.selection === selectionName) ?? null;
+}
+
+function makeCaptureStraight(
+  oddsGames: OddsGame[],
+  gameId: string,
+  market: BetMarket,
+  selectionName: string,
+  amount: number,
+): SlipBet | null {
+  const game = findCaptureGame(oddsGames, gameId);
+  const selection = findCaptureSelection(game, market, selectionName);
+
+  if (!game || !selection) {
+    return null;
+  }
+
+  return makeStraightBet(game, selection, amount);
+}
+
+function makeCaptureParlay(
+  oddsGames: OddsGame[],
+  amount: number,
+  legs: Array<{ gameId: string; market: BetMarket; selectionName: string }>,
+): SlipBet | null {
+  const slipLegs = legs
+    .map(({ gameId, market, selectionName }) => {
+      const game = findCaptureGame(oddsGames, gameId);
+      const selection = findCaptureSelection(game, market, selectionName);
+      return game && selection ? makeSlipLeg(game, selection) : null;
+    })
+    .filter((leg): leg is SlipLeg => leg !== null);
+
+  if (slipLegs.length !== legs.length || slipLegs.length < 2) {
+    return null;
+  }
+
+  const { cappedReward, rawReward } = calculateParlayReward(amount, slipLegs);
+  return {
+    amount,
+    bet_type: 'parlay',
+    id: `capture-parlay:${slipLegs.map((leg) => leg.id).join('|')}`,
+    is_lock: false,
+    label: `${slipLegs.length}-leg Parlay`,
+    legs: slipLegs,
+    odds: getParlayOdds(slipLegs),
+    potential_payout: cappedReward,
+    rawPotentialReward: rawReward,
+    teaser_points: null,
+  };
+}
+
+function makeCaptureTeaser(
+  oddsGames: OddsGame[],
+  amount: number,
+  teaserPoints: TeaserPoints,
+  legs: Array<{ gameId: string; market: Exclude<BetMarket, 'moneyline'>; selectionName: string }>,
+): SlipBet | null {
+  const slipLegs = legs
+    .map(({ gameId, market, selectionName }) => {
+      const game = findCaptureGame(oddsGames, gameId);
+      const selection = findCaptureSelection(game, market, selectionName);
+      return game && selection ? makeSlipLeg(game, selection, getAdjustedTeaserLine(selection, teaserPoints)) : null;
+    })
+    .filter((leg): leg is SlipLeg => leg !== null);
+  const odds = getTeaserOdds(slipLegs.length, teaserPoints);
+
+  if (slipLegs.length !== legs.length || odds === null) {
+    return null;
+  }
+
+  return {
+    amount,
+    bet_type: 'teaser',
+    id: `capture-teaser:${teaserPoints}:${slipLegs.map((leg) => leg.id).join('|')}`,
+    is_lock: false,
+    label: `${slipLegs.length}-leg ${teaserPoints}pt Teaser`,
+    legs: slipLegs,
+    odds,
+    potential_payout: calculatePotentialPayout(amount, odds),
+    teaser_points: teaserPoints,
+  };
+}
+
+function makeAppStoreCaptureSlip(oddsGames: OddsGame[], mode: AppStoreCaptureMode): SlipBet[] {
+  if (mode === 'hook_prefill') {
+    const hookBet = makeCaptureStraight(
+      oddsGames,
+      'mock_nfl_w01_bal_pit',
+      'moneyline',
+      'Baltimore Ravens',
+      20,
+    );
+    return hookBet ? [hookBet] : [];
+  }
+
+  const straightPackers = makeCaptureStraight(
+    oddsGames,
+    'mock_nfl_w01_min_gb',
+    'moneyline',
+    'Green Bay Packers',
+    20,
+  );
+  const featuredParlay = makeCaptureParlay(oddsGames, 20, [
+    { gameId: 'mock_nfl_w01_buf_nyj', market: 'spread', selectionName: 'Buffalo Bills' },
+    { gameId: 'mock_nfl_w01_cin_cle', market: 'moneyline', selectionName: 'Cincinnati Bengals' },
+  ]);
+  const teaser = makeCaptureTeaser(oddsGames, 20, 6, [
+    { gameId: 'mock_nfl_w01_tb_no', market: 'spread', selectionName: 'Tampa Bay Buccaneers' },
+    { gameId: 'mock_nfl_w01_was_nyg', market: 'over_under', selectionName: 'Over' },
+  ]);
+  const straightCowboys = makeCaptureStraight(
+    oddsGames,
+    'mock_nfl_w01_dal_phi',
+    'moneyline',
+    'Dallas Cowboys',
+    20,
+  );
+  const straightRavens = makeCaptureStraight(
+    oddsGames,
+    'mock_nfl_w01_bal_pit',
+    'moneyline',
+    'Baltimore Ravens',
+    20,
+  );
+
+  if (!straightPackers || !featuredParlay || !teaser || !straightCowboys || !straightRavens) {
+    return [];
+  }
+
+  return [
+    straightPackers,
+    { ...featuredParlay, is_lock: true },
+    teaser,
+    straightCowboys,
+    straightRavens,
+  ];
 }
 
 // ============================================================
@@ -3237,42 +3397,103 @@ function getMissingReplacementLinesMessage(mode: BetMode, selectedLeg: EditingPl
   return 'Replacement lines for this slate are not published yet. Try again from this screen.';
 }
 
-function SettledRewardSummary({ bet }: { bet: PlacedBet }) {
-  if (!isSettledPick(bet.result)) {
-    return (
-      <Text
-        className={cn(
-          'text-sm font-black',
-          bet.is_lock ? 'text-gold' : 'text-electric-green',
-        )}>
-        Reward {formatCurrency(getDisplayedPlacedPayout(bet))}
-        {isCappedPlacedParlay(bet) ? ' (capped)' : ''}
-      </Text>
-    );
-  }
+type PickSummaryMetricTone = 'muted' | 'green' | 'red' | 'gold';
 
-  const realizedReward = getSettledReward(bet);
-  const profit = bet.profit ?? 0;
-
-  if (bet.result === 'push') {
-    return (
-      <Text className="text-right text-sm font-black text-white/65">
-        Outcome {formatCurrency(realizedReward)} · Push
-      </Text>
-    );
-  }
-
-  const outcomeWord = bet.result === 'win' ? 'profit' : 'loss';
-  const outcomeClass = bet.result === 'win' ? 'text-electric-green' : 'text-coral-red';
+function PickSummaryMetric({
+  label,
+  tone = 'muted',
+  value,
+}: {
+  label: string;
+  tone?: PickSummaryMetricTone;
+  value: string;
+}) {
+  const valueClass =
+    tone === 'green'
+      ? 'text-electric-green'
+      : tone === 'red'
+        ? 'text-coral-red'
+        : tone === 'gold'
+          ? 'text-gold'
+          : 'text-white/75';
 
   return (
-    <View className="flex-row flex-wrap justify-end">
-      <Text className="text-sm font-black text-white/65">
-        Outcome {formatCurrency(realizedReward)} ·{' '}
+    <View
+      className="rounded-xl border border-white/[0.08] bg-white/[0.035] px-3 py-2"
+      style={{ flexBasis: '47%', flexGrow: 1, flexShrink: 1, minWidth: 116 }}>
+      <Text className="text-[9px] font-black uppercase text-white/40" numberOfLines={1}>
+        {label}
       </Text>
-      <Text className={cn('text-sm font-black', outcomeClass)}>
-        {formatProfit(profit)} {outcomeWord}
+      <Text
+        adjustsFontSizeToFit
+        className={cn('mt-0.5 text-sm font-black', valueClass)}
+        minimumFontScale={0.82}
+        numberOfLines={2}>
+        {value}
       </Text>
+    </View>
+  );
+}
+
+function PickFinancialSummary({ bet }: { bet: PlacedBet }) {
+  const metrics: Array<{
+    label: string;
+    tone?: PickSummaryMetricTone;
+    value: string;
+  }> = [
+    { label: 'Odds', value: formatAmericanOdds(bet.odds) },
+    { label: 'Played', value: formatCurrency(bet.amount) },
+  ];
+
+  if (!isSettledPick(bet.result)) {
+    metrics.push({
+      label: 'Reward',
+      tone: bet.is_lock ? 'gold' : 'green',
+      value: `${formatCurrency(getDisplayedPlacedPayout(bet))}${
+        isCappedPlacedParlay(bet) ? ' capped' : ''
+      }`,
+    });
+
+    if (bet.is_lock) {
+      metrics.push({
+        label: 'Base',
+        tone: 'gold',
+        value: `${formatCurrency(bet.potential_payout)} x ${LOCK_OF_THE_WEEK_MULTIPLIER}`,
+      });
+    }
+  } else {
+    const realizedReward = getSettledReward(bet);
+    const profit = bet.profit ?? 0;
+
+    metrics.push({
+      label: 'Outcome',
+      value: formatCurrency(realizedReward),
+    });
+
+    if (bet.result === 'push') {
+      metrics.push({
+        label: 'Result',
+        value: 'Push',
+      });
+    } else {
+      metrics.push({
+        label: bet.result === 'win' ? 'Profit' : 'Loss',
+        tone: bet.result === 'win' ? 'green' : 'red',
+        value: formatProfit(profit),
+      });
+    }
+  }
+
+  return (
+    <View className="flex-row flex-wrap gap-2 border-t border-white/[0.08] pt-3">
+      {metrics.map((metric) => (
+        <PickSummaryMetric
+          key={metric.label}
+          label={metric.label}
+          tone={metric.tone}
+          value={metric.value}
+        />
+      ))}
     </View>
   );
 }
@@ -3961,23 +4182,7 @@ function PlacedBetCard({
             </View>
           );
         })}
-        <View className="flex-row items-center justify-between border-t border-white/[0.08] pt-3">
-          <Text
-            className="text-[11px] font-black uppercase text-white/55"
-            style={{ letterSpacing: 1.5 }}>
-            {formatAmericanOdds(bet.odds)} · {formatCurrency(bet.amount)}
-          </Text>
-          <View className="items-end">
-            <SettledRewardSummary bet={bet} />
-            {isLock && !isSettled ? (
-              <Text
-                className="mt-0.5 text-[10px] font-semibold text-gold/85"
-                style={{ letterSpacing: 0.4 }}>
-                base {formatCurrency(bet.potential_payout)} × 1.5
-              </Text>
-            ) : null}
-          </View>
-        </View>
+        <PickFinancialSummary bet={bet} />
         <Button
           loading={shareLoading}
           onPress={() => {
@@ -4204,10 +4409,12 @@ export default function BetBoardScreen() {
   const [tourVisible, setTourVisible] = useState(false);
   const [pickConflictMessage, setPickConflictMessage] = useState<string | null>(null);
   const [selectionConflict, setSelectionConflict] = useState<SelectionConflict | null>(null);
+  const appStorePrefillKeyRef = useRef<string | null>(null);
 
   const leagueSummaries = leaguesQuery.data ?? [];
   const leagues = leagueSummaries.map((summary) => summary.league);
   const selectedLeague = leagues.find((league) => league.id === selectedLeagueId) ?? leagues[0];
+  const appStoreCaptureMode = getAppStoreCaptureMode(selectedLeague);
   const [selectedWeek, setSelectedWeek] = useState<number | undefined>();
   const viewedWeek = selectedWeek ?? selectedLeague?.current_week;
   const isPastWeek =
@@ -4293,6 +4500,7 @@ export default function BetBoardScreen() {
   }, [selectedLeague?.current_week, selectedLeague?.id]);
 
   useEffect(() => {
+    appStorePrefillKeyRef.current = null;
     setSlipBets([]);
     setEditingSlipBet(null);
     setPendingStraightSelection(null);
@@ -4305,6 +4513,48 @@ export default function BetBoardScreen() {
     setPickConflictMessage(null);
     setSelectionConflict(null);
   }, [selectedLeagueId, viewedWeek]);
+
+  useEffect(() => {
+    if (
+      !appStoreCaptureMode ||
+      !selectedLeague ||
+      viewedWeek === undefined ||
+      !canBuildLineup ||
+      !oddsQuery.data?.length
+    ) {
+      return;
+    }
+
+    const prefillKey = `${selectedLeague.id}:${viewedWeek}:${appStoreCaptureMode}`;
+    if (appStorePrefillKeyRef.current === prefillKey) {
+      return;
+    }
+
+    const captureSlip = makeAppStoreCaptureSlip(oddsQuery.data, appStoreCaptureMode);
+    const expectedCount = appStoreCaptureMode === 'lineup_prefill' ? MINIMUM_BETS_PER_WEEK : 1;
+    if (captureSlip.length !== expectedCount) {
+      return;
+    }
+
+    appStorePrefillKeyRef.current = prefillKey;
+    setSlipBets(captureSlip);
+    setMode('straight');
+    setPendingStraightSelection(null);
+    setEditingSlipBet(null);
+    setParlayLegs([]);
+    setTeaserLegs([]);
+    setParlayAmount('');
+    setTeaserAmount('');
+    setPickConflictMessage(null);
+    setSelectionConflict(null);
+    setSlipSnap(appStoreCaptureMode === 'lineup_prefill' ? 1 : 0);
+  }, [
+    appStoreCaptureMode,
+    canBuildLineup,
+    oddsQuery.data,
+    selectedLeague,
+    viewedWeek,
+  ]);
 
   useEffect(() => {
     if (!tourFlag.isLoading && !tourFlag.value && leagues.length > 0) {

@@ -179,7 +179,7 @@ const achievementBets = [
   bet({ profit: 12, result: 'win', week_number: 9 }),
 ];
 const earned = achievementKeys(buildAchievements(achievementBets, []));
-const budgetMaster = buildAchievements(achievementBets, []).find(
+const strategyMaster = buildAchievements(achievementBets, []).find(
   (achievement) => achievement.key === 'budget_master',
 );
 
@@ -188,8 +188,8 @@ assert.ok(earned.has('underdog_hunter'), '+300 or longer win should unlock Under
 assert.ok(earned.has('perfect_week'), 'five winning settled picks in one week should unlock Perfect Week');
 assert.ok(earned.has('parlay_king'), 'four-leg parlay win should unlock Parlay King');
 assert.ok(earned.has('teaser_genius'), 'three teaser wins in one week should unlock Teaser Genius');
-assert.ok(earned.has('budget_master'), 'five consecutive positive weeks should unlock Budget Master');
-assert.equal(budgetMaster?.title, 'Budget Master');
+assert.ok(earned.has('budget_master'), 'five consecutive positive weeks should unlock Strategy Master');
+assert.equal(strategyMaster?.title, 'Strategy Master');
 
 const skippedWeekBets = [1, 2, 4, 5, 6].map((weekNumber) =>
   bet({ profit: 10, result: 'win', week_number: weekNumber }),
@@ -197,7 +197,7 @@ const skippedWeekBets = [1, 2, 4, 5, 6].map((weekNumber) =>
 assert.equal(
   achievementKeys(buildAchievements(skippedWeekBets, [])).has('budget_master'),
   false,
-  'missing calendar weeks should break Budget Master progress',
+  'missing calendar weeks should break Strategy Master progress',
 );
 
 const breakdownBets = [

@@ -205,9 +205,9 @@ begin
             'game_start_time', (now() + interval '7 days')::text
           ),
           jsonb_build_object(
-            'game_id', 'DAL-PHI',
+            'game_id', 'ARI-SF',
             'market', 'spread',
-            'selection', 'Dallas Cowboys +2.5',
+            'selection', 'Arizona Cardinals +2.5',
             'original_line', 2.5,
             'adjusted_line', 9,
             'leg_odds', -110,
