@@ -6,8 +6,24 @@ export type SettledBetOutcome = {
   result: BetResult;
 };
 
-export function isSettledResult(result: BetResult) {
+export type BetSettlementState = 'unsettled' | 'partially_settled' | 'settled';
+
+export function isSettledResult(result: BetResult): result is Exclude<BetResult, 'pending'> {
   return result !== 'pending';
+}
+
+export function getBetSettlementState<T extends { result: BetResult }>(
+  bets: T[],
+): BetSettlementState {
+  if (bets.length === 0 || bets.every((bet) => !isSettledResult(bet.result))) {
+    return 'unsettled';
+  }
+
+  if (bets.every((bet) => isSettledResult(bet.result))) {
+    return 'settled';
+  }
+
+  return 'partially_settled';
 }
 
 export function getRealizedReward(outcome: SettledBetOutcome) {

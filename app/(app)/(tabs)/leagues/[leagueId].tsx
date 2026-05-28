@@ -92,6 +92,7 @@ import type {
 type DetailTab = 'standings' | 'schedule' | 'members' | 'chat';
 type PlayoffPlaceholderWeek = 15 | 16 | 17;
 type PlayoffStatus = 'clinched' | 'eliminated' | null;
+type WeekViewStatus = 'current' | 'future' | 'past';
 type StandingsSnapshot = {
   standings: StandingRow[];
   weekNumber: number | null;
@@ -380,10 +381,10 @@ function rankAccent(rank: number): { bg: string; ring: string; text: string } {
     return { bg: 'bg-gold/15', ring: 'border-gold/60', text: 'text-gold' };
   }
   if (rank === 2) {
-    return { bg: 'bg-white/10', ring: 'border-white/40', text: 'text-white' };
+    return { bg: 'bg-silver/20', ring: 'border-silver/60', text: 'text-silver-text' };
   }
   if (rank === 3) {
-    return { bg: 'bg-amber-accent/15', ring: 'border-amber-accent/50', text: 'text-amber-accent' };
+    return { bg: 'bg-bronze/20', ring: 'border-bronze/60', text: 'text-bronze-text' };
   }
   return { bg: 'bg-white/[0.04]', ring: 'border-white/10', text: 'text-white/70' };
 }
@@ -547,7 +548,7 @@ function FightCard({
   detail: LeagueDetail;
   matchup: WeeklyMatchupRow;
   weekNumber: number;
-  weekStatus: 'current' | 'future' | 'past';
+  weekStatus: WeekViewStatus;
   userId: string;
 }) {
   const homeName = getDisplayName(detail, matchup.home_user_id);
@@ -593,15 +594,15 @@ function FightCard({
               name={homeName}
               side="home"
             />
-            <View className="items-center gap-1">
+            <View className="w-full items-center gap-1">
               <Text
                 className="text-[10px] font-black uppercase text-white/45"
                 style={{ letterSpacing: 1.5 }}>
                 Home
               </Text>
               <Text
-                className="text-center text-base font-black text-white"
-                numberOfLines={1}
+                className="w-full text-center text-base font-black text-white"
+                numberOfLines={2}
                 style={{ letterSpacing: -0.3 }}>
                 {homeName}
               </Text>
@@ -616,7 +617,7 @@ function FightCard({
             </View>
           </View>
 
-          <View className="items-center px-3">
+          <View className="shrink-0 items-center px-2">
             <View className="h-12 w-12 items-center justify-center rounded-full border border-gold/50 bg-gold/15">
               <Text className="text-base font-black text-gold" style={{ letterSpacing: 0.5 }}>
                 VS
@@ -631,15 +632,15 @@ function FightCard({
               name={awayName}
               side="away"
             />
-            <View className="items-center gap-1">
+            <View className="w-full items-center gap-1">
               <Text
                 className="text-[10px] font-black uppercase text-white/45"
                 style={{ letterSpacing: 1.5 }}>
                 Away
               </Text>
               <Text
-                className="text-center text-base font-black text-white"
-                numberOfLines={1}
+                className="w-full text-center text-base font-black text-white"
+                numberOfLines={2}
                 style={{ letterSpacing: -0.3 }}>
                 {awayName}
               </Text>
@@ -912,17 +913,33 @@ function TeamNameEditorModal({
   );
 }
 
-function AwardCard({ award }: { award: WeeklyAward }) {
+function AwardCard({
+  award,
+  variant = 'top',
+}: {
+  award: WeeklyAward;
+  variant?: 'top' | 'cold';
+}) {
   const tiedUsers = award.displayNames.length > 1;
   const displayName = tiedUsers
     ? award.displayNames.length <= 2
       ? award.displayNames.join(' + ')
       : `${award.displayNames.length} tied`
     : award.displayName;
+  const isCold = variant === 'cold';
 
   return (
-    <View className="flex-1 rounded-2xl border border-gold/25 bg-gold/[0.06] p-3">
-      <Text className="text-[10px] font-black uppercase text-gold" style={{ letterSpacing: 1.4 }}>
+    <View
+      className={cn(
+        'flex-1 rounded-2xl border p-3',
+        isCold ? 'border-coral-red/35 bg-coral-red/[0.07]' : 'border-gold/25 bg-gold/[0.06]',
+      )}>
+      <Text
+        className={cn(
+          'text-[10px] font-black uppercase',
+          isCold ? 'text-coral-red' : 'text-gold',
+        )}
+        style={{ letterSpacing: 1.4 }}>
         {award.label}
       </Text>
       <Text className="mt-2 text-sm font-black text-white" numberOfLines={1}>
@@ -965,7 +982,7 @@ function WeeklyAwardsCard({
     return null;
   }
 
-  const noActivity = !awards.hasBets && awards.liveStandings.length === 0 && !awards.lock;
+  const noActivity = !awards.hasBets && !awards.isFullySettled && !awards.lock;
   const inProgress = !awards.isFullySettled;
   const hasFinalAwards = Boolean(awards.sharpest || awards.coldStreak);
 
@@ -979,7 +996,7 @@ function WeeklyAwardsCard({
               inProgress ? 'text-electric-green' : 'text-gold',
             )}
             style={{ letterSpacing: 2 }}>
-            {inProgress ? `Week ${weekNumber} Standings` : 'Weekly Awards'}
+            {inProgress ? `Week ${weekNumber} Pick Tracker` : `Week ${weekNumber} Awards`}
           </Text>
           <Badge label={inProgress ? 'In Progress' : 'Final'} tone={inProgress ? 'green' : 'gold'} />
         </View>
@@ -997,8 +1014,8 @@ function WeeklyAwardsCard({
           </View>
         ) : hasFinalAwards ? (
           <View className="flex-row gap-2">
-            {awards.sharpest ? <AwardCard award={awards.sharpest} /> : null}
-            {awards.coldStreak ? <AwardCard award={awards.coldStreak} /> : null}
+            {awards.sharpest ? <AwardCard award={awards.sharpest} variant="top" /> : null}
+            {awards.coldStreak ? <AwardCard award={awards.coldStreak} variant="cold" /> : null}
           </View>
         ) : (
           <View className="rounded-2xl border border-white/[0.08] bg-white/[0.035] p-3">
@@ -1060,29 +1077,40 @@ function FutureWeekAwardsCard({ weekNumber }: { weekNumber: number }) {
   );
 }
 
-function FutureWeekPreviewCard({
-  hasMatchup,
+function MatchupPlaceholderCard({
   weekNumber,
+  weekStatus,
 }: {
-  hasMatchup: boolean;
   weekNumber: number;
+  weekStatus: WeekViewStatus;
 }) {
+  const isFutureWeek = weekStatus === 'future';
+  const isPastWeek = weekStatus === 'past';
+  const title = isFutureWeek
+    ? `Week ${weekNumber} Schedule Pending`
+    : isPastWeek
+      ? `Week ${weekNumber} Matchup Missing`
+      : `No Week ${weekNumber} Matchup Assigned`;
+  const description = isFutureWeek
+    ? 'The matchup card will appear here once the league schedule is generated.'
+    : isPastWeek
+      ? 'No head-to-head matchup was saved for your team in this week.'
+      : 'Your matchup card will appear here once this week is scheduled.';
+
   return (
     <Card>
       <View className="items-center gap-3 py-4">
         <View className="h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-white/[0.04]">
-          <Ionicons color="rgba(255,255,255,0.62)" name={hasMatchup ? 'calendar' : 'git-branch'} size={20} />
+          <Ionicons color="rgba(255,255,255,0.62)" name="git-branch" size={20} />
         </View>
         <View className="items-center gap-1">
           <Text
             className="text-center text-lg font-black uppercase text-white"
             style={{ letterSpacing: -0.2 }}>
-            {hasMatchup ? `Week ${weekNumber} Preview` : `Week ${weekNumber} Schedule Pending`}
+            {title}
           </Text>
           <Text className="text-center text-sm font-semibold leading-5 text-white/55">
-            {hasMatchup
-              ? 'This matchup is scheduled. Picks, scores, and awards will appear once the week opens.'
-              : 'The matchup card will appear here once the league schedule is generated.'}
+            {description}
           </Text>
         </View>
       </View>
@@ -1562,6 +1590,7 @@ function StandingsBoard({
   cosmeticsByUserId,
   detail,
   hasSeasonStandings,
+  selectedWeekSettled,
   selectedWeekNumber,
   standingsWeekNumber,
   userId,
@@ -1569,6 +1598,7 @@ function StandingsBoard({
   cosmeticsByUserId: Record<string, EquippedCosmeticsByCategory>;
   detail: LeagueDetail;
   hasSeasonStandings: boolean;
+  selectedWeekSettled: boolean;
   selectedWeekNumber: number;
   standingsWeekNumber: number | null;
   userId: string;
@@ -1613,11 +1643,14 @@ function StandingsBoard({
   const badgeLabel =
     detail.league.status === 'complete' && resolvedStandingsWeekNumber === detail.league.current_week
       ? 'Final'
+      : selectedWeekSettled && resolvedStandingsWeekNumber === selectedWeekNumber
+      ? 'Final'
       : resolvedStandingsWeekNumber === selectedWeekNumber
       ? selectedWeekNumber === detail.league.current_week
         ? 'Live'
         : 'Snapshot'
       : 'Latest';
+  const badgeTone = badgeLabel === 'Live' ? 'green' : 'gold';
 
   return (
     <Card padded={false}>
@@ -1628,7 +1661,7 @@ function StandingsBoard({
             style={{ letterSpacing: 2 }}>
             Standings Through Week {resolvedStandingsWeekNumber}
           </Text>
-          <Badge label={badgeLabel} tone={badgeLabel === 'Snapshot' ? 'gold' : 'green'} />
+          <Badge label={badgeLabel} tone={badgeTone} />
         </View>
         <View className="flex-row items-center gap-3 px-5 pb-3 pt-5">
           <Text
@@ -1971,8 +2004,8 @@ function ScheduleMatchupCard({
             </View>
           ) : null}
 
-          <View className="flex-row items-center gap-3">
-            <View className="flex-1 flex-row items-center gap-2.5">
+          <View className="flex-row items-center gap-2">
+            <View className="flex-1 flex-row items-center gap-2">
               <CosmeticAvatar
                 cosmetics={cosmeticsByUserId[matchup.home_user_id]}
                 name={homeName}
@@ -1984,7 +2017,7 @@ function ScheduleMatchupCard({
                     'text-base font-black',
                     homeIsUser ? 'text-electric-green' : 'text-white',
                   )}
-                  numberOfLines={1}
+                  numberOfLines={2}
                   style={{ letterSpacing: -0.3 }}>
                   {homeName}
                 </Text>
@@ -2011,7 +2044,7 @@ function ScheduleMatchupCard({
               </Text>
             </View>
 
-            <View className="flex-1 flex-row items-center justify-end gap-2.5">
+            <View className="flex-1 flex-row items-center justify-end gap-2">
               {awayIsWinner ? (
                 <Ionicons color={THEME_COLORS.electricGreen} name="trophy" size={14} />
               ) : null}
@@ -2025,8 +2058,8 @@ function ScheduleMatchupCard({
                         ? 'text-electric-green'
                         : 'text-white',
                   )}
-                  numberOfLines={1}
-                  style={{ letterSpacing: -0.3 }}>
+                  numberOfLines={2}
+                  style={{ letterSpacing: -0.3, textAlign: 'right' }}>
                   {awayName}
                 </Text>
                 {isBye ? (
@@ -2901,6 +2934,7 @@ function TabContent({
   detail,
   hasSeasonStandings,
   onStartSeason,
+  selectedWeekSettled,
   selectedWeekNumber,
   standingsWeekNumber,
   startSeasonError,
@@ -2913,6 +2947,7 @@ function TabContent({
   detail: LeagueDetail;
   hasSeasonStandings: boolean;
   onStartSeason: () => void;
+  selectedWeekSettled: boolean;
   selectedWeekNumber: number;
   standingsWeekNumber: number | null;
   startSeasonError?: string;
@@ -2927,6 +2962,7 @@ function TabContent({
           cosmeticsByUserId={cosmeticsByUserId}
           detail={detail}
           hasSeasonStandings={hasSeasonStandings}
+          selectedWeekSettled={selectedWeekSettled}
           selectedWeekNumber={selectedWeekNumber}
           standingsWeekNumber={standingsWeekNumber}
           userId={userId}
@@ -3140,6 +3176,17 @@ export default function LeagueDetailScreen() {
   const isCurrentWeek = selectedWeekNumber === detail.league.current_week;
   const isPastWeek = selectedWeekNumber < detail.league.current_week;
   const isFutureWeek = selectedWeekNumber > detail.league.current_week;
+  const selectedWeekStatus: WeekViewStatus = isCurrentWeek ? 'current' : isPastWeek ? 'past' : 'future';
+  const selectedWeekSettled = Boolean(
+    selectedDetail.standings.some(
+      (standing) =>
+        standing.weekly_profit !== 0 ||
+        standing.wins !== 0 ||
+        standing.losses !== 0 ||
+        standing.ties !== 0,
+    ) ||
+      (awardsQuery.data?.isFullySettled && selectedWeekAwardsNumber === selectedWeekNumber),
+  );
   const seasonFirstKickoffTime = detail.seasonFirstKickoffAt
     ? new Date(detail.seasonFirstKickoffAt).getTime()
     : null;
@@ -3274,12 +3321,12 @@ export default function LeagueDetailScreen() {
               detail={selectedDetail}
               matchup={currentUserMatchup}
               weekNumber={selectedWeekNumber}
-              weekStatus={isCurrentWeek ? 'current' : isPastWeek ? 'past' : 'future'}
+              weekStatus={selectedWeekStatus}
               userId={userId}
             />
           </PressableScale>
-        ) : isFutureWeek ? (
-          <FutureWeekPreviewCard hasMatchup={false} weekNumber={selectedWeekNumber} />
+        ) : detail.league.type === 'h2h' ? (
+          <MatchupPlaceholderCard weekNumber={selectedWeekNumber} weekStatus={selectedWeekStatus} />
         ) : null}
 
         {/* Standings hub: the current-week snapshot, the section tabs, and the
@@ -3298,6 +3345,7 @@ export default function LeagueDetailScreen() {
             detail={selectedDetail}
             hasSeasonStandings={detail.standings.length > 0}
             onStartSeason={handleStartSeason}
+            selectedWeekSettled={selectedWeekSettled}
             selectedWeekNumber={selectedWeekNumber}
             standingsWeekNumber={selectedStandingsSnapshot.weekNumber}
             startSeasonError={generateSchedule.error?.message}

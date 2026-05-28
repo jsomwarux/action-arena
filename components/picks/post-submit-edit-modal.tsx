@@ -12,7 +12,12 @@ import {
   SegmentedToggle,
   type SegmentedOption,
 } from '@/components/ui';
-import { PARLAY_PAYOUT_CAP, TEASER_ODDS_LOOKUP } from '@/constants/rules';
+import {
+  PARLAY_PAYOUT_CAP,
+  TEASER_MAX_LEGS,
+  TEASER_MIN_LEGS,
+  TEASER_ODDS_LOOKUP,
+} from '@/constants/rules';
 import { THEME_COLORS } from '@/constants/theme';
 import type { BetEditSubmission, BetEditSubmissionLeg, PlacedBet } from '@/hooks/use-straight-bets';
 import { cn } from '@/lib/cn';
@@ -247,7 +252,7 @@ function calculateParlayReward(amount: number, legs: Pick<SlipLeg, 'leg_odds'>[]
 }
 
 function getTeaserOdds(legCount: number, teaserPoints: TeaserPoints) {
-  if (legCount < 2 || legCount > 4) {
+  if (legCount < TEASER_MIN_LEGS || legCount > TEASER_MAX_LEGS) {
     return null;
   }
 

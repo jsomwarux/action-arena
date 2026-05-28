@@ -43,6 +43,8 @@ import {
   MAX_SINGLE_BET,
   MINIMUM_BETS_PER_WEEK,
   PARLAY_PAYOUT_CAP,
+  TEASER_MAX_LEGS,
+  TEASER_MIN_LEGS,
   TEASER_ODDS_LOOKUP,
   WEEKLY_BUDGET,
 } from '@/constants/rules';
@@ -68,6 +70,11 @@ import {
 } from '@/hooks/use-straight-bets';
 import { cn } from '@/lib/cn';
 import {
+  getBetSettlementState,
+  getRealizedReward,
+  isSettledResult,
+} from '@/lib/bet-outcome';
+import {
   americanOddsToDecimal,
   calculatePotentialPayout,
   decimalOddsToAmerican,
@@ -75,9 +82,11 @@ import {
   formatCurrency,
   formatGameTime,
   formatProfit,
+  getProfitTone,
 } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import { evaluateLiveBetStatus } from '@/lib/live-pick-status';
+import { getNflTeamShortName } from '@/lib/nfl-teams';
 import type { OddsGame, OddsSelection } from '@/lib/odds-api';
 import {
   formatBetLegLabel,
@@ -163,6 +172,7 @@ type SelectionConflict = {
   nextLeg: SlipLeg;
   selection: OddsSelection;
   source: ConflictSource;
+  summary: string;
   targetMode: BetMode;
 };
 
@@ -470,7 +480,7 @@ function getEditedPlacedBetMetrics(bet: PlacedBet, legs: EditingPlacedLeg[]) {
 }
 
 function getTeaserOdds(legCount: number, teaserPoints: TeaserPoints) {
-  if (legCount < 2 || legCount > 4) {
+  if (legCount < TEASER_MIN_LEGS || legCount > TEASER_MAX_LEGS) {
     return null;
   }
 
@@ -579,6 +589,20 @@ function formatConflictShortLabel(leg: SlipLeg) {
   return side;
 }
 
+function formatConflictInlineLabel(leg: SlipLeg) {
+  const side = getPickConflictSide(leg);
+
+  if (leg.market === 'moneyline') {
+    return `${getNflTeamShortName(side)} ML`;
+  }
+
+  if (leg.market === 'spread') {
+    return `${getNflTeamShortName(side)} spread`;
+  }
+
+  return side;
+}
+
 function capitalizeSentence(value: string) {
   return value.length > 0 ? `${value.charAt(0).toUpperCase()}${value.slice(1)}` : value;
 }
@@ -659,6 +683,7 @@ function makeSelectionConflict({
     nextLeg,
     selection,
     source,
+    summary: `Blocked by ${formatConflictInlineLabel(existingLeg)}`,
     targetMode,
   };
 }
@@ -768,19 +793,11 @@ function isCappedPlacedParlay(bet: Pick<PlacedBet, 'bet_type' | 'potential_payou
 }
 
 function isSettledPick(result: PlacedBet['result']): result is Exclude<PlacedBet['result'], 'pending'> {
-  return result !== 'pending';
+  return isSettledResult(result);
 }
 
 function getSettledReward(bet: Pick<PlacedBet, 'amount' | 'profit' | 'result'>) {
-  if (bet.result === 'loss') {
-    return 0;
-  }
-
-  if (bet.result === 'push') {
-    return bet.amount;
-  }
-
-  return bet.amount + (bet.profit ?? 0);
+  return getRealizedReward(bet);
 }
 
 function getBetTypeLabel(type: BetType) {
@@ -1458,7 +1475,8 @@ function OddsLogoChip({
 }
 
 function OddsButton({
-  hasConflict,
+  conflictMessage,
+  conflictSummary,
   disabled,
   isSelected,
   mode,
@@ -1466,8 +1484,9 @@ function OddsButton({
   selection,
   teaserPoints,
 }: {
+  conflictMessage?: string;
+  conflictSummary?: string;
   disabled?: boolean;
-  hasConflict?: boolean;
   isSelected: boolean;
   mode: BetMode;
   onPress: () => void;
@@ -1501,12 +1520,16 @@ function OddsButton({
         shadowRadius: 12,
       }
     : null;
-  const conflict = Boolean(hasConflict && !isSelected);
+  const conflict = Boolean(conflictSummary && !isSelected);
+  const baseAccessibilityLabel = isTeaserMode
+    ? primaryLabel
+    : `${primaryLabel} ${formatAmericanOdds(selection.odds)}`;
 
   return (
     <PressableScale
+      accessibilityHint={conflict ? conflictMessage : undefined}
       accessibilityLabel={
-        isTeaserMode ? primaryLabel : `${primaryLabel} ${formatAmericanOdds(selection.odds)}`
+        conflict ? `${baseAccessibilityLabel}. ${conflictSummary}. Tap for details.` : baseAccessibilityLabel
       }
       accessibilityRole="button"
       accessibilityState={{ disabled: Boolean(disabled), selected: isSelected }}
@@ -1517,7 +1540,7 @@ function OddsButton({
         alignSelf: 'stretch',
         flex: 1,
         flexBasis: 0,
-        minHeight: 68,
+        minHeight: conflict ? 84 : 68,
         minWidth: 0,
         opacity: disabled || conflict ? 0.36 : pressed ? 0.92 : 1,
         width: '100%',
@@ -1537,7 +1560,7 @@ function OddsButton({
             alignItems: 'center',
             flexDirection: 'row',
             gap: 8,
-            minHeight: 68,
+            minHeight: conflict ? 84 : 68,
             paddingHorizontal: 10,
             paddingVertical: 12,
             shadowColor: isSelected ? accentHex : '#000',
@@ -1579,16 +1602,30 @@ function OddsButton({
               {formatAmericanOdds(selection.odds)}
             </Text>
           ) : null}
+          {conflict ? (
+            <View
+              className="mt-1 flex-row items-center gap-1 rounded-full border border-coral-red/45 bg-coral-red/15 px-2 py-1"
+              style={{ alignSelf: 'flex-start', maxWidth: '100%' }}>
+              <Ionicons color={THEME_COLORS.coralRed} name="alert-circle" size={10} />
+              <Text
+                numberOfLines={1}
+                style={{
+                  color: THEME_COLORS.coralRed,
+                  flexShrink: 1,
+                  fontSize: 10,
+                  fontWeight: '900',
+                  includeFontPadding: false,
+                  letterSpacing: 0,
+                  lineHeight: 12,
+                }}>
+                {conflictSummary}
+              </Text>
+            </View>
+          ) : null}
         </View>
         {isSelected ? (
           <View style={{ marginLeft: 2 }}>
             <Ionicons color={accentHex} name="checkmark-circle" size={14} />
-          </View>
-        ) : null}
-        {conflict ? (
-          <View
-            className="absolute right-2 top-2 h-5 w-5 items-center justify-center rounded-full border border-coral-red/50 bg-coral-red/20">
-            <Ionicons color={THEME_COLORS.coralRed} name="warning" size={11} />
           </View>
         ) : null}
       </View>
@@ -1695,8 +1732,9 @@ function GameCard({
                   key={`${selection.market}:${selection.selection}:${selection.line ?? 'na'}`}
                   style={{ flex: 1, flexBasis: 0, minWidth: 0 }}>
                   <OddsButton
+                    conflictMessage={conflict?.message}
+                    conflictSummary={conflict?.summary}
                     disabled={readOnly}
-                    hasConflict={Boolean(conflict)}
                     isSelected={isSelected}
                     mode={mode}
                     selection={selection}
@@ -1994,7 +2032,9 @@ function TeaserBuilder({
   const odds = getTeaserOdds(legs.length, teaserPoints);
   const reward = odds && Number.isFinite(amount) ? calculatePotentialPayout(amount || 0, odds) : 0;
   const amountError = getPickAmountError(amountText);
-  const canAdd = Boolean(odds && !amountError && Number.isFinite(amount) && amount > 0);
+  const canAdd = Boolean(
+    legs.length >= TEASER_MIN_LEGS && odds && !amountError && Number.isFinite(amount) && amount > 0,
+  );
 
   return (
     <View>
@@ -4220,6 +4260,33 @@ function PlacedBetCard({
   );
 }
 
+function SubmittedCardSummaryRow({
+  label,
+  value,
+  valueClassName = 'text-white',
+}: {
+  label: string;
+  value: string;
+  valueClassName?: string;
+}) {
+  return (
+    <View className="flex-row items-center justify-between gap-4">
+      <Text
+        className="text-[10px] font-black uppercase text-white/45"
+        style={{ letterSpacing: 1.5 }}>
+        {label}
+      </Text>
+      <Text
+        adjustsFontSizeToFit
+        className={cn('text-sm font-black', valueClassName)}
+        minimumFontScale={0.82}
+        numberOfLines={1}>
+        {value}
+      </Text>
+    </View>
+  );
+}
+
 function PlacedBetsView({
   bets,
   cosmetics,
@@ -4245,16 +4312,66 @@ function PlacedBetsView({
 }) {
   const shareBet = useShareBetToChat(userId);
   const totalAllocated = bets.reduce((sum, bet) => sum + bet.amount, 0);
-  const totalReward = bets.reduce(
-    (sum, bet) =>
-      sum + (isSettledPick(bet.result) ? getSettledReward(bet) : getDisplayedPlacedPayout(bet)),
+  const settlementState = getBetSettlementState(bets);
+  const settledBets = bets.filter((bet) => isSettledPick(bet.result));
+  const pendingBets = bets.filter((bet) => !isSettledPick(bet.result));
+  const totalSettledReward = settledBets.reduce((sum, bet) => sum + getSettledReward(bet), 0);
+  const totalPendingReward = pendingBets.reduce(
+    (sum, bet) => sum + getDisplayedPlacedPayout(bet),
     0,
   );
+  const totalSettledProfit = settledBets.reduce((sum, bet) => sum + (bet.profit ?? 0), 0);
   const liveScoreGameIds = useMemo(
     () => bets.flatMap((bet) => bet.bet_legs.map((leg) => leg.game_id)),
     [bets],
   );
   const liveScoresQuery = useLiveScores(liveScoreGameIds);
+  const headerIcon =
+    settlementState === 'settled'
+      ? 'checkmark-circle'
+      : settlementState === 'partially_settled'
+        ? 'time-outline'
+        : readOnly
+          ? 'eye-outline'
+          : 'lock-closed';
+  const headerColor =
+    settlementState === 'settled'
+      ? THEME_COLORS.electricGreen
+      : settlementState === 'partially_settled'
+        ? THEME_COLORS.gold
+        : readOnly
+          ? THEME_COLORS.cyanAccent
+          : THEME_COLORS.electricGreen;
+  const headerTextClass =
+    settlementState === 'partially_settled'
+      ? 'text-gold'
+      : readOnly && settlementState === 'unsettled'
+        ? 'text-cyan-accent'
+        : 'text-electric-green';
+  const headerLabel =
+    settlementState === 'settled'
+      ? 'Card Settled'
+      : settlementState === 'partially_settled'
+        ? 'Results Updating'
+        : readOnly
+          ? `Week ${weekNumber} Lineup`
+          : 'Card Submitted';
+  const headline =
+    settlementState === 'settled'
+      ? 'Week Results Final'
+      : settlementState === 'partially_settled'
+        ? 'Picks Are Settling'
+        : readOnly
+          ? 'Read-Only Lineup'
+          : 'This Week is Submitted';
+  const helperText =
+    settlementState === 'settled'
+      ? 'All picks have settled. Returns and net profit are final for this card.'
+      : settlementState === 'partially_settled'
+        ? `${settledBets.length} of ${bets.length} picks have settled. Pending picks still show potential reward.`
+        : readOnly
+          ? 'Past weeks show submitted picks and cannot be edited.'
+          : 'Picks stay editable until their lock game starts. Pick of the Week can be moved until first kickoff.';
 
   // Surface Pick of the Week first, the rest follow.
   const orderedBets = useMemo(() => {
@@ -4281,46 +4398,67 @@ function PlacedBetsView({
         <View className="gap-3">
           <View className="flex-row items-center gap-2">
             <Ionicons
-              color={readOnly ? THEME_COLORS.cyanAccent : THEME_COLORS.electricGreen}
-              name={readOnly ? 'eye-outline' : 'lock-closed'}
+              color={headerColor}
+              name={headerIcon}
               size={14}
             />
             <Text
-              className={cn(
-                'text-[10px] font-black uppercase',
-                readOnly ? 'text-cyan-accent' : 'text-electric-green',
-              )}
+              className={cn('text-[10px] font-black uppercase', headerTextClass)}
               style={{ letterSpacing: 2.5 }}>
-              {readOnly ? `Week ${weekNumber} Results` : 'Card Submitted'}
+              {headerLabel}
             </Text>
           </View>
           <Text
             className="text-2xl font-black uppercase text-white"
             style={{ letterSpacing: -0.4 }}>
-            {readOnly ? 'Read-Only Lineup' : 'This Week is Submitted'}
+            {headline}
           </Text>
           <Text className="text-sm font-semibold text-white/55">
-            {readOnly
-              ? 'Past weeks show final pick outcomes and cannot be edited.'
-              : 'Picks stay editable until their lock game starts. Pick of the Week can be moved until first kickoff.'}
+            {helperText}
           </Text>
-          <View className="mt-2 flex-row items-center justify-between">
-            <Text
-              className="text-[10px] font-black uppercase text-white/45"
-              style={{ letterSpacing: 1.5 }}>
-              Allocated
-            </Text>
-            <Text className="text-sm font-black text-white">{formatCurrency(totalAllocated)}</Text>
-          </View>
-          <View className="flex-row items-center justify-between">
-            <Text
-              className="text-[10px] font-black uppercase text-white/45"
-              style={{ letterSpacing: 1.5 }}>
-              {readOnly ? 'Outcome' : 'Potential Reward'}
-            </Text>
-            <Text className="text-sm font-black text-electric-green">
-              {formatCurrency(totalReward)}
-            </Text>
+          <View className="mt-2 gap-2">
+            <SubmittedCardSummaryRow
+              label="Allocated"
+              value={formatCurrency(totalAllocated)}
+            />
+            {settlementState === 'settled' ? (
+              <>
+                <SubmittedCardSummaryRow
+                  label="Total Returned"
+                  value={formatCurrency(totalSettledReward)}
+                  valueClassName="text-electric-green"
+                />
+                <SubmittedCardSummaryRow
+                  label="Net Profit"
+                  value={formatProfit(totalSettledProfit)}
+                  valueClassName={getProfitTone(totalSettledProfit)}
+                />
+              </>
+            ) : settlementState === 'partially_settled' ? (
+              <>
+                <SubmittedCardSummaryRow
+                  label="Returned So Far"
+                  value={formatCurrency(totalSettledReward)}
+                  valueClassName="text-electric-green"
+                />
+                <SubmittedCardSummaryRow
+                  label="Pending Potential"
+                  value={formatCurrency(totalPendingReward)}
+                  valueClassName="text-gold"
+                />
+                <SubmittedCardSummaryRow
+                  label="Net So Far"
+                  value={formatProfit(totalSettledProfit)}
+                  valueClassName={getProfitTone(totalSettledProfit)}
+                />
+              </>
+            ) : (
+              <SubmittedCardSummaryRow
+                label="Potential Reward"
+                value={formatCurrency(totalPendingReward)}
+                valueClassName="text-electric-green"
+              />
+            )}
           </View>
         </View>
       </Card>
@@ -4962,6 +5100,11 @@ export default function BetBoardScreen() {
   const addTeaserToSlip = () => {
     const amount = Number(teaserAmount);
     const odds = getTeaserOdds(teaserLegs.length, teaserPoints);
+    if (teaserLegs.length < TEASER_MIN_LEGS) {
+      haptics.warning();
+      Alert.alert('Add another leg', 'Teasers need at least two legs.');
+      return;
+    }
     if (!odds || !Number.isFinite(amount) || amount <= 0) return;
     if (amount > MAX_SINGLE_BET) {
       haptics.warning();

@@ -54,6 +54,11 @@ import {
   getProfitTone,
 } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
+import {
+  getMatchupSideStatus,
+  getProfitSwingHeadline,
+  type MatchupSideStatus,
+} from '@/lib/matchup-language';
 import { evaluateLiveBetStatus } from '@/lib/live-pick-status';
 import { formatBetLegLabel, formatPickTitle, getPickLogoLabel } from '@/lib/pick-labels';
 import { isParentPickLocked } from '@/lib/pick-locking';
@@ -291,17 +296,10 @@ function BetCard({
     <View
       className={cn(
         'rounded-2xl border p-4',
-        isLock ? 'border-gold/70 bg-gold/[0.07]' : cn(accent.border, accent.bg),
+        isLock ? 'border-white/15 bg-white/[0.04]' : cn(accent.border, accent.bg),
       )}
       style={
-        isLock
-          ? {
-              shadowColor: THEME_COLORS.gold,
-              shadowOffset: { width: 0, height: 0 },
-              shadowOpacity: 0.42,
-              shadowRadius: 14,
-            }
-          : isUser
+        isUser
           ? {
               shadowColor: accent.hex,
               shadowOffset: { width: 0, height: 0 },
@@ -482,35 +480,44 @@ function BetCard({
 
 function PlayerSide({
   cosmetics,
-  isLeading,
   isUser,
   name,
   profit,
   record,
   side,
+  status,
 }: {
   cosmetics?: EquippedCosmeticsByCategory;
-  isLeading: boolean;
   isUser: boolean;
   name: string;
   profit: number;
   record: string;
   side: Side;
+  status: MatchupSideStatus;
 }) {
+  const isWinningStatus = status === 'leading' || status === 'won';
+  const isLosingStatus = status === 'trailing' || status === 'lost';
   const accentBorder = isUser
     ? 'border-electric-green/60 bg-electric-green/15'
-    : isLeading
+    : isWinningStatus
       ? 'border-gold/55 bg-gold/15'
+      : isLosingStatus
+        ? 'border-coral-red/35 bg-coral-red/10'
       : 'border-white/15 bg-white/[0.05]';
+  const statusTone = isWinningStatus
+    ? 'border-gold/50 bg-gold/15 text-gold'
+    : isLosingStatus
+      ? 'border-coral-red/45 bg-coral-red/15 text-coral-red'
+      : null;
 
   return (
     <View
       className="flex-1 items-center gap-3"
-      style={{ transform: [{ scale: isLeading ? 1.06 : 1 }] }}>
+      style={{ transform: [{ scale: isWinningStatus ? 1.06 : 1 }] }}>
       <View
         className={cn('h-20 w-20 items-center justify-center rounded-2xl border', accentBorder)}
         style={
-          isLeading || isUser
+          isWinningStatus || isUser
             ? {
                 shadowColor: isUser ? THEME_COLORS.electricGreen : THEME_COLORS.gold,
                 shadowOffset: { width: 0, height: 0 },
@@ -522,26 +529,29 @@ function PlayerSide({
         <CosmeticAvatar cosmetics={cosmetics} name={name} size="lg" />
       </View>
 
-      <View className="items-center gap-1">
+      <View className="w-full items-center gap-1">
         <View className="flex-row items-center gap-1.5">
           <Text
             className="text-[10px] font-black uppercase text-white/45"
             style={{ letterSpacing: 1.5 }}>
             {isUser ? 'You' : side === 'home' ? 'Home' : 'Opponent'}
           </Text>
-          {isLeading ? (
-            <View className="rounded-full border border-gold/50 bg-gold/15 px-2 py-[1px]">
+          {statusTone && status ? (
+            <View className={cn('rounded-full border px-2 py-[1px]', statusTone)}>
               <Text
-                className="text-[9px] font-black uppercase text-gold"
+                className={cn(
+                  'text-[9px] font-black uppercase',
+                  isWinningStatus ? 'text-gold' : 'text-coral-red',
+                )}
                 style={{ letterSpacing: 1.2 }}>
-                Leading
+                {status}
               </Text>
             </View>
           ) : null}
         </View>
         <Text
-          className="text-center text-base font-black text-white"
-          numberOfLines={1}
+          className="w-full text-center text-base font-black text-white"
+          numberOfLines={2}
           style={{ letterSpacing: -0.3 }}>
           {name}
         </Text>
@@ -562,25 +572,39 @@ function PlayerSide({
 function ProfitTug({
   awayName,
   awayProfit,
+  awayUserId,
   homeName,
   homeProfit,
+  homeUserId,
+  winnerId,
 }: {
   awayName: string;
   awayProfit: number;
+  awayUserId: string | null;
   homeName: string;
   homeProfit: number;
+  homeUserId: string;
+  winnerId: string | null;
 }) {
   const range = Math.max(Math.abs(homeProfit) + Math.abs(awayProfit), 1);
   const homeWidth = Math.max(8, Math.min(92, ((homeProfit + range) / (range * 2)) * 100));
 
   const diff = homeProfit - awayProfit;
-  const leader = diff > 0 ? homeName : diff < 0 ? awayName : null;
+  const headline = getProfitSwingHeadline({
+    awayName,
+    awayProfit,
+    awayUserId,
+    homeName,
+    homeProfit,
+    homeUserId,
+    winnerId,
+  });
   const compactDiff = formatProfit(diff).replace(' coins', '');
 
   return (
     <Card>
       <View className="gap-4">
-        <View className="flex-row items-center justify-between gap-3">
+        <View className="flex-row items-start justify-between gap-3">
           <View className="min-w-0 flex-1">
             <Text
               className="text-[10px] font-black uppercase text-white/45"
@@ -590,8 +614,8 @@ function ProfitTug({
             <Text
               className="mt-1 text-base font-black text-white"
               style={{ letterSpacing: -0.3 }}
-              numberOfLines={1}>
-              {leader ? `${leader} leads by ${formatCurrency(Math.abs(diff))}` : 'Dead even'}
+              numberOfLines={2}>
+              {headline}
             </Text>
           </View>
           <View
@@ -622,24 +646,40 @@ function ProfitTug({
           </View>
         </View>
 
-        <View className="flex-row items-center justify-between gap-3">
-          <View className="min-w-0 flex-1 flex-row items-center gap-2">
-            <View className="h-2 w-2 rounded-full bg-electric-green" />
+        <View className="gap-2">
+          <View className="flex-row items-center justify-between gap-3">
+            <View className="min-w-0 flex-1 flex-row items-center gap-2">
+              <View className="h-2 w-2 shrink-0 rounded-full bg-electric-green" />
+              <Text
+                className="min-w-0 flex-1 text-[11px] font-black uppercase text-white/55"
+                numberOfLines={2}
+                style={{ letterSpacing: 1.2 }}>
+                {homeName}
+              </Text>
+            </View>
             <Text
-              className="min-w-0 flex-1 text-[11px] font-black uppercase text-white/55"
+              className="shrink-0 text-[11px] font-black uppercase text-white/55"
               numberOfLines={1}
               style={{ letterSpacing: 1.2 }}>
-              {homeName} {formatProfit(homeProfit)}
+              {formatProfit(homeProfit)}
             </Text>
           </View>
-          <View className="min-w-0 flex-1 flex-row items-center justify-end gap-2">
+          <View className="flex-row items-center justify-between gap-3">
+            <View className="min-w-0 flex-1 flex-row items-center gap-2">
+              <View className="h-2 w-2 shrink-0 rounded-full bg-coral-red" />
+              <Text
+                className="min-w-0 flex-1 text-[11px] font-black uppercase text-white/55"
+                numberOfLines={2}
+                style={{ letterSpacing: 1.2 }}>
+                {awayName}
+              </Text>
+            </View>
             <Text
-              className="min-w-0 flex-1 text-right text-[11px] font-black uppercase text-white/55"
+              className="shrink-0 text-[11px] font-black uppercase text-white/55"
               numberOfLines={1}
               style={{ letterSpacing: 1.2 }}>
-              {awayName} {formatProfit(awayProfit)}
+              {formatProfit(awayProfit)}
             </Text>
-            <View className="h-2 w-2 rounded-full bg-coral-red" />
           </View>
         </View>
       </View>
@@ -658,8 +698,19 @@ function FightCardHeader({
 }) {
   const homeProfit = detail.matchup.home_profit ?? detail.homeStanding?.weekly_profit ?? 0;
   const awayProfit = detail.matchup.away_profit ?? detail.awayStanding?.weekly_profit ?? 0;
-  const homeLeading = homeProfit > awayProfit;
-  const awayLeading = awayProfit > homeProfit;
+  const winnerId = detail.matchup.winner_id;
+  const homeStatus = getMatchupSideStatus({
+    opposingProfit: awayProfit,
+    sideProfit: homeProfit,
+    sideUserId: detail.matchup.home_user_id,
+    winnerId,
+  });
+  const awayStatus = getMatchupSideStatus({
+    opposingProfit: homeProfit,
+    sideProfit: awayProfit,
+    sideUserId: detail.matchup.away_user_id,
+    winnerId,
+  });
   const homeName = getLeagueMemberPrimaryName(detail.homeMember, detail.homeUser, 'Home');
   const awayName = detail.matchup.away_user_id
     ? getLeagueMemberPrimaryName(detail.awayMember, detail.awayUser, 'Opponent')
@@ -697,7 +748,6 @@ function FightCardHeader({
         <View className="flex-row items-center">
           <PlayerSide
             cosmetics={cosmeticsByUserId[detail.matchup.home_user_id]}
-            isLeading={homeLeading}
             isUser={detail.matchup.home_user_id === userId}
             name={homeName}
             profit={homeProfit}
@@ -711,6 +761,7 @@ function FightCardHeader({
                 : '0-0'
             }
             side="home"
+            status={homeStatus}
           />
           <View className="px-3">
             <View
@@ -732,7 +783,6 @@ function FightCardHeader({
                 ? cosmeticsByUserId[detail.matchup.away_user_id]
                 : undefined
             }
-            isLeading={awayLeading}
             isUser={detail.matchup.away_user_id === userId}
             name={awayName}
             profit={awayProfit}
@@ -748,6 +798,7 @@ function FightCardHeader({
                   : 'Bye'
             }
             side="away"
+            status={awayStatus}
           />
         </View>
       </View>
@@ -780,7 +831,7 @@ function LockShowdownSide({
     <View className="gap-2">
       <View className="flex-row items-center justify-between gap-3">
         <Text
-          className="text-[10px] font-black uppercase text-gold/85"
+          className="text-[10px] font-black uppercase text-white/55"
           style={{ letterSpacing: 1.5 }}>
           {sideLabel}
         </Text>
@@ -893,22 +944,15 @@ function LockShowdown({
             visibility={homeVisibility}
           />
           <View className="flex-row items-center gap-3">
-            <View className="h-[1px] flex-1 bg-gold/30" />
-            <View
-              className="h-9 w-9 items-center justify-center rounded-full border border-gold/55 bg-gold/15"
-              style={{
-                shadowColor: THEME_COLORS.gold,
-                shadowOffset: { width: 0, height: 0 },
-                shadowOpacity: 0.5,
-                shadowRadius: 10,
-              }}>
+            <View className="h-[1px] flex-1 bg-white/15" />
+            <View className="h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/[0.06]">
               <Text
-                className="text-xs font-black text-gold"
+                className="text-xs font-black text-white/65"
                 style={{ letterSpacing: 0.5 }}>
                 VS
               </Text>
             </View>
-            <View className="h-[1px] flex-1 bg-gold/30" />
+            <View className="h-[1px] flex-1 bg-white/15" />
           </View>
           <LockShowdownSide
             bet={awayBet}
@@ -1500,10 +1544,11 @@ export default function MatchupDetailScreen() {
   const awayName = detail.matchup.away_user_id
     ? getLeagueMemberPrimaryName(detail.awayMember, detail.awayUser, 'Opponent')
     : 'Bye Week';
+  const matchupWinnerId = detail.matchup.winner_id;
   const cosmeticsByUserId = cosmeticsQuery.data ?? {};
 
   const userWonMatchup = Boolean(
-    userId && detail.matchup.winner_id && detail.matchup.winner_id === userId,
+    userId && matchupWinnerId && matchupWinnerId === userId,
   );
 
   const homeLockBet = detail.homeBets.find((bet) => bet.is_lock) ?? null;
@@ -1671,8 +1716,11 @@ export default function MatchupDetailScreen() {
             <ProfitTug
               awayName={awayName}
               awayProfit={awayProfit}
+              awayUserId={detail.matchup.away_user_id}
               homeName={homeName}
               homeProfit={homeProfit}
+              homeUserId={detail.matchup.home_user_id}
+              winnerId={matchupWinnerId}
             />
             <LockShowdown
               awayBet={awayLockBet}

@@ -36,31 +36,33 @@ function LeagueCard({ index, item }: { index: number; item: LeagueSummary }) {
         <Card>
           <View className="gap-4">
             <View className="flex-row items-start gap-3">
-              <View className="h-12 w-12 items-center justify-center rounded-2xl border border-electric-green/30 bg-electric-green/10">
+              <View className="h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-electric-green/30 bg-electric-green/10">
                 <Ionicons color={THEME_COLORS.electricGreen} name="american-football" size={22} />
               </View>
               <View className="flex-1 gap-2">
-                <Text
-                  className="text-xl font-black uppercase text-white"
-                  style={{ letterSpacing: -0.3 }}
-                  numberOfLines={1}>
-                  {league.name}
-                </Text>
+                <View className="flex-row items-start justify-between gap-2">
+                  <Text
+                    className="flex-1 text-xl font-black uppercase text-white"
+                    style={{ letterSpacing: -0.3 }}
+                    numberOfLines={2}>
+                    {league.name}
+                  </Text>
+                  <View className="shrink-0 items-end">
+                    <Text
+                      className="text-[10px] font-black uppercase text-white/45"
+                      style={{ letterSpacing: 1.5 }}>
+                      Roster
+                    </Text>
+                    <Text className="mt-1 text-base font-black text-white">
+                      {memberCount}
+                      <Text className="text-white/40">/{league.max_members}</Text>
+                    </Text>
+                  </View>
+                </View>
                 <View className="flex-row flex-wrap gap-2">
                   <Badge label={formatLeagueType(league.type)} tone={isH2H ? 'cyan' : 'gold'} />
                   <Badge label={formatSport(league.sport)} tone="green" />
                 </View>
-              </View>
-              <View className="items-end">
-                <Text
-                  className="text-[10px] font-black uppercase text-white/45"
-                  style={{ letterSpacing: 1.5 }}>
-                  Roster
-                </Text>
-                <Text className="mt-1 text-base font-black text-white">
-                  {memberCount}
-                  <Text className="text-white/40">/{league.max_members}</Text>
-                </Text>
               </View>
             </View>
 
@@ -73,9 +75,22 @@ function LeagueCard({ index, item }: { index: number; item: LeagueSummary }) {
                   style={{ letterSpacing: 1.5 }}>
                   Rank
                 </Text>
-                <Text className="mt-1 text-3xl font-black text-gold" style={{ letterSpacing: -1 }}>
-                  #{currentUserStanding?.rank ?? '–'}
-                </Text>
+                {currentUserStanding?.rank ? (
+                  <Text
+                    className={cn(
+                      'mt-1 text-3xl font-black',
+                      currentUserStanding.rank === 1 ? 'text-gold' : 'text-white',
+                    )}
+                    style={{ letterSpacing: -1 }}>
+                    #{currentUserStanding.rank}
+                  </Text>
+                ) : (
+                  <Text
+                    className="mt-1 text-3xl font-black text-white/35"
+                    style={{ letterSpacing: -1 }}>
+                    #—
+                  </Text>
+                )}
               </View>
               <View className="items-end">
                 <Text

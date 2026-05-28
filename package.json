@@ -16,6 +16,7 @@
     "test:weekly-resolution": "supabase db query --linked -f scripts/test-weekly-matchup-resolution.sql",
     "test:season-awards": "supabase db query --linked -f scripts/test-end-of-season-awards.sql",
     "test:profile-stats": "node scripts/test-profile-stats.mjs",
+    "test:matchup-language": "node scripts/test-matchup-language.mjs",
     "test:home-dashboard": "node scripts/test-home-dashboard-data-integrity.mjs",
     "test:leaderboard": "supabase db query --linked -f scripts/test-leaderboard-ranking.sql",
     "test:season-pass": "supabase db query --linked -f scripts/test-season-pass.sql",
