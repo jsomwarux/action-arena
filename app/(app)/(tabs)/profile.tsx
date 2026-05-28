@@ -89,40 +89,27 @@ export default function ProfileScreen() {
         showsVerticalScrollIndicator={false}>
         <Card tone="highlight">
           <View className="gap-4">
-            <View className="flex-row items-center justify-between gap-4">
-              <View className="flex-row items-center gap-3">
-                <CosmeticAvatar
-                  cosmetics={cosmeticsQuery.data?.equippedByCategory}
-                  name={profileQuery.data?.profile.display_name ?? user?.email ?? 'Player'}
-                  size="lg"
-                />
-                <View>
-                  <Text
-                    className="text-[11px] font-semibold uppercase text-electric-green"
-                    style={{ letterSpacing: 1.2 }}>
-                    Locker
-                  </Text>
-                  <View className="mt-0.5 flex-row items-baseline gap-1">
-                    <AnimatedNumber
-                      className="text-lg font-extrabold text-white"
-                      style={{ letterSpacing: -0.3 }}
-                      value={cosmeticsQuery.data?.coinBalance ?? 0}
-                    />
-                    <Text className="text-xs font-medium text-white/55">Arena Coins</Text>
-                  </View>
+            <View className="flex-row items-center gap-3">
+              <CosmeticAvatar
+                cosmetics={cosmeticsQuery.data?.equippedByCategory}
+                name={profileQuery.data?.profile.display_name ?? user?.email ?? 'Player'}
+                size="lg"
+              />
+              <View className="flex-1">
+                <Text
+                  className="text-[11px] font-semibold uppercase text-electric-green"
+                  style={{ letterSpacing: 1.2 }}>
+                  Locker
+                </Text>
+                <View className="mt-0.5 flex-row items-baseline gap-1">
+                  <AnimatedNumber
+                    className="text-lg font-extrabold text-white"
+                    style={{ letterSpacing: -0.3 }}
+                    value={cosmeticsQuery.data?.coinBalance ?? 0}
+                  />
+                  <Text className="text-xs font-medium text-white/55">Arena Coins</Text>
                 </View>
               </View>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => {
-                  haptics.light();
-                  router.push('/shop');
-                }}
-                style={({ pressed }) => ({ opacity: pressed ? 0.78 : 1 })}>
-                <View className="h-12 w-12 items-center justify-center rounded-2xl border border-gold/45 bg-gold/15">
-                  <Ionicons color={THEME_COLORS.gold} name="storefront" size={22} />
-                </View>
-              </Pressable>
             </View>
             <View className="flex-row gap-3">
               {quickActions.map((action) => (

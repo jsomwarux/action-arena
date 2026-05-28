@@ -11,7 +11,15 @@ import {
 } from 'react-native';
 
 import { CosmeticAvatar } from '@/components/cosmetics';
+import {
+  PickSummaryMetricGrid,
+  type PickSummaryMetric,
+} from '@/components/picks/pick-summary-metrics';
 import { Badge, Card, StaggeredItem } from '@/components/ui';
+import {
+  LOCK_OF_THE_WEEK_MULTIPLIER,
+  PARLAY_PAYOUT_CAP,
+} from '@/constants/rules';
 import { THEME_COLORS } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
 import { useEquippedCosmeticsForUsers } from '@/hooks/use-cosmetics';
@@ -361,6 +369,9 @@ function LeagueSelector({
 
 function HeroStats({ summary }: { summary: ProfileSummary }) {
   const { stats } = summary;
+  const seasonScopeLabel = summary.latestStanding
+    ? `Through Week ${summary.latestStanding.week_number}`
+    : 'Season to date';
   const isStreakWin = stats.currentStreak.includes('W');
   const isStreakLoss = stats.currentStreak.includes('L');
   const profitColor =
@@ -421,28 +432,24 @@ function HeroStats({ summary }: { summary: ProfileSummary }) {
             <Text
               className="text-xs font-black uppercase text-white/55"
               style={{ letterSpacing: 2 }}>
-              Total Profit
+              Season Profit
             </Text>
-            <View className="mt-1 flex-row items-baseline gap-3">
             <Text
+              className="mt-1"
               style={{
                 color: profitColor,
                 fontSize: 56,
                 fontWeight: '900',
                 letterSpacing: -2.2,
-                lineHeight: 56,
+                lineHeight: 60,
               }}>
               {formatProfit(stats.totalProfit)}
             </Text>
-            <Text className="text-base font-black text-white/55" style={{ letterSpacing: -0.3 }}>
-              total
+            <Text className="mt-2 text-sm font-semibold text-white/65">
+              {seasonScopeLabel} · {formatRecord(stats.wins, stats.losses, stats.ties)} league record ·{' '}
+              {stats.totalSettledBets} settled pick{stats.totalSettledBets === 1 ? '' : 's'}
             </Text>
           </View>
-          <Text className="mt-2 text-sm font-semibold text-white/65">
-            {formatRecord(stats.wins, stats.losses, stats.ties)} league record ·{' '}
-            {stats.totalSettledBets} settled pick{stats.totalSettledBets === 1 ? '' : 's'}
-          </Text>
-        </View>
 
         <View className="flex-row gap-3">
           <StatTile
@@ -484,8 +491,7 @@ function StatTile({
       </Text>
       <Text
         className={cn('mt-1.5 text-xl font-black text-white', accent)}
-        numberOfLines={1}
-        style={{ letterSpacing: -0.4 }}>
+        style={{ letterSpacing: -0.4, lineHeight: 24 }}>
         {value}
       </Text>
     </View>
@@ -945,6 +951,46 @@ function Achievements({ achievements }: { achievements: AchievementDisplay[] }) 
 // Pick history
 // ============================================================
 
+function getDisplayedHistoryPayout(bet: Pick<BetWithLegs, 'is_lock' | 'potential_payout'>) {
+  return bet.is_lock
+    ? bet.potential_payout * LOCK_OF_THE_WEEK_MULTIPLIER
+    : bet.potential_payout;
+}
+
+function isCappedHistoryParlay(bet: Pick<BetWithLegs, 'bet_type' | 'potential_payout'>) {
+  return bet.bet_type === 'parlay' && bet.potential_payout >= PARLAY_PAYOUT_CAP;
+}
+
+function getHistoryFinancialMetrics(
+  bet: BetWithLegs,
+  rewardLabel: string,
+  displayedReward: number,
+): PickSummaryMetric[] {
+  const metrics: PickSummaryMetric[] = [
+    { label: 'Odds', value: formatAmericanOdds(bet.odds) },
+    { label: 'Played', value: formatCurrency(bet.amount) },
+    {
+      label: rewardLabel,
+      tone: !isSettledResult(bet.result) ? (bet.is_lock ? 'gold' : 'green') : undefined,
+      value: `${formatCurrency(displayedReward)}${
+        !isSettledResult(bet.result) && isCappedHistoryParlay(bet) ? ' capped' : ''
+      }`,
+    },
+  ];
+
+  if (bet.result === 'push') {
+    metrics.push({ label: 'Result', value: 'Push' });
+  } else {
+    metrics.push({
+      label: bet.result === 'loss' ? 'Loss' : 'Profit',
+      tone: bet.result === 'loss' ? 'red' : bet.result === 'win' ? 'green' : undefined,
+      value: bet.profit === null ? '-' : formatProfit(bet.profit),
+    });
+  }
+
+  return metrics;
+}
+
 function BetHistoryCard({
   bet,
   leagueName,
@@ -962,7 +1008,8 @@ function BetHistoryCard({
   const rewardLabel = isSettledResult(bet.result) ? 'Outcome' : 'Reward';
   const displayedReward = isSettledResult(bet.result)
     ? getRealizedReward(bet)
-    : bet.potential_payout;
+    : getDisplayedHistoryPayout(bet);
+  const financialMetrics = getHistoryFinancialMetrics(bet, rewardLabel, displayedReward);
 
   return (
     <View
@@ -1029,23 +1076,7 @@ function BetHistoryCard({
           </View>
         </View>
 
-        <View className="flex-row items-center justify-between rounded-xl bg-arena-bg/40 px-3 py-2">
-          <Text
-            className="text-[11px] font-black uppercase text-white/55"
-            style={{ letterSpacing: 1.2 }}>
-            {formatAmericanOdds(bet.odds)}
-          </Text>
-          <Text
-            className="text-[11px] font-black uppercase text-white/55"
-            style={{ letterSpacing: 1.2 }}>
-            {formatCurrency(bet.amount)} played
-          </Text>
-          <Text
-            className="text-[11px] font-black uppercase text-white/55"
-            style={{ letterSpacing: 1.2 }}>
-            {rewardLabel} {formatCurrency(displayedReward)}
-          </Text>
-        </View>
+        <PickSummaryMetricGrid metrics={financialMetrics} showTopBorder={false} />
 
         {isMultiLeg ? (
           <View className="gap-1.5">
@@ -1491,7 +1522,7 @@ export function ProfileContent({
   const secondaryName = isLeagueScoped
     ? getLeagueMemberSecondaryName(scopedMembership, data.profile) ?? scopeLabel
     : data.profile.display_name;
-  const headerTitle = isLeagueScoped ? primaryName : title;
+  const profileHeaderTitle = isLeagueScoped ? primaryName : title;
   const leagueNameById = useMemo(
     () =>
       data.leagues.reduce<LeagueNameById>((names, league) => {
@@ -1523,7 +1554,7 @@ export function ProfileContent({
               className="mt-1 text-3xl font-extrabold text-white"
               numberOfLines={1}
               style={{ letterSpacing: -0.5 }}>
-              {headerTitle}
+              {profileHeaderTitle}
             </Text>
             <Text className="mt-1.5 text-base font-medium text-white/60" numberOfLines={1}>
               {secondaryName}

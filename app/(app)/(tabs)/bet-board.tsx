@@ -18,6 +18,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LockEffect } from '@/components/cosmetics';
 import { LiveBetStatusSummary, LiveLegScoreLine } from '@/components/picks/live-pick-status';
 import {
+  PickSummaryMetricGrid,
+  type PickSummaryMetric,
+} from '@/components/picks/pick-summary-metrics';
+import {
   AnimatedBar,
   AnimatedNumber,
   Badge,
@@ -3437,50 +3441,8 @@ function getMissingReplacementLinesMessage(mode: BetMode, selectedLeg: EditingPl
   return 'Replacement lines for this slate are not published yet. Try again from this screen.';
 }
 
-type PickSummaryMetricTone = 'muted' | 'green' | 'red' | 'gold';
-
-function PickSummaryMetric({
-  label,
-  tone = 'muted',
-  value,
-}: {
-  label: string;
-  tone?: PickSummaryMetricTone;
-  value: string;
-}) {
-  const valueClass =
-    tone === 'green'
-      ? 'text-electric-green'
-      : tone === 'red'
-        ? 'text-coral-red'
-        : tone === 'gold'
-          ? 'text-gold'
-          : 'text-white/75';
-
-  return (
-    <View
-      className="rounded-xl border border-white/[0.08] bg-white/[0.035] px-3 py-2"
-      style={{ flexBasis: '47%', flexGrow: 1, flexShrink: 1, minWidth: 116 }}>
-      <Text className="text-[9px] font-black uppercase text-white/40" numberOfLines={1}>
-        {label}
-      </Text>
-      <Text
-        adjustsFontSizeToFit
-        className={cn('mt-0.5 text-sm font-black', valueClass)}
-        minimumFontScale={0.82}
-        numberOfLines={2}>
-        {value}
-      </Text>
-    </View>
-  );
-}
-
 function PickFinancialSummary({ bet }: { bet: PlacedBet }) {
-  const metrics: Array<{
-    label: string;
-    tone?: PickSummaryMetricTone;
-    value: string;
-  }> = [
+  const metrics: PickSummaryMetric[] = [
     { label: 'Odds', value: formatAmericanOdds(bet.odds) },
     { label: 'Played', value: formatCurrency(bet.amount) },
   ];
@@ -3524,18 +3486,7 @@ function PickFinancialSummary({ bet }: { bet: PlacedBet }) {
     }
   }
 
-  return (
-    <View className="flex-row flex-wrap gap-2 border-t border-white/[0.08] pt-3">
-      {metrics.map((metric) => (
-        <PickSummaryMetric
-          key={metric.label}
-          label={metric.label}
-          tone={metric.tone}
-          value={metric.value}
-        />
-      ))}
-    </View>
-  );
+  return <PickSummaryMetricGrid metrics={metrics} />;
 }
 
 function PotwStarButton({

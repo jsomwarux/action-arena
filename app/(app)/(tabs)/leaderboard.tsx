@@ -262,7 +262,7 @@ function PodiumCard({
         </View>
         <Text
           className={cn('mt-2 text-center font-semibold text-white', nameSize)}
-          numberOfLines={1}>
+          numberOfLines={2}>
           {displayName}
         </Text>
         <View className="mt-1.5 flex-row items-center gap-1">
@@ -471,7 +471,11 @@ export default function LeaderboardScreen() {
         {!leaderboardQuery.isLoading && leaderboardQuery.data && sortedRows.length > 0 ? (
           <View className="gap-5">
             {leaderboardQuery.data.leagueOptions.length > 1 ? (
-              <View className="flex-row flex-wrap gap-2">
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: 8, paddingHorizontal: 20 }}
+                style={{ marginHorizontal: -20 }}>
                 {leaderboardQuery.data.leagueOptions.map((league) => {
                   const active =
                     (selectedLeague?.id ?? leaderboardQuery.data?.leagueOptions[0]?.id) === league.id;
@@ -495,7 +499,7 @@ export default function LeaderboardScreen() {
                     </TapTarget>
                   );
                 })}
-              </View>
+              </ScrollView>
             ) : null}
 
             <SegmentedToggle

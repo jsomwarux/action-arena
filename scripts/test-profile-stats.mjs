@@ -162,6 +162,77 @@ const h2hStats = calculateProfileStats(
 assert.equal(`${h2hStats.wins}-${h2hStats.losses}-${h2hStats.ties}`, '5-2-2');
 assert.equal(h2hStats.winRate, 50);
 
+const seasonScopedSummary = buildProfileSummary(
+  {
+    achievements: [],
+    bets: [
+      bet({
+        amount: 100,
+        bet_type: 'straight',
+        league_id: 'league-a',
+        profit: 127,
+        result: 'win',
+        week_number: 2,
+      }),
+      bet({
+        amount: 100,
+        bet_legs: [leg(), leg()],
+        bet_type: 'parlay',
+        league_id: 'league-a',
+        profit: 118,
+        result: 'win',
+        week_number: 3,
+      }),
+      bet({
+        amount: 100,
+        bet_type: 'straight',
+        league_id: 'league-a',
+        profit: 99,
+        result: 'win',
+        week_number: 4,
+      }),
+    ],
+    leagueOptions: [],
+    leagues: [{ id: 'league-a', name: 'League A' }],
+    memberships: [],
+    profile: { id: 'target-user' },
+    standings: [
+      {
+        id: 'standing-a-w3',
+        league_id: 'league-a',
+        losses: 1,
+        rank: 1,
+        ties: 0,
+        total_profit: 245,
+        user_id: 'target-user',
+        week_number: 3,
+        weekly_profit: 118,
+        wins: 2,
+      },
+    ],
+    targetMatchups: [],
+    viewerBets: [],
+    viewerMatchups: [],
+    viewerStandings: [],
+  },
+  'league-a',
+);
+const seasonStraightBreakdown = seasonScopedSummary.betTypeBreakdowns.find(
+  (row) => row.type === 'straight',
+);
+const seasonParlayBreakdown = seasonScopedSummary.betTypeBreakdowns.find((row) => row.type === 'parlay');
+assert.equal(
+  seasonScopedSummary.stats.totalProfit,
+  245,
+  'profile season total should use the same latest standings total as leaderboard and leagues',
+);
+assert.equal(seasonScopedSummary.stats.totalSettledBets, 2);
+assert.equal(seasonScopedSummary.stats.averageProfitPerBet, 122.5);
+assert.equal(seasonStraightBreakdown?.profit, 127);
+assert.equal(seasonStraightBreakdown?.total, 1);
+assert.equal(seasonParlayBreakdown?.profit, 118);
+assert.equal(seasonParlayBreakdown?.total, 1);
+
 const achievementBets = [
   ...Array.from({ length: 5 }, (_, index) =>
     bet({ created_at: `2026-09-${10 + index}T12:00:00.000Z`, result: 'win', week_number: 2 }),
