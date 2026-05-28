@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { RefreshControl, ScrollView, Text, View } from 'react-native';
 
 import { Badge, Button, Card, ScreenWrapper, SkeletonLoader } from '@/components/ui';
@@ -9,8 +9,6 @@ import { THEME_COLORS } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
 import {
   buildProfileSummary,
-  calculateBetTypeBreakdowns,
-  calculateTeaserBreakdowns,
   useProfileData,
 } from '@/hooks/use-profile-stats';
 import { useSeasonPass } from '@/hooks/use-season-pass';
@@ -86,10 +84,8 @@ function HiddenStatPill({ width = 72 }: { width?: number }) {
 
 function LockedAnalyticsPreview({
   onGetPass,
-  onRewardedUnlock,
 }: {
   onGetPass: () => void;
-  onRewardedUnlock: () => void;
 }) {
   const previewBars = [42, 68, 55, 82, 63, 76];
 
@@ -108,7 +104,7 @@ function LockedAnalyticsPreview({
                 The shape is here. The numbers stay hidden.
               </Text>
               <Text className="mt-1 text-sm font-medium leading-5 text-white/55">
-                Season Pass unlocks the full analytics dashboard. A rewarded-video placeholder can unlock this view immediately for testing.
+                Season Pass unlocks pick-type trends, team reads, and weekly profit movement once your cards settle.
               </Text>
             </View>
             <Badge label="Pass Only" tone="gold" />
@@ -156,12 +152,6 @@ function LockedAnalyticsPreview({
 
           <View className="gap-2">
             <Button onPress={onGetPass} title="Get Season Pass" />
-            <Button
-              icon="play-circle"
-              onPress={onRewardedUnlock}
-              title="Watch video to unlock stats"
-              variant="secondary"
-            />
           </View>
         </View>
       </Card>
@@ -199,10 +189,32 @@ function ProfitTrendChart({ points }: { points: WeeklyProfitPoint[] }) {
   );
 }
 
+function AnalyticsNotice({
+  body,
+  title,
+}: {
+  body: string;
+  title: string;
+}) {
+  return (
+    <Card>
+      <View className="gap-2">
+        <Text
+          className="text-[11px] font-semibold uppercase text-cyan-accent"
+          style={{ letterSpacing: 1.2 }}>
+          {title}
+        </Text>
+        <Text className="text-base font-semibold leading-6 text-white/60">
+          {body}
+        </Text>
+      </View>
+    </Card>
+  );
+}
+
 export default function AnalyticsScreen() {
   const { user } = useAuth();
   const router = useRouter();
-  const [rewardedUnlock, setRewardedUnlock] = useState(false);
   const profileQuery = useProfileData({
     targetUserId: user?.id,
     viewerUserId: user?.id,
@@ -220,29 +232,16 @@ export default function AnalyticsScreen() {
     () => (profileQuery.data ? buildProfileSummary(profileQuery.data, 'all') : null),
     [profileQuery.data],
   );
-  const betTypeBreakdowns = useMemo(
-    () => calculateBetTypeBreakdowns(profileQuery.data?.bets ?? []),
-    [profileQuery.data?.bets],
-  );
-  const teaserBreakdowns = useMemo(
-    () => calculateTeaserBreakdowns(profileQuery.data?.bets ?? []),
-    [profileQuery.data?.bets],
-  );
-  const teams = useMemo(() => teamSplits(profileQuery.data?.bets ?? []), [profileQuery.data?.bets]);
+  const betTypeBreakdowns = summary?.betTypeBreakdowns ?? [];
+  const teaserBreakdowns = summary?.teaserBreakdowns ?? [];
+  const teams = useMemo(() => teamSplits(summary?.bets ?? []), [summary?.bets]);
   const hasSeasonPass = Boolean(seasonPassQuery.data);
-  const hasAnalyticsAccess = hasSeasonPass || rewardedUnlock;
+  const hasAnalyticsAccess = hasSeasonPass;
+  const hasSettledHistory = Boolean(summary && summary.stats.totalSettledBets > 0);
   const parlayBreakdown = useMemo(
     () => betTypeBreakdowns.find((breakdown) => breakdown.type === 'parlay') ?? null,
     [betTypeBreakdowns],
   );
-
-  const unlockWithRewardedVideo = () => {
-    setRewardedUnlock(true);
-    logAnalyticsEvent('rewarded_unlock_triggered', {
-      placement: 'advanced_analytics',
-      user_id: user?.id,
-    });
-  };
 
   if (seasonPassQuery.isLoading) {
     return (
@@ -263,8 +262,11 @@ export default function AnalyticsScreen() {
         refreshControl={
           <RefreshControl
             tintColor={THEME_COLORS.electricGreen}
-            refreshing={profileQuery.isRefetching}
-            onRefresh={profileQuery.refetch}
+            refreshing={profileQuery.isRefetching || seasonPassQuery.isRefetching}
+            onRefresh={() => {
+              void profileQuery.refetch();
+              void seasonPassQuery.refetch();
+            }}
           />
         }
         showsVerticalScrollIndicator={false}>
@@ -287,13 +289,7 @@ export default function AnalyticsScreen() {
           </Text>
           <View className="mt-3">
             <Badge
-              label={
-                hasSeasonPass
-                  ? 'Season Pass Holder'
-                  : rewardedUnlock
-                    ? 'Video Unlock Active'
-                    : 'Preview Locked'
-              }
+              label={hasSeasonPass ? 'Season Pass Holder' : 'Preview Locked'}
               tone={hasAnalyticsAccess ? 'green' : 'gold'}
             />
           </View>
@@ -302,7 +298,6 @@ export default function AnalyticsScreen() {
         {!hasAnalyticsAccess ? (
           <LockedAnalyticsPreview
             onGetPass={() => router.push('/season-pass')}
-            onRewardedUnlock={unlockWithRewardedVideo}
           />
         ) : null}
 
@@ -314,7 +309,18 @@ export default function AnalyticsScreen() {
           </View>
         ) : null}
 
-        {hasAnalyticsAccess && summary ? (
+        {hasAnalyticsAccess && profileQuery.isError ? (
+          <AnalyticsNotice
+            body={
+              profileQuery.error instanceof Error
+                ? profileQuery.error.message
+                : 'Pull to refresh and try again.'
+            }
+            title="Could Not Load Analytics"
+          />
+        ) : null}
+
+        {hasAnalyticsAccess && summary && hasSettledHistory ? (
           <View className="gap-4">
             <View>
               <Card>
@@ -483,12 +489,11 @@ export default function AnalyticsScreen() {
           </View>
         ) : null}
 
-        {hasAnalyticsAccess && !profileQuery.isLoading && !summary ? (
-          <Card>
-            <Text className="text-base font-semibold text-white/55">
-              Analytics will appear once your first league card is settled.
-            </Text>
-          </Card>
+        {hasAnalyticsAccess && !profileQuery.isLoading && !profileQuery.isError && !hasSettledHistory ? (
+          <AnalyticsNotice
+            body="No settled picks were found in your all-leagues Strategy Lab scope yet. Once a card settles, win rate, ROI, streaks, pick-type records, and team reads will populate here."
+            title="No Settled Picks"
+          />
         ) : null}
       </ScrollView>
     </ScreenWrapper>

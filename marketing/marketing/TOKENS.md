@@ -58,7 +58,7 @@ Each of the following appears in exactly one file. These are not part of the des
 
 ## Typography
 
-- **Display font:** *None loaded.* Headings use React Native's platform default (SF Pro on iOS, Roboto on Android) at the weights below. There is no Google Font, no custom display face.
+- **Display font:** *None loaded.* Headings use the native system font at the weights below. There is no Google Font, no custom display face.
 - **Body font:** Same as display — platform default.
 - **Monospace font:** `SpaceMono-Regular.ttf` is bundled in `assets/fonts/` and loaded via `useFonts` in `app/_layout.tsx`, **but no component actually applies `fontFamily: 'SpaceMono'`.** The font ships in the binary but is unused. [TODO: confirm whether SpaceMono should be removed from the bundle or wired up to a specific surface (scoreboards, odds displays, etc.).]
 - **Icon fonts:** `@expo/vector-icons` — Ionicons is the primary icon set across the app; FontAwesome glyphs are loaded but rarely used.
@@ -123,5 +123,4 @@ shadowOffset: { width: 0, height: <varies> },
 shadowOpacity: 0.25 – 0.45,
 shadowRadius: 12 – 24,
 ```
-
 

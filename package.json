@@ -27,6 +27,7 @@
     "test:edge-cases:db": "supabase db query --linked -f scripts/test-edge-cases.sql",
     "test:edge-cases": "npm run test:edge-cases:source && npm run test:edge-cases:db",
     "test:notifications": "supabase db query --linked -f scripts/test-notification-events.sql",
+    "test:rls-authorization": "supabase db query --linked -f scripts/test-rls-authorization-hardening.sql",
     "seed:manual-regressions": "supabase db query --linked -f scripts/seed-manual-regression-fixtures.sql",
     "typecheck": "tsc --noEmit"
   },

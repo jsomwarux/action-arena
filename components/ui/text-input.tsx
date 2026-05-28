@@ -1,5 +1,12 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
-import { Text, TextInput as NativeTextInput, type TextInputProps, View } from 'react-native';
+import {
+  Pressable,
+  Text,
+  TextInput as NativeTextInput,
+  type TextInputProps,
+  View,
+} from 'react-native';
 
 import { THEME_COLORS } from '@/constants/theme';
 import { cn } from '@/lib/cn';
@@ -8,6 +15,7 @@ type AppTextInputProps = TextInputProps & {
   containerClassName?: string;
   error?: string;
   label: string;
+  showPasswordToggle?: boolean;
 };
 
 export function TextInput({
@@ -17,9 +25,12 @@ export function TextInput({
   onBlur,
   onFocus,
   placeholderTextColor = 'rgba(255,255,255,0.32)',
+  secureTextEntry,
+  showPasswordToggle,
   ...textInputProps
 }: AppTextInputProps) {
   const [isFocused, setIsFocused] = useState(false);
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
 
   const borderColor = error
     ? THEME_COLORS.coralRed
@@ -34,6 +45,8 @@ export function TextInput({
     shadowRadius: 12,
   };
 
+  const effectiveSecureTextEntry = showPasswordToggle ? !isPasswordVisible : secureTextEntry;
+
   return (
     <View className={cn('gap-2', containerClassName)}>
       <Text
@@ -46,9 +59,14 @@ export function TextInput({
         {label}
       </Text>
 
-      <View className="min-h-14 rounded-2xl border bg-white/[0.04]" style={fieldStyle}>
+      <View
+        className="min-h-14 flex-row items-center rounded-2xl border bg-white/[0.04]"
+        style={fieldStyle}>
         <NativeTextInput
-          className="min-h-14 px-4 text-base font-semibold text-white"
+          className={cn(
+            'min-h-14 flex-1 px-4 text-base font-semibold text-white',
+            showPasswordToggle ? 'pr-2' : null,
+          )}
           placeholderTextColor={placeholderTextColor}
           onBlur={(event) => {
             setIsFocused(false);
@@ -58,9 +76,28 @@ export function TextInput({
             setIsFocused(true);
             onFocus?.(event);
           }}
+          secureTextEntry={effectiveSecureTextEntry}
           selectionColor={THEME_COLORS.electricGreen}
           {...textInputProps}
         />
+        {showPasswordToggle ? (
+          <Pressable
+            accessibilityLabel={isPasswordVisible ? 'Hide password' : 'Show password'}
+            accessibilityRole="button"
+            hitSlop={12}
+            onPress={() => setIsPasswordVisible((prev) => !prev)}
+            style={({ pressed }) => ({
+              opacity: pressed ? 0.55 : 1,
+              paddingHorizontal: 14,
+              paddingVertical: 12,
+            })}>
+            <Ionicons
+              color={isPasswordVisible ? THEME_COLORS.electricGreen : 'rgba(255,255,255,0.55)'}
+              name={isPasswordVisible ? 'eye-off' : 'eye'}
+              size={20}
+            />
+          </Pressable>
+        ) : null}
       </View>
 
       {error ? (

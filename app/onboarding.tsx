@@ -36,13 +36,13 @@ type IntroSlide = {
 
 const SLIDES: IntroSlide[] = [
   {
-    body: 'Compete with friends. No real money. Just bragging rights.',
+    body: 'Go head-to-head with your league on every spread, parlay, and weekly matchup. Free to play, no real money.',
     icon: 'flame',
     kicker: 'Welcome',
     title: 'The fantasy sports league for prediction game lovers.',
   },
   {
-    body: 'Join or create a league. Get matched up each week. Highest score wins.',
+    body: 'Join or create a league. Get matched up each week. Most coins wins.',
     icon: 'shield-checkmark',
     kicker: 'Leagues',
     title: 'Your weekly matchup is the main event.',
@@ -159,9 +159,9 @@ function Slide({
                   <PickTypeExample
                     accent={THEME_COLORS.amberAccent}
                     label="Parlay"
-                    value="3 picks x bigger reward"
+                    value="3 picks, bigger reward"
                   />
-                  <PickTypeExample accent={THEME_COLORS.cyanAccent} label="Teaser" value="-7.5 -> -1.5" />
+                  <PickTypeExample accent={THEME_COLORS.cyanAccent} label="Teaser" value="-7.5 → -1.5" />
                 </View>
               ) : null}
             </View>

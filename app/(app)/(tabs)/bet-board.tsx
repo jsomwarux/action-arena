@@ -1,4 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -89,6 +90,7 @@ import {
   getProfitTone,
 } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
+import { getAppStoreCaptureMode, type AppStoreCaptureMode } from '@/lib/league-settings';
 import { evaluateLiveBetStatus } from '@/lib/live-pick-status';
 import { getNflTeamShortName } from '@/lib/nfl-teams';
 import type { OddsGame, OddsSelection } from '@/lib/odds-api';
@@ -112,7 +114,6 @@ import type {
   BetMarket,
   BetType,
   EquippedCosmeticsByCategory,
-  Json,
   LeagueRow,
   LiveGameStateRow,
   TeaserLegCount,
@@ -149,8 +150,6 @@ type EditingPlacedLeg = SlipLeg & {
   betLegId: string;
   locked: boolean;
 };
-
-type AppStoreCaptureMode = 'hook_prefill' | 'lineup_prefill';
 
 type ValidationState = {
   errors: string[];
@@ -532,6 +531,29 @@ function getGameDateParts(isoDate: string) {
   return { dayLabel, timeLabel };
 }
 
+function formatUpcomingSlateDate(isoDate: string | null | undefined) {
+  if (!isoDate) {
+    return null;
+  }
+
+  const date = new Date(isoDate);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  if (date.getTime() <= Date.now()) {
+    return null;
+  }
+
+  return new Intl.DateTimeFormat('en-US', {
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    month: 'short',
+    weekday: 'short',
+  }).format(date);
+}
+
 function LockBadge({ compact = false }: { compact?: boolean }) {
   return (
     <View
@@ -909,19 +931,6 @@ function getValidationState(slipBets: SlipBet[]): ValidationState {
   };
 }
 
-function isJsonRecord(value: Json | null | undefined): value is { [key: string]: Json | undefined } {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function getAppStoreCaptureMode(league: LeagueRow | undefined): AppStoreCaptureMode | null {
-  if (!isJsonRecord(league?.settings)) {
-    return null;
-  }
-
-  const mode = league.settings.app_store_capture_mode;
-  return mode === 'hook_prefill' || mode === 'lineup_prefill' ? mode : null;
-}
-
 function findCaptureGame(oddsGames: OddsGame[], gameId: string) {
   return oddsGames.find((game) => game.id === gameId) ?? null;
 }
@@ -1114,6 +1123,30 @@ function FutureWeekBoardPlaceholder({ weekNumber }: { weekNumber: number }) {
         <Text className="text-center text-sm font-semibold leading-5 text-white/55">
           Week {weekNumber} is not open yet. The lineup builder will unlock when
           the slate is released.
+        </Text>
+      </View>
+    </Card>
+  );
+}
+
+function NoActiveSlateCard({ revealAt }: { revealAt: string | null | undefined }) {
+  const nextSlateLabel = formatUpcomingSlateDate(revealAt);
+
+  return (
+    <Card>
+      <View className="items-center gap-3 py-5">
+        <View className="h-14 w-14 items-center justify-center rounded-2xl border border-cyan-accent/30 bg-cyan-accent/10">
+          <Ionicons color={THEME_COLORS.cyanAccent} name="calendar-clear" size={24} />
+        </View>
+        <Text
+          className="text-center text-xl font-black uppercase text-white"
+          style={{ letterSpacing: -0.3 }}>
+          {nextSlateLabel ? 'Next Slate Opens Soon' : 'Season Starts Soon'}
+        </Text>
+        <Text className="px-2 text-center text-sm font-semibold leading-5 text-white/55">
+          {nextSlateLabel
+            ? `Next slate opens ${nextSlateLabel}. No current NFL games are available for picks yet.`
+            : 'No active NFL slate is available right now. When the next week opens, games and lines will appear here.'}
         </Text>
       </View>
     </Card>
@@ -4476,8 +4509,8 @@ function OddsSkeletons() {
 
 export default function BetBoardScreen() {
   const { user } = useAuth();
+  const router = useRouter();
   const leaguesQuery = useMyLeagues(user?.id);
-  const oddsQuery = useUpcomingNflOdds();
   const cosmeticsQuery = useUserCosmetics(user?.id);
   const tourFlag = useLocalFlag(LOCAL_FLAG_KEYS.betBoardTourComplete);
   const [selectedLeagueId, setSelectedLeagueId] = useState<string | undefined>();
@@ -4504,6 +4537,7 @@ export default function BetBoardScreen() {
   const leagues = leagueSummaries.map((summary) => summary.league);
   const selectedLeague = leagues.find((league) => league.id === selectedLeagueId) ?? leagues[0];
   const appStoreCaptureMode = getAppStoreCaptureMode(selectedLeague);
+  const oddsQuery = useUpcomingNflOdds({ allowMockOdds: Boolean(appStoreCaptureMode) });
   const [selectedWeek, setSelectedWeek] = useState<number | undefined>();
   const viewedWeek = selectedWeek ?? selectedLeague?.current_week;
   const isPastWeek =
@@ -4539,13 +4573,15 @@ export default function BetBoardScreen() {
   const canBuildLineup = isCurrentWeek && hasLoadedPlacedBets && !hasSubmittedLineup;
   const isCheckingBetBoardAccess = hasBetBoardAccessInputs && accessQuery.isLoading;
   const canAccessBetBoard = hasBetBoardAccessInputs ? accessQuery.data === true : true;
+  const hasActiveSlate = Boolean(oddsQuery.data?.length);
+  const canBuildLineupWithSlate = canBuildLineup && canAccessBetBoard && hasActiveSlate;
   const potwSwapClosed = revealTimeQuery.data
     ? Date.now() >= new Date(revealTimeQuery.data).getTime()
     : false;
   const validation = useMemo(() => getValidationState(slipBets), [slipBets]);
   useSyncLeagueWeekSlate(
     selectedLeague?.id,
-    canBuildLineup ? viewedWeek : undefined,
+    canBuildLineupWithSlate ? viewedWeek : undefined,
     oddsQuery.data,
   );
   const lockClockNow = useLockClock(isReadOnly);
@@ -5223,13 +5259,21 @@ export default function BetBoardScreen() {
           <Text className="px-2 text-center text-base font-semibold text-white/55">
             Join or create a league before building your weekly card.
           </Text>
+          <View className="w-full gap-3 px-4">
+            <Button title="Create a League" onPress={() => router.push('/leagues/create')} />
+            <Button
+              title="Join a League"
+              variant="secondary"
+              onPress={() => router.push('/leagues/join')}
+            />
+          </View>
         </View>
       </ScreenWrapper>
     );
   }
 
   const showPlacedBetsView = isPastWeek || hasSubmittedLineup;
-  const sheetVisible = canBuildLineup && canAccessBetBoard && !isFutureWeek;
+  const sheetVisible = canBuildLineupWithSlate && !isFutureWeek;
   const slipBottomPadding = sheetVisible ? LINEUP_COLLAPSED_HEIGHT + 20 : 32;
   const activeEditingPlacedBet = isCurrentWeek && editingPlacedBet
     ? placedBets.find((bet) => bet.id === editingPlacedBet.id) ?? editingPlacedBet
@@ -5240,7 +5284,7 @@ export default function BetBoardScreen() {
       <ScreenWrapper className="pb-0" topSafe>
         <FlatList
           contentContainerStyle={{ paddingBottom: slipBottomPadding }}
-          data={canBuildLineup && canAccessBetBoard ? oddsQuery.data ?? [] : []}
+          data={canBuildLineupWithSlate ? oddsQuery.data ?? [] : []}
           keyExtractor={(game) => game.id}
           ListHeaderComponent={
             <View className="gap-5 pb-5">
@@ -5259,7 +5303,7 @@ export default function BetBoardScreen() {
                 </View>
               ) : null}
 
-              {canBuildLineup ? (
+              {canBuildLineupWithSlate ? (
                 <View className="gap-2">
                   <Text
                     className="text-[10px] font-black uppercase text-white/50"
@@ -5289,7 +5333,7 @@ export default function BetBoardScreen() {
                 <FutureWeekBoardPlaceholder weekNumber={viewedWeek} />
               ) : null}
 
-              {isCurrentWeek ? (
+              {isCurrentWeek && (hasSubmittedLineup || hasActiveSlate) ? (
                 <BudgetTracker
                   placedBets={hasSubmittedLineup ? placedBets : undefined}
                   slipBets={slipBets}
@@ -5341,7 +5385,7 @@ export default function BetBoardScreen() {
                 </Card>
               ) : null}
 
-              {canBuildLineup && canAccessBetBoard && mode === 'parlay' ? (
+              {canBuildLineupWithSlate && mode === 'parlay' ? (
                 <ParlayBuilder
                   amountText={parlayAmount}
                   legs={parlayLegs}
@@ -5355,7 +5399,7 @@ export default function BetBoardScreen() {
                 />
               ) : null}
 
-              {canBuildLineup && canAccessBetBoard && mode === 'teaser' ? (
+              {canBuildLineupWithSlate && mode === 'teaser' ? (
                 <TeaserBuilder
                   amountText={teaserAmount}
                   legs={teaserLegs}
@@ -5426,30 +5470,7 @@ export default function BetBoardScreen() {
           }
           ListEmptyComponent={
             canBuildLineup && canAccessBetBoard && !oddsQuery.isLoading && !oddsQuery.isError ? (
-              <Card>
-                <View className="items-center gap-3 py-4">
-                  <View className="h-14 w-14 items-center justify-center rounded-full border border-electric-green/30 bg-electric-green/10">
-                    <Ionicons color={THEME_COLORS.electricGreen} name="football" size={26} />
-                  </View>
-                  <Text
-                    className="text-center text-xl font-black uppercase text-white"
-                    style={{ letterSpacing: -0.3 }}>
-                    Lines Loading Up
-                  </Text>
-                  <Text className="px-2 text-center text-sm font-semibold leading-5 text-white/55">
-                    No NFL lines are showing yet. Check your connection, then pull
-                    down to refresh.
-                  </Text>
-                  <Button
-                    onPress={() => {
-                      haptics.selection();
-                      void oddsQuery.refetch();
-                    }}
-                    title="Try Again"
-                    variant="secondary"
-                  />
-                </View>
-              </Card>
+              <NoActiveSlateCard revealAt={revealTimeQuery.data} />
             ) : null
           }
           refreshControl={

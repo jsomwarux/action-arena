@@ -68,6 +68,8 @@ function RootLayoutNav() {
           <Stack.Screen name="onboarding" />
           <Stack.Screen name="(auth)" />
           <Stack.Screen name="(app)" />
+          <Stack.Screen name="terms" />
+          <Stack.Screen name="privacy" />
           <Stack.Screen name="+not-found" />
         </Stack>
       </ThemeProvider>

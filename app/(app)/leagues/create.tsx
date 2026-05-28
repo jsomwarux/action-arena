@@ -11,7 +11,10 @@ import {
 } from '@/constants/league-options';
 import { THEME_COLORS } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
-import { useCreateLeagueMutation } from '@/hooks/use-leagues';
+import {
+  getLeagueNameValidationError,
+  useCreateLeagueMutation,
+} from '@/hooks/use-leagues';
 import { cn } from '@/lib/cn';
 import type { LeagueSport, LeagueType, LeagueVisibility } from '@/types/database';
 
@@ -27,8 +30,6 @@ const VISIBILITY_ICONS: Record<LeagueVisibility, IoniconName> = {
   private: 'lock-closed',
 };
 
-const MAX_LEAGUE_NAME_LENGTH = 50;
-const LEAGUE_NAME_TOO_LONG_MESSAGE = 'League name must be 50 characters or fewer.';
 const CREATE_LEAGUE_ERROR_MESSAGE =
   'We could not create that league. Please check the details and try again.';
 
@@ -135,31 +136,22 @@ export default function CreateLeagueScreen() {
   const [sport, setSport] = useState<LeagueSport>('nfl');
   const [nameError, setNameError] = useState<string | undefined>();
   const trimmedName = name.trim();
-  const isNameTooLong = trimmedName.length > MAX_LEAGUE_NAME_LENGTH;
+  const currentNameError = getLeagueNameValidationError(name);
+  const isNameValid = !currentNameError;
 
   const handleNameChange = (nextName: string) => {
     setName(nextName);
 
-    if (nextName.trim().length > MAX_LEAGUE_NAME_LENGTH) {
-      setNameError(LEAGUE_NAME_TOO_LONG_MESSAGE);
-      return;
-    }
-
     if (nameError) {
-      setNameError(undefined);
+      setNameError(getLeagueNameValidationError(nextName));
     }
   };
 
   const handleSubmit = async () => {
     setNameError(undefined);
 
-    if (trimmedName.length < 2) {
-      setNameError('League name needs at least 2 characters.');
-      return;
-    }
-
-    if (trimmedName.length > MAX_LEAGUE_NAME_LENGTH) {
-      setNameError(LEAGUE_NAME_TOO_LONG_MESSAGE);
+    if (currentNameError) {
+      setNameError(currentNameError);
       return;
     }
 
@@ -328,7 +320,7 @@ export default function CreateLeagueScreen() {
               </View>
 
               <Button
-                disabled={isNameTooLong}
+                disabled={!isNameValid}
                 loading={createLeague.isPending}
                 title="Create League"
                 onPress={handleSubmit}

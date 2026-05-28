@@ -9,6 +9,12 @@ type FetchBetsWithLegsInput = {
   weekNumbers?: number[];
 };
 
+type FetchUserBetsWithLegsInput = {
+  ascending?: boolean;
+  userId: string;
+  weekNumbers?: number[];
+};
+
 function uniqueValues<T>(values: T[]) {
   return [...new Set(values)];
 }
@@ -60,6 +66,46 @@ export async function fetchBetsWithLegs({
   } else if (userIds && userIds.length > 0) {
     betsQuery = betsQuery.in('user_id', uniqueValues(userIds.filter(Boolean)));
   }
+
+  if (weekNumbers && weekNumbers.length > 0) {
+    betsQuery = betsQuery.in('week_number', uniqueValues(weekNumbers));
+  }
+
+  const { data: betData, error: betError } = await betsQuery;
+
+  if (betError) {
+    throw new Error(betError.message);
+  }
+
+  const bets = (betData ?? []) as BetRow[];
+  const betIds = bets.map((bet) => bet.id);
+
+  if (betIds.length === 0) {
+    return [];
+  }
+
+  const { data: legData, error: legError } = await supabase
+    .from('bet_legs')
+    .select('*')
+    .in('bet_id', betIds);
+
+  if (legError) {
+    throw new Error(legError.message);
+  }
+
+  return mergeBetsWithLegRows(bets, (legData ?? []) as BetLegRow[]);
+}
+
+export async function fetchUserBetsWithLegs({
+  ascending = false,
+  userId,
+  weekNumbers,
+}: FetchUserBetsWithLegsInput): Promise<BetWithLegs[]> {
+  let betsQuery = supabase
+    .from('bets')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending });
 
   if (weekNumbers && weekNumbers.length > 0) {
     betsQuery = betsQuery.in('week_number', uniqueValues(weekNumbers));

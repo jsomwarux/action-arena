@@ -373,7 +373,7 @@ advance, but cuts rather than slides.
       logos if license is acquired — otherwise keep the placeholder per
       `INTAKE.md`'s pending TODO on NFL trademarks.
 - [ ] Replace prototype Tweaks panel with locked production values.
-- [ ] Add real App Store / Play Store deep links to CTA buttons.
+- [ ] Add real App Store deep links to CTA buttons.
 - [ ] Add `<meta>` tags for OG image, Twitter card, App Store smart banner.
 - [ ] Move `pick-cards/teams.ts` into shared `constants/teams.ts` if the
       same crest component is reused on App Store screenshots / social.

@@ -126,24 +126,21 @@ assertCheck(
 const analyticsSource = readProjectFile('app/(app)/analytics.tsx');
 
 assertCheck(
-  '25.3 rewarded analytics button has a play icon',
-  analyticsSource.includes('icon="play-circle"') &&
-    analyticsSource.includes('title="Watch video to unlock stats"'),
-  'rewarded unlock button should render a play icon',
-);
-
-assertCheck(
-  '25.3 rewarded analytics unlock is immediate and logged',
-  analyticsSource.includes('setRewardedUnlock(true);') &&
-    analyticsSource.includes("logAnalyticsEvent('rewarded_unlock_triggered'"),
-  'rewarded unlock should set local access and emit analytics',
-);
-
-assertCheck(
-  '25.3 Season Pass holders do not see rewarded button',
-  analyticsSource.includes('const hasAnalyticsAccess = hasSeasonPass || rewardedUnlock;') &&
+  '25.3 analytics unlock is Season Pass only',
+  analyticsSource.includes('const hasAnalyticsAccess = hasSeasonPass;') &&
     /!\s*hasAnalyticsAccess\s*\?\s*\(\s*<LockedAnalyticsPreview/s.test(analyticsSource),
-  'locked preview with rewarded button should only render without analytics access',
+  'Strategy Lab should render the locked preview unless the user has Season Pass access',
+);
+
+assertCheck(
+  '25.3 analytics screen has no rewarded-video test scaffold',
+  !analyticsSource.includes('Watch video to unlock stats') &&
+    !analyticsSource.includes('Video Unlock Active') &&
+    !analyticsSource.includes('setRewardedUnlock(true);') &&
+    !analyticsSource.includes("logAnalyticsEvent('rewarded_unlock_triggered'") &&
+    !analyticsSource.includes('for testing') &&
+    !analyticsSource.includes('placeholder'),
+  'production analytics UI must not expose rewarded-video placeholders or testing copy',
 );
 
 if (failures.length > 0) {

@@ -23,7 +23,7 @@ export const LEAGUE_VISIBILITY_OPTIONS: Array<{
   value: LeagueVisibility;
 }> = [
   {
-    description: 'Visible in public league search. Anyone can request to join while spots remain.',
+    description: 'Visible in public league search. Anyone can join while spots remain.',
     label: 'Public',
     value: 'public',
   },

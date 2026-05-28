@@ -22,6 +22,7 @@ import {
   remainingBetsNeeded,
   useHomeDashboard,
 } from '@/hooks/use-matchups';
+import { useUpcomingNflOdds } from '@/hooks/use-odds';
 import type { WeeklyAward } from '@/hooks/use-profile-stats';
 import { cn } from '@/lib/cn';
 import {
@@ -32,6 +33,7 @@ import {
   getProfitTone,
 } from '@/lib/format';
 import { summarizeRecentResults } from '@/lib/home-results';
+import { isGlobalWeekFixture } from '@/lib/league-settings';
 import { formatBetLegLabel, formatPickTitle } from '@/lib/pick-labels';
 import { isParentPickLocked } from '@/lib/pick-locking';
 
@@ -247,10 +249,31 @@ function SectionHeading({ caption, count, title }: { caption?: string; count?: n
   );
 }
 
-function ThisWeekCard({ card }: { card: HomeLeagueCard }) {
+function NoActiveSlateNotice() {
+  return (
+    <Card>
+      <View className="items-center gap-3 py-4">
+        <View className="h-14 w-14 items-center justify-center rounded-2xl border border-cyan-accent/30 bg-cyan-accent/10">
+          <Ionicons color={THEME_COLORS.cyanAccent} name="calendar-clear" size={24} />
+        </View>
+        <Text
+          className="text-center text-xl font-black uppercase text-white"
+          style={{ letterSpacing: -0.3 }}>
+          Season Starts Soon
+        </Text>
+        <Text className="px-2 text-center text-sm font-semibold leading-5 text-white/55">
+          No active NFL slate is available right now. Your leagues are ready, and this board will light up when the next slate opens.
+        </Text>
+      </View>
+    </Card>
+  );
+}
+
+function ThisWeekCard({ card, slateOpen }: { card: HomeLeagueCard; slateOpen: boolean }) {
   const router = useRouter();
   const isH2H = card.league.type === 'h2h';
   const needed = remainingBetsNeeded(card.betsPlaced);
+  const showSlateClosed = !slateOpen && needed > 0;
   const currentMatchup = card.currentMatchup;
   const live = hasLiveBets(card.thisWeekBets);
   const openCardDestination = () => {
@@ -414,7 +437,7 @@ function ThisWeekCard({ card }: { card: HomeLeagueCard }) {
                 )}
                 numberOfLines={1}
                 style={{ letterSpacing: 1.4 }}>
-                {picksSubmittedLabel(card.betsPlaced)}
+                {showSlateClosed ? 'Slate opens soon' : picksSubmittedLabel(card.betsPlaced)}
               </Text>
             </View>
             <PressableScale onPress={() => router.push('/bet-board')}>
@@ -431,7 +454,7 @@ function ThisWeekCard({ card }: { card: HomeLeagueCard }) {
                     needed > 0 ? 'text-electric-green' : 'text-white/65',
                   )}
                   style={{ letterSpacing: 1.2 }}>
-                  {needed > 0 ? `Place ${needed}` : 'Card Ready'}
+                  {showSlateClosed ? 'Season Soon' : needed > 0 ? `Place ${needed}` : 'Card Ready'}
                 </Text>
                 <Ionicons
                   color={needed > 0 ? THEME_COLORS.electricGreen : 'rgba(255,255,255,0.55)'}
@@ -887,7 +910,14 @@ function WeeklyAwardsSection({ cards }: { cards: HomeLeagueCard[] }) {
 export default function HomeScreen() {
   const { user } = useAuth();
   const dashboardQuery = useHomeDashboard(user?.id);
+  const oddsQuery = useUpcomingNflOdds();
   const cards = dashboardQuery.data?.cards ?? [];
+  const hasFixtureCard = cards.some((card) => isGlobalWeekFixture(card.league));
+  const showNoActiveSlate =
+    cards.length > 0 &&
+    oddsQuery.isSuccess &&
+    (oddsQuery.data?.length ?? 0) === 0 &&
+    !hasFixtureCard;
 
   return (
     <ScreenWrapper className="pb-0" topSafe>
@@ -910,13 +940,13 @@ export default function HomeScreen() {
           <EmptyState />
         ) : (
           <>
-            <ActionNeeded cards={cards} />
+            {showNoActiveSlate ? <NoActiveSlateNotice /> : <ActionNeeded cards={cards} />}
 
             <View className="gap-3">
               <SectionHeading title="This Week" count={cards.length} />
               {cards.map((card, index) => (
                 <StaggeredItem index={index} key={card.league.id} perItemDelay={70}>
-                  <ThisWeekCard card={card} />
+                  <ThisWeekCard card={card} slateOpen={!showNoActiveSlate} />
                 </StaggeredItem>
               ))}
             </View>

@@ -1,4 +1,4 @@
-import { Redirect, Stack } from 'expo-router';
+import { Redirect, Stack, usePathname } from 'expo-router';
 import { ActivityIndicator, View } from 'react-native';
 
 import { THEME_COLORS } from '@/constants/theme';
@@ -7,7 +7,9 @@ import { LOCAL_FLAG_KEYS, useLocalFlag } from '@/hooks/use-local-flags';
 
 export default function AuthLayout() {
   const { isLoading, session } = useAuth();
+  const pathname = usePathname();
   const onboardingFlag = useLocalFlag(LOCAL_FLAG_KEYS.onboardingComplete);
+  const isPasswordResetRoute = pathname === '/reset-password';
 
   if (isLoading || onboardingFlag.isLoading) {
     return (
@@ -17,11 +19,11 @@ export default function AuthLayout() {
     );
   }
 
-  if (session) {
+  if (session && !isPasswordResetRoute) {
     return <Redirect href="/" />;
   }
 
-  if (!onboardingFlag.value) {
+  if (!onboardingFlag.value && !isPasswordResetRoute) {
     return <Redirect href="/onboarding" />;
   }
 

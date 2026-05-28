@@ -28,6 +28,8 @@ export type NotificationType =
   | 'opponent_bets_locked';
 export type NotificationStatus = 'pending' | 'sent' | 'skipped' | 'failed';
 export type ChatMessageType = 'user' | 'system' | 'bet_share' | 'sticker';
+export type ContentReportTargetType = 'chat_message' | 'league' | 'league_member' | 'user_profile';
+export type ContentReportStatus = 'pending' | 'reviewed' | 'removed' | 'dismissed';
 export type SeasonAwardKey =
   | 'season_mvp'
   | 'best_record'
@@ -336,6 +338,10 @@ export type LeagueChatMessageRow = {
   league_id: string;
   message_type: ChatMessageType;
   metadata: Json;
+  moderation_status: 'active' | 'removed';
+  removal_reason: string | null;
+  removed_at: string | null;
+  removed_by: string | null;
   user_id: string | null;
 };
 
@@ -347,10 +353,68 @@ export type LeagueChatMessageInsert = {
   league_id: string;
   message_type?: ChatMessageType;
   metadata?: Json;
+  moderation_status?: 'active' | 'removed';
+  removal_reason?: string | null;
+  removed_at?: string | null;
+  removed_by?: string | null;
   user_id?: string | null;
 };
 
 export type LeagueChatMessageUpdate = Partial<LeagueChatMessageInsert>;
+
+export type UserBlockRow = {
+  blocked_user_id: string;
+  blocker_user_id: string;
+  created_at: string;
+};
+
+export type UserBlockInsert = {
+  blocked_user_id: string;
+  blocker_user_id: string;
+  created_at?: string;
+};
+
+export type UserBlockUpdate = Partial<UserBlockInsert>;
+
+export type ContentReportRow = {
+  action_taken: string | null;
+  content_snapshot: Json;
+  created_at: string;
+  details: string | null;
+  id: string;
+  league_id: string | null;
+  reason: string;
+  reported_user_id: string | null;
+  reporter_user_id: string;
+  review_note: string | null;
+  reviewed_at: string | null;
+  reviewer_user_id: string | null;
+  status: ContentReportStatus;
+  target_id: string;
+  target_type: ContentReportTargetType;
+  updated_at: string;
+};
+
+export type ContentReportInsert = {
+  action_taken?: string | null;
+  content_snapshot?: Json;
+  created_at?: string;
+  details?: string | null;
+  id?: string;
+  league_id?: string | null;
+  reason?: string;
+  reported_user_id?: string | null;
+  reporter_user_id: string;
+  review_note?: string | null;
+  reviewed_at?: string | null;
+  reviewer_user_id?: string | null;
+  status?: ContentReportStatus;
+  target_id: string;
+  target_type: ContentReportTargetType;
+  updated_at?: string;
+};
+
+export type ContentReportUpdate = Partial<ContentReportInsert>;
 
 export type CosmeticCatalogRow = {
   category: CosmeticCategory;
@@ -646,6 +710,8 @@ export type Database = {
       bet_result: BetResult;
       bet_type: BetType;
       chat_message_type: ChatMessageType;
+      content_report_status: ContentReportStatus;
+      content_report_target_type: ContentReportTargetType;
       league_sport: LeagueSport;
       league_status: LeagueStatus;
       league_type: LeagueType;
@@ -727,6 +793,25 @@ export type Database = {
         };
         Returns: boolean;
       };
+      get_my_arena_coin_balance: {
+        Args: Record<PropertyKey, never>;
+        Returns: number;
+      };
+      moderate_content_report: {
+        Args: {
+          p_report_id: string;
+          p_review_note?: string | null;
+          p_status: ContentReportStatus;
+        };
+        Returns: string;
+      };
+      remove_league_chat_message: {
+        Args: {
+          p_message_id: string;
+          p_reason?: string | null;
+        };
+        Returns: string;
+      };
       equip_cosmetic: {
         Args: {
           p_item_id: string;
@@ -800,6 +885,15 @@ export type Database = {
           p_item_id: string;
         };
         Returns: string;
+      };
+      public_league_member_counts: {
+        Args: {
+          p_league_ids: string[];
+        };
+        Returns: Array<{
+          league_id: string;
+          member_count: number;
+        }>;
       };
       redeem_season_pass: {
         Args: {
@@ -933,6 +1027,41 @@ export type Database = {
         ];
         Row: BetRow;
         Update: BetUpdate;
+      };
+      content_reports: {
+        Insert: ContentReportInsert;
+        Relationships: [
+          {
+            columns: ['league_id'];
+            foreignKeyName: 'content_reports_league_id_fkey';
+            isOneToOne: false;
+            referencedColumns: ['id'];
+            referencedRelation: 'leagues';
+          },
+          {
+            columns: ['reported_user_id'];
+            foreignKeyName: 'content_reports_reported_user_id_fkey';
+            isOneToOne: false;
+            referencedColumns: ['id'];
+            referencedRelation: 'users';
+          },
+          {
+            columns: ['reporter_user_id'];
+            foreignKeyName: 'content_reports_reporter_user_id_fkey';
+            isOneToOne: false;
+            referencedColumns: ['id'];
+            referencedRelation: 'users';
+          },
+          {
+            columns: ['reviewer_user_id'];
+            foreignKeyName: 'content_reports_reviewer_user_id_fkey';
+            isOneToOne: false;
+            referencedColumns: ['id'];
+            referencedRelation: 'users';
+          },
+        ];
+        Row: ContentReportRow;
+        Update: ContentReportUpdate;
       };
       games: {
         Insert: GameInsert;
@@ -1217,6 +1346,27 @@ export type Database = {
         ];
         Row: UserCosmeticRow;
         Update: UserCosmeticUpdate;
+      };
+      user_blocks: {
+        Insert: UserBlockInsert;
+        Relationships: [
+          {
+            columns: ['blocked_user_id'];
+            foreignKeyName: 'user_blocks_blocked_user_id_fkey';
+            isOneToOne: false;
+            referencedColumns: ['id'];
+            referencedRelation: 'users';
+          },
+          {
+            columns: ['blocker_user_id'];
+            foreignKeyName: 'user_blocks_blocker_user_id_fkey';
+            isOneToOne: false;
+            referencedColumns: ['id'];
+            referencedRelation: 'users';
+          },
+        ];
+        Row: UserBlockRow;
+        Update: UserBlockUpdate;
       };
       users: {
         Insert: UserInsert;

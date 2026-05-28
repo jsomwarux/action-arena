@@ -54,7 +54,6 @@ const requiredEvents = [
   'coin_store_viewed',
   'season_pass_screen_viewed',
   'season_pass_redeemed',
-  'rewarded_unlock_triggered',
 ];
 
 requiredEvents.forEach((eventName) => {
@@ -195,13 +194,11 @@ assertCheck(
 );
 
 assertCheck(
-  '26.1 rewarded analytics unlock logs rewarded_unlock_triggered',
-  hasAll(analyticsScreenSource, [
-    "logAnalyticsEvent('rewarded_unlock_triggered'",
-    "placement: 'advanced_analytics'",
-    'user_id: user?.id',
-  ]),
-  'rewarded unlock should log placement and user id',
+  '26.1 analytics is Season Pass gated in production',
+  analyticsScreenSource.includes('const hasAnalyticsAccess = hasSeasonPass;') &&
+    !analyticsScreenSource.includes("logAnalyticsEvent('rewarded_unlock_triggered'") &&
+    !analyticsScreenSource.includes('setRewardedUnlock(true);'),
+  'advanced analytics should not expose the old local rewarded-video unlock',
 );
 
 const legacyEventNames = ['picks_submitted', 'pick_settled', 'pick_shared_to_chat'];

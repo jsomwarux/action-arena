@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
+import { PUBLIC_USER_SELECT } from '@/constants/public-user-select';
 import { MINIMUM_BETS_PER_WEEK } from '@/constants/rules';
 import { calculateWeeklyAwards, type WeeklyAwards } from '@/hooks/use-profile-stats';
 import {
@@ -115,7 +116,7 @@ async function fetchUsersByIds(ids: string[]) {
     return [];
   }
 
-  const { data, error } = await supabase.from('users').select('*').in('id', userIds);
+  const { data, error } = await supabase.from('users').select(PUBLIC_USER_SELECT).in('id', userIds);
   return assertSupabaseResult(data as UserRow[] | null, error);
 }
 
