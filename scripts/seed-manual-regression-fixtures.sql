@@ -472,7 +472,20 @@ on conflict (id) do nothing;
 
 insert into public.bet_legs (bet_id, game_id, market, selection, original_line, adjusted_line, leg_odds, result, game_start_time, locked)
 values
-  ('00000000-0000-0000-0000-000000021431'::uuid, 'qa_manual_championship_den_kc', 'moneyline'::public.bet_market, 'Denver Broncos', null, null, 800, 'win'::public.bet_result, now() - interval '30 days', true);
+  ('00000000-0000-0000-0000-000000021411'::uuid, 'qa_manual_championship_buf_nyj', 'spread'::public.bet_market, 'Buffalo Bills -2.5', -2.5, -2.5, 100, 'win'::public.bet_result, now() - interval '36 days', true),
+  ('00000000-0000-0000-0000-000000021412'::uuid, 'qa_manual_championship_dal_phi', 'moneyline'::public.bet_market, 'Dallas Cowboys', null, null, 100, 'win'::public.bet_result, now() - interval '35 days', true),
+  ('00000000-0000-0000-0000-000000021413'::uuid, 'qa_manual_championship_kc_den', 'over_under'::public.bet_market, 'Over 45.5', 45.5, 45.5, 100, 'win'::public.bet_result, now() - interval '34 days', true),
+  ('00000000-0000-0000-0000-000000021414'::uuid, 'qa_manual_championship_sf_sea', 'moneyline'::public.bet_market, 'San Francisco 49ers', null, null, 100, 'win'::public.bet_result, now() - interval '33 days', true),
+  ('00000000-0000-0000-0000-000000021415'::uuid, 'qa_manual_championship_mia_ne', 'moneyline'::public.bet_market, 'Miami Dolphins', null, null, 120, 'win'::public.bet_result, now() - interval '32 days', true),
+  ('00000000-0000-0000-0000-000000021415'::uuid, 'qa_manual_championship_det_chi', 'spread'::public.bet_market, 'Detroit Lions -3.5', -3.5, -3.5, -110, 'win'::public.bet_result, now() - interval '32 days', true),
+  ('00000000-0000-0000-0000-000000021421'::uuid, 'qa_manual_championship_tb_no', 'moneyline'::public.bet_market, 'Tampa Bay Buccaneers', null, null, 100, 'win'::public.bet_result, now() - interval '31 days', true),
+  ('00000000-0000-0000-0000-000000021422'::uuid, 'qa_manual_championship_was_nyg', 'moneyline'::public.bet_market, 'Washington Commanders', null, null, 125, 'win'::public.bet_result, now() - interval '30 days', true),
+  ('00000000-0000-0000-0000-000000021422'::uuid, 'qa_manual_championship_min_gb', 'moneyline'::public.bet_market, 'Green Bay Packers', null, null, -135, 'win'::public.bet_result, now() - interval '30 days', true),
+  ('00000000-0000-0000-0000-000000021423'::uuid, 'qa_manual_championship_lac_lv', 'spread'::public.bet_market, 'Los Angeles Chargers -1.5', -1.5, -1.5, 140, 'win'::public.bet_result, now() - interval '29 days', true),
+  ('00000000-0000-0000-0000-000000021423'::uuid, 'qa_manual_championship_atl_car', 'over_under'::public.bet_market, 'Under 43.5', 43.5, 43.5, -110, 'win'::public.bet_result, now() - interval '29 days', true),
+  ('00000000-0000-0000-0000-000000021431'::uuid, 'qa_manual_championship_den_kc', 'moneyline'::public.bet_market, 'Denver Broncos', null, null, 800, 'win'::public.bet_result, now() - interval '28 days', true),
+  ('00000000-0000-0000-0000-000000021441'::uuid, 'qa_manual_championship_bal_pit', 'moneyline'::public.bet_market, 'Baltimore Ravens', null, null, -120, 'win'::public.bet_result, now() - interval '27 days', true),
+  ('00000000-0000-0000-0000-000000021441'::uuid, 'qa_manual_championship_ind_hou', 'spread'::public.bet_market, 'Houston Texans +2.5', 2.5, 2.5, -110, 'win'::public.bet_result, now() - interval '27 days', true);
 
 select public.capture_completed_season(id)
 from qa_manual_leagues

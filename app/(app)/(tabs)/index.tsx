@@ -31,22 +31,9 @@ import {
   formatProfit,
   getProfitTone,
 } from '@/lib/format';
+import { summarizeRecentResults } from '@/lib/home-results';
 import { formatBetLegLabel, formatPickTitle } from '@/lib/pick-labels';
 import { isParentPickLocked } from '@/lib/pick-locking';
-
-function bestBet(bets: BetWithLegs[], direction: 'best' | 'worst') {
-  const settled = bets.filter((bet) => bet.profit !== null);
-
-  if (settled.length === 0) {
-    return null;
-  }
-
-  return settled.sort((left, right) =>
-    direction === 'best'
-      ? (right.profit ?? 0) - (left.profit ?? 0)
-      : (left.profit ?? 0) - (right.profit ?? 0),
-  )[0];
-}
 
 function hasLiveBets(bets: BetWithLegs[]) {
   return bets.some((bet) => bet.result === 'pending' && isParentPickLocked(bet));
@@ -516,21 +503,35 @@ function NotableBet({
 function RecentResultCard({ card }: { card: HomeLeagueCard }) {
   const router = useRouter();
   const lastWeekMatchup = card.lastWeekMatchup;
-  const lastProfit =
-    card.lastWeekStanding?.weekly_profit ??
-    card.lastWeekBets.reduce((sum, bet) => sum + (bet.profit ?? 0), 0);
-  const biggestWin = bestBet(card.lastWeekBets, 'best');
-  const biggestLoss = bestBet(card.lastWeekBets, 'worst');
+  const recentResult = summarizeRecentResults(card.lastWeekBets);
+  const lastProfit = recentResult.profit;
+  const hasSettledPicks = recentResult.hasSettledPicks;
+  const biggestWin = recentResult.biggestWin;
+  const biggestLoss = recentResult.biggestLoss;
   const won =
+    hasSettledPicks &&
     Boolean(lastWeekMatchup?.winner_id) &&
     lastWeekMatchup?.winner_id === card.lastWeekStanding?.user_id;
   const lost =
+    hasSettledPicks &&
     Boolean(lastWeekMatchup?.winner_id) &&
     Boolean(card.lastWeekStanding) &&
     lastWeekMatchup?.winner_id !== card.lastWeekStanding?.user_id;
-  const isWin = won || (!lastWeekMatchup && lastProfit > 0);
-  const isLoss = lost || (!lastWeekMatchup && lastProfit < 0);
-  const outcome = won ? 'Win' : lost ? 'Loss' : lastWeekMatchup ? 'Tie' : lastProfit !== 0 ? (lastProfit > 0 ? 'Profit' : 'Loss') : 'Settled';
+  const isWin = won || (!lastWeekMatchup && lastProfit !== null && lastProfit > 0);
+  const isLoss = lost || (!lastWeekMatchup && lastProfit !== null && lastProfit < 0);
+  const outcome = !hasSettledPicks
+    ? 'Pending'
+    : won
+      ? 'Win'
+      : lost
+        ? 'Loss'
+        : lastWeekMatchup
+          ? 'Tie'
+          : lastProfit !== null && lastProfit !== 0
+            ? lastProfit > 0
+              ? 'Profit'
+              : 'Loss'
+            : 'Settled';
 
   return (
     <View>
@@ -594,11 +595,19 @@ function RecentResultCard({ card }: { card: HomeLeagueCard }) {
                 {card.league.name}
               </Text>
             </View>
-            <Text
-              className={cn('text-2xl font-black', getProfitTone(lastProfit))}
-              style={{ letterSpacing: -0.5 }}>
-              {formatProfit(lastProfit)}
-            </Text>
+            {lastProfit !== null ? (
+              <Text
+                className={cn('text-2xl font-black', getProfitTone(lastProfit))}
+                style={{ letterSpacing: -0.5 }}>
+                {formatProfit(lastProfit)}
+              </Text>
+            ) : (
+              <Text
+                className="text-[10px] font-black uppercase text-white/45"
+                style={{ letterSpacing: 1.4 }}>
+                No Result
+              </Text>
+            )}
           </View>
 
           <View className="gap-2">
