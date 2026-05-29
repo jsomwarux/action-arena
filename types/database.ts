@@ -467,6 +467,12 @@ export type EquippedCosmeticsByCategory = Partial<Record<CosmeticCategory, UserC
 export type SeasonPassRow = {
   created_at: string;
   id: string;
+  iap_environment: string | null;
+  iap_original_transaction_id: string | null;
+  iap_product_id: string | null;
+  iap_purchase_date: string | null;
+  iap_transaction_id: string | null;
+  receipt_validated_at: string | null;
   redeemed_code: string | null;
   season_year: number;
   source: string;
@@ -476,6 +482,12 @@ export type SeasonPassRow = {
 export type SeasonPassInsert = {
   created_at?: string;
   id?: string;
+  iap_environment?: string | null;
+  iap_original_transaction_id?: string | null;
+  iap_product_id?: string | null;
+  iap_purchase_date?: string | null;
+  iap_transaction_id?: string | null;
+  receipt_validated_at?: string | null;
   redeemed_code?: string | null;
   season_year: number;
   source?: string;

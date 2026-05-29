@@ -28,6 +28,7 @@ import {
 } from '@/hooks/use-notifications';
 import { useProfileData } from '@/hooks/use-profile-stats';
 import { useSeasonPass } from '@/hooks/use-season-pass';
+import { useSeasonPassPurchase } from '@/hooks/use-season-pass-purchase';
 import { useUpdateUserProfile } from '@/hooks/use-user-profile';
 import { cn } from '@/lib/cn';
 import { formatLeagueType } from '@/lib/format';
@@ -96,6 +97,7 @@ export default function SettingsScreen() {
   const leaguesQuery = useMyLeagues(user?.id);
   const preferencesQuery = useNotificationPreferences(user?.id);
   const seasonPassQuery = useSeasonPass(user?.id);
+  const seasonPassPurchase = useSeasonPassPurchase(user?.id);
   const updatePreferences = useUpdateNotificationPreferences(user?.id);
   const updateProfile = useUpdateUserProfile(user?.id);
   const deleteAccount = useDeleteAccount();
@@ -187,6 +189,11 @@ export default function SettingsScreen() {
     );
   };
 
+  const restorePurchases = async () => {
+    const outcome = await seasonPassPurchase.restore();
+    Alert.alert(outcome.title, outcome.message);
+  };
+
   return (
     <ScreenWrapper className="pb-0">
       <ScrollView
@@ -195,11 +202,12 @@ export default function SettingsScreen() {
           <RefreshControl
             tintColor={THEME_COLORS.electricGreen}
             refreshing={profileQuery.isRefetching || leaguesQuery.isRefetching || preferencesQuery.isRefetching}
-            onRefresh={() => {
-              void profileQuery.refetch();
-              void leaguesQuery.refetch();
-              void preferencesQuery.refetch();
-            }}
+              onRefresh={() => {
+                void profileQuery.refetch();
+                void leaguesQuery.refetch();
+                void preferencesQuery.refetch();
+                void seasonPassQuery.refetch();
+              }}
           />
         }
         showsVerticalScrollIndicator={false}>
@@ -314,6 +322,33 @@ export default function SettingsScreen() {
                   title="View Season Pass"
                   variant="secondary"
                 />
+                <View className="rounded-2xl border border-white/[0.07] bg-white/[0.04] p-3">
+                  <View className="flex-row items-start gap-3">
+                    <View className="h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-gold/30 bg-gold/15">
+                      <Ionicons color={THEME_COLORS.gold} name="refresh" size={18} />
+                    </View>
+                    <View className="min-w-0 flex-1 gap-1">
+                      <Text className="text-sm font-bold text-white">Restore Purchases</Text>
+                      <Text className="text-xs font-medium leading-5 text-white/55">
+                        Reconnect a Season Pass bought with the current Apple ID.
+                      </Text>
+                    </View>
+                  </View>
+                  <View className="mt-3">
+                    <Button
+                      icon="refresh"
+                      loading={seasonPassPurchase.isPurchasing}
+                      onPress={restorePurchases}
+                      title="Restore Purchases"
+                      variant="secondary"
+                    />
+                  </View>
+                  {seasonPassPurchase.error ? (
+                    <Text className="mt-2 text-xs font-bold leading-5 text-coral-red">
+                      {seasonPassPurchase.error}
+                    </Text>
+                  ) : null}
+                </View>
               </View>
             </Card>
 

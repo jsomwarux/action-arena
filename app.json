@@ -39,7 +39,8 @@
             "deploymentTarget": "15.1"
           }
         }
-      ]
+      ],
+      "expo-iap"
     ],
     "experiments": {
       "typedRoutes": true

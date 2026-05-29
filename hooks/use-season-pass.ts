@@ -5,7 +5,7 @@ import { logAnalyticsEvent } from '@/lib/analytics';
 import { supabase } from '@/lib/supabase';
 import type { SeasonPassRow } from '@/types/database';
 
-const seasonPassKeys = {
+export const seasonPassKeys = {
   access: (
     userId: string | undefined,
     leagueId: string | undefined,

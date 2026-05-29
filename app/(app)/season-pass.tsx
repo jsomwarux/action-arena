@@ -12,11 +12,10 @@ import {
 import { THEME_COLORS } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
 import { useRedeemSeasonPassMutation, useSeasonPass } from '@/hooks/use-season-pass';
+import { useSeasonPassPurchase } from '@/hooks/use-season-pass-purchase';
 import { logAnalyticsEvent } from '@/lib/analytics';
 import { cn } from '@/lib/cn';
 import { haptics } from '@/lib/haptics';
-
-const PASS_STATUS_LABEL = 'Coming Soon';
 
 const PASS_FEATURES: {
   body: string;
@@ -50,7 +49,18 @@ const PASS_FEATURES: {
   },
 ];
 
-function HeroPriceTag() {
+function HeroPriceTag({
+  hasPass,
+  isLoading,
+  priceLabel,
+}: {
+  hasPass: boolean;
+  isLoading: boolean;
+  priceLabel: string | null;
+}) {
+  const label = hasPass ? 'Active' : isLoading ? 'Loading' : priceLabel ?? 'Store';
+  const sublabel = hasPass ? 'Unlocked' : priceLabel ? 'One-time purchase' : 'Restore or code';
+
   return (
     <View className="items-end">
       <Text
@@ -61,18 +71,26 @@ function HeroPriceTag() {
       <Text
         className="text-xl font-extrabold text-white"
         style={{ letterSpacing: -0.6 }}>
-        {PASS_STATUS_LABEL}
+        {label}
       </Text>
       <Text
         className="text-[10px] font-semibold uppercase text-gold"
         style={{ letterSpacing: 1 }}>
-        Code access now
+        {sublabel}
       </Text>
     </View>
   );
 }
 
-function HeroCard({ hasPass }: { hasPass: boolean }) {
+function HeroCard({
+  hasPass,
+  isPriceLoading,
+  priceLabel,
+}: {
+  hasPass: boolean;
+  isPriceLoading: boolean;
+  priceLabel: string | null;
+}) {
   return (
     <View
       className="overflow-hidden rounded-2xl border border-gold bg-gold/[0.10]"
@@ -109,7 +127,7 @@ function HeroCard({ hasPass }: { hasPass: boolean }) {
               Season {CURRENT_SEASON_YEAR} pass holders join the founders’ class. Four perks unlock for the full season — detailed below.
             </Text>
           </View>
-          <HeroPriceTag />
+          <HeroPriceTag hasPass={hasPass} isLoading={isPriceLoading} priceLabel={priceLabel} />
         </View>
         {hasPass ? (
           <View className="flex-row items-center gap-2 rounded-xl border border-electric-green/45 bg-electric-green/15 px-3 py-2">
@@ -283,7 +301,9 @@ export default function SeasonPassScreen() {
   const [code, setCode] = useState('');
   const seasonPassQuery = useSeasonPass(user?.id);
   const redeemSeasonPass = useRedeemSeasonPassMutation(user?.id);
+  const seasonPassPurchase = useSeasonPassPurchase(user?.id);
   const hasPass = Boolean(seasonPassQuery.data);
+  const priceLabel = seasonPassPurchase.product?.displayPrice ?? null;
 
   useEffect(() => {
     logAnalyticsEvent('season_pass_screen_viewed', {
@@ -309,13 +329,39 @@ export default function SeasonPassScreen() {
     }
   };
 
-  const showPurchasePlaceholder = () => {
-    haptics.light();
-    Alert.alert(
-      'Season Pass purchases are not available yet.',
-      'Season Pass purchases will be available after App Store purchase setup is complete.',
-    );
+  const purchase = async () => {
+    haptics.medium();
+    const outcome = await seasonPassPurchase.purchase();
+
+    if (outcome.ok) {
+      haptics.success();
+    } else if (outcome.title === 'Purchase started') {
+      haptics.light();
+    } else {
+      haptics.warning();
+    }
+
+    Alert.alert(outcome.title, outcome.message);
   };
+
+  const restore = async () => {
+    haptics.light();
+    const outcome = await seasonPassPurchase.restore();
+
+    if (outcome.ok) {
+      haptics.success();
+    } else {
+      haptics.warning();
+    }
+
+    Alert.alert(outcome.title, outcome.message);
+  };
+
+  const purchaseButtonTitle = priceLabel
+    ? `Buy Pass · ${priceLabel}`
+    : seasonPassPurchase.isLoading
+      ? 'Loading Price'
+      : 'Store Unavailable';
 
   return (
     <ScreenWrapper className="pb-0">
@@ -341,10 +387,14 @@ export default function SeasonPassScreen() {
           </Text>
         </View>
 
-        <HeroCard hasPass={hasPass} />
+        <HeroCard
+          hasPass={hasPass}
+          isPriceLoading={seasonPassPurchase.isLoading}
+          priceLabel={priceLabel}
+        />
 
         <Card>
-          <View className="gap-3">
+          <View className="gap-4">
             <View className="flex-row items-center justify-between">
               <View>
                 <Text
@@ -353,20 +403,69 @@ export default function SeasonPassScreen() {
                     hasPass ? 'text-electric-green' : 'text-gold',
                   )}
                   style={{ letterSpacing: 1.2 }}>
-                  {hasPass ? 'Pass Active' : 'Redeem'}
+                  {hasPass ? 'Pass Active' : 'Apple In-App Purchase'}
                 </Text>
                 <Text className="mt-0.5 text-base font-bold text-white">
-                  {hasPass ? 'You’re all set for the season' : 'Have a code? Drop it in.'}
+                  {hasPass ? 'You’re all set for the season' : 'Unlock Season Pass'}
                 </Text>
               </View>
               {hasPass ? (
                 <Badge label="Active" tone="green" />
               ) : (
-                <Badge label="Code Only" tone="gold" />
+                <Badge label="One-Time" tone="gold" />
               )}
             </View>
+            <Text className="text-sm font-medium leading-5 text-white/60">
+              A one-time Apple purchase unlocks Season {CURRENT_SEASON_YEAR} cosmetics, analytics, early Pick Board access, and future ad-free hooks.
+            </Text>
             {!hasPass ? (
-              <View className="gap-2">
+              <Button
+                disabled={
+                  !priceLabel || seasonPassPurchase.isLoading || seasonPassPurchase.isPurchasing
+                }
+                icon="card"
+                loading={seasonPassPurchase.isPurchasing}
+                onPress={purchase}
+                title={purchaseButtonTitle}
+              />
+            ) : null}
+            <Button
+              disabled={seasonPassPurchase.isPurchasing}
+              icon="refresh"
+              loading={seasonPassPurchase.isPurchasing}
+              onPress={restore}
+              title="Restore Purchases"
+              variant="secondary"
+            />
+            {seasonPassPurchase.message ? (
+              <View className="rounded-2xl border border-electric-green/30 bg-electric-green/10 p-3">
+                <Text className="text-xs font-bold leading-5 text-electric-green">
+                  {seasonPassPurchase.message}
+                </Text>
+              </View>
+            ) : null}
+            {seasonPassPurchase.error ? (
+              <View className="rounded-2xl border border-coral-red/30 bg-coral-red/10 p-3">
+                <Text className="text-xs font-bold leading-5 text-coral-red">
+                  {seasonPassPurchase.error}
+                </Text>
+              </View>
+            ) : null}
+            {!hasPass ? (
+              <View className="gap-2 rounded-2xl border border-white/[0.07] bg-white/[0.04] p-3">
+                <View className="flex-row items-center justify-between gap-3">
+                  <View className="flex-1">
+                    <Text
+                      className="text-[11px] font-semibold uppercase text-white/45"
+                      style={{ letterSpacing: 1.2 }}>
+                      Redeem Code
+                    </Text>
+                    <Text className="mt-0.5 text-sm font-bold text-white">
+                      Reviewer or promo code
+                    </Text>
+                  </View>
+                  <Badge label="Secondary" tone="gold" />
+                </View>
                 <TextInput
                   autoCapitalize="characters"
                   label="Redeem Code"
@@ -378,15 +477,8 @@ export default function SeasonPassScreen() {
                   loading={redeemSeasonPass.isPending}
                   onPress={redeem}
                   title="Redeem Pass"
-                />
-                <Button
-                  onPress={showPurchasePlaceholder}
-                  title="Buy Pass · Soon"
                   variant="secondary"
                 />
-                <Text className="text-[11px] font-medium text-white/45">
-                  Purchases will be processed through Apple In-App Purchase when launch setup is complete.
-                </Text>
               </View>
             ) : null}
           </View>
