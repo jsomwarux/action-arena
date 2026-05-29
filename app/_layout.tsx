@@ -9,6 +9,7 @@ import 'react-native-reanimated';
 import '../global.css';
 
 import { THEME_COLORS } from '@/constants/theme';
+import { assertProductionMockDataDisabled } from '@/lib/mock-data-safety';
 import { AppProviders } from '@/providers/app-providers';
 
 export {
@@ -24,6 +25,8 @@ export const unstable_settings = {
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
+  assertProductionMockDataDisabled();
+
   const [loaded, error] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
     ...FontAwesome.font,

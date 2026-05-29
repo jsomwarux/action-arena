@@ -29,3 +29,6 @@ Compliance note: keywords intentionally use fantasy sports and prediction langua
 
 ## Age Rating Recommendation
 12+. Apple may adjust if they decide the prediction mechanics require it; do not preemptively submit as 17+.
+
+## Build Safety TODO
+TODO: When `eas.json` is added, wire the EAS `production` build profile to call `npm run prebuild:prod-check` before the production binary is produced. The script fails the build if `EXPO_PUBLIC_USE_MOCK_DATA=true` is present in the active environment profile.
