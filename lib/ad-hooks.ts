@@ -15,7 +15,10 @@ export function triggerAdHook({
     return;
   }
 
-  console.info('[ads]', 'ad would have shown here', { placement, userId });
+  if (__DEV__) {
+    console.info('[ads]', 'ad would have shown here', { placement, userId });
+  }
+
   logAnalyticsEvent('ad_hook_triggered', {
     placement,
     user_id: userId,

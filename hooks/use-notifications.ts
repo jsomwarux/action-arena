@@ -252,7 +252,9 @@ export function useRegisterPushNotifications() {
 
         await supabase.from('users').update({ push_token: token }).eq('id', user.id);
       } catch (error) {
-        console.warn('Push notification registration failed', error);
+        if (__DEV__) {
+          console.warn('Push notification registration failed', error);
+        }
       }
     };
 

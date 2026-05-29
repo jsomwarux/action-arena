@@ -76,7 +76,7 @@ function normalizeSubmitPicksError(message: string) {
   if (
     /failed to fetch|network request failed|load failed|networkerror|fetch failed/i.test(message)
   ) {
-    return 'Network connection lost. Your lineup is still in the slip - reconnect and submit again.';
+    return 'Network connection lost. Your card is still in the slip - reconnect and submit again.';
   }
 
   if (/already been submitted for this week/i.test(message)) {

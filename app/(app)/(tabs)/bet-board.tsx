@@ -218,7 +218,7 @@ const TOUR_STEPS: {
   },
   {
     anchor: 'middle',
-    body: 'Tap any odds value on a game. Choose how many coins to allocate. Then add it to your lineup.',
+    body: 'Tap any odds value on a game. Choose how many coins to allocate. Then add it to your card.',
     icon: 'finger-print',
     title: 'Make a pick',
   },
@@ -230,9 +230,9 @@ const TOUR_STEPS: {
   },
   {
     anchor: 'bottom',
-    body: 'Pull up the lineup from the bottom to review picks, rewards, and remaining budget before you submit.',
+    body: 'Pull up the card from the bottom to review picks, rewards, and remaining budget before you submit.',
     icon: 'receipt',
-    title: 'Lineup',
+    title: 'Card',
   },
   {
     anchor: 'middle',
@@ -798,20 +798,28 @@ function useLockClock(enabled: boolean) {
   return now;
 }
 
-function getDisplayedPotentialPayout(bet: Pick<SlipBet, 'is_lock' | 'potential_payout'>) {
-  return bet.is_lock
-    ? bet.potential_payout * LOCK_OF_THE_WEEK_MULTIPLIER
-    : bet.potential_payout;
+function getDisplayedPotentialPayout(
+  bet: Pick<SlipBet, 'amount' | 'is_lock' | 'potential_payout'>,
+) {
+  if (!bet.is_lock) {
+    return bet.potential_payout;
+  }
+
+  return bet.amount + (bet.potential_payout - bet.amount) * LOCK_OF_THE_WEEK_MULTIPLIER;
 }
 
 function isCappedParlay(bet: Pick<SlipBet, 'bet_type' | 'potential_payout' | 'rawPotentialReward'>) {
   return bet.bet_type === 'parlay' && (bet.rawPotentialReward ?? bet.potential_payout) > PARLAY_PAYOUT_CAP;
 }
 
-function getDisplayedPlacedPayout(bet: Pick<PlacedBet, 'is_lock' | 'potential_payout'>) {
-  return bet.is_lock
-    ? bet.potential_payout * LOCK_OF_THE_WEEK_MULTIPLIER
-    : bet.potential_payout;
+function getDisplayedPlacedPayout(
+  bet: Pick<PlacedBet, 'amount' | 'is_lock' | 'potential_payout'>,
+) {
+  if (!bet.is_lock) {
+    return bet.potential_payout;
+  }
+
+  return bet.amount + (bet.potential_payout - bet.amount) * LOCK_OF_THE_WEEK_MULTIPLIER;
 }
 
 function isCappedPlacedParlay(bet: Pick<PlacedBet, 'bet_type' | 'potential_payout'>) {
@@ -1121,7 +1129,7 @@ function FutureWeekBoardPlaceholder({ weekNumber }: { weekNumber: number }) {
           Odds Release Monday
         </Text>
         <Text className="text-center text-sm font-semibold leading-5 text-white/55">
-          Week {weekNumber} is not open yet. The lineup builder will unlock when
+          Week {weekNumber} is not open yet. The card builder will unlock when
           the slate is released.
         </Text>
       </View>
@@ -2035,7 +2043,7 @@ function ParlayBuilder({
               haptics.medium();
               onAddToSlip();
             }}
-            title="Add Parlay to Lineup"
+            title="Add Parlay to Card"
             variant="secondary"
           />
         </View>
@@ -2217,7 +2225,7 @@ function TeaserBuilder({
               haptics.medium();
               onAddToSlip();
             }}
-            title="Add Teaser to Lineup"
+            title="Add Teaser to Card"
             variant="secondary"
           />
         </View>
@@ -2575,7 +2583,7 @@ function SlipSummary({
 }
 
 // ============================================================
-// Lineup Bottom Sheet
+// Card Bottom Sheet
 // ============================================================
 
 function BetSlipSheet({
@@ -2635,7 +2643,7 @@ function BetSlipSheet({
                 <Text
                   className="text-[10px] font-black uppercase text-electric-green"
                   style={{ letterSpacing: 2 }}>
-                  Lineup
+                  Card
                 </Text>
                 <Text
                   className="text-base font-black text-white"
@@ -2662,7 +2670,7 @@ function BetSlipSheet({
               </Text>
               {slipBets.length > 0 ? (
                 <Pressable
-                  accessibilityLabel="Clear all picks from lineup"
+                  accessibilityLabel="Clear all picks from card"
                   accessibilityRole="button"
                   hitSlop={8}
                   onPress={() => {
@@ -2700,10 +2708,10 @@ function BetSlipSheet({
               <Text
                 className="text-2xl font-black uppercase text-white"
                 style={{ letterSpacing: -0.4 }}>
-                Lineup is Empty
+                Card is Empty
               </Text>
               <Text className="px-4 text-center text-sm font-semibold text-white/55">
-                Select odds from any game above to start building your lineup.
+                Select odds from any game above to start building your card.
               </Text>
             </View>
           }
@@ -2958,7 +2966,7 @@ function AmountModal({
                     }
                     onSaveStraight(amount);
                   }}
-                  title={isEditing ? 'Save Amount' : 'Add to Lineup'}
+                  title={isEditing ? 'Save Amount' : 'Add to Card'}
                 />
                 <Button title="Cancel" variant="secondary" onPress={onClose} />
               </View>
@@ -3146,7 +3154,7 @@ function ConfirmationModal({
                       haptics.heavy();
                       onConfirm();
                     }}
-                    title="Submit Lineup"
+                    title="Submit Card"
                   />
                 </View>
               </View>
@@ -4338,7 +4346,7 @@ function PlacedBetsView({
       : settlementState === 'partially_settled'
         ? 'Results Updating'
         : readOnly
-          ? `Week ${weekNumber} Lineup`
+          ? `Week ${weekNumber} Card`
           : 'Card Submitted';
   const headline =
     settlementState === 'settled'
@@ -4346,7 +4354,7 @@ function PlacedBetsView({
       : settlementState === 'partially_settled'
         ? 'Picks Are Settling'
         : readOnly
-          ? 'Read-Only Lineup'
+          ? 'Read-Only Card'
           : 'This Week is Submitted';
   const helperText =
     settlementState === 'settled'
@@ -4455,7 +4463,7 @@ function PlacedBetsView({
               No picks this week
             </Text>
             <Text className="text-center text-sm font-semibold text-white/50">
-              There is no submitted lineup for Week {weekNumber}.
+              There is no submitted card for Week {weekNumber}.
             </Text>
           </View>
         </Card>
@@ -5018,7 +5026,7 @@ export default function BetBoardScreen() {
   };
 
   const handleClearAllPicks = () => {
-    Alert.alert('Remove all picks from your lineup?', 'This clears every pick and coin amount.', [
+    Alert.alert('Remove all picks from your card?', 'This clears every pick and coin amount.', [
       { style: 'cancel', text: 'Cancel' },
       {
         onPress: () => {
@@ -5162,7 +5170,7 @@ export default function BetBoardScreen() {
       setSlipSnap(0);
       setSlipBets([]);
       haptics.success();
-      Alert.alert('Lineup submitted', 'Your card is set at the selected values.');
+      Alert.alert('Card submitted', 'Your card is set at the selected values.');
     } catch (error) {
       haptics.error();
       Alert.alert('Could not submit picks', error instanceof Error ? error.message : 'Try again.');

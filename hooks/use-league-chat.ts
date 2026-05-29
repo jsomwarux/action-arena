@@ -36,6 +36,7 @@ export type SharedBetMetadata = {
   }[];
   odds: number;
   potentialReward: number;
+  profit?: number | null;
   result: BetWithLegs['result'];
   weekNumber: number;
 };
@@ -89,6 +90,7 @@ function metadataForBet(bet: ShareableBet): SharedBetMetadata {
     })),
     odds: bet.odds,
     potentialReward: bet.potential_payout,
+    profit: bet.profit,
     result: bet.result,
     weekNumber: bet.week_number,
   };

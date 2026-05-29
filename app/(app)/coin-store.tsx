@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { useEffect } from 'react';
+import { ScrollView, Text, View } from 'react-native';
 
 import {
   AnimatedNumber,
@@ -15,7 +15,6 @@ import { useAuth } from '@/hooks/use-auth';
 import { useUserCosmetics } from '@/hooks/use-cosmetics';
 import { logAnalyticsEvent } from '@/lib/analytics';
 import { cn } from '@/lib/cn';
-import { haptics } from '@/lib/haptics';
 
 type Tier = 'pouch' | 'chest' | 'vault';
 
@@ -65,26 +64,6 @@ const TIER_META: Record<
     tagline: 'Best value',
   },
 };
-
-function ToastNotice({ message, onDismiss }: { message: string | null; onDismiss: () => void }) {
-  useEffect(() => {
-    if (!message) return undefined;
-    const timer = setTimeout(onDismiss, 2300);
-    return () => clearTimeout(timer);
-  }, [message, onDismiss]);
-
-  if (!message) return null;
-
-  return (
-    <View className="absolute bottom-8 left-5 right-5 z-20">
-      <Pressable onPress={onDismiss}>
-        <View className="rounded-2xl border border-electric-green/45 bg-arena-surface px-4 py-3">
-          <Text className="text-center text-sm font-bold text-electric-green">{message}</Text>
-        </View>
-      </Pressable>
-    </View>
-  );
-}
 
 function CoinIconCluster({ accent, plateSize }: { accent: string; plateSize: number }) {
   // Stacked-coin illusion built with three offset circles.
@@ -228,7 +207,7 @@ function PriceBlock({
       <Text
         className="text-[10px] font-semibold uppercase"
         style={{ color: accent, letterSpacing: 1 }}>
-        Tap to buy
+        Coming soon
       </Text>
     </View>
   );
@@ -360,16 +339,14 @@ function PackCard({
   isFeatured,
   pack,
   tier,
-  onPress,
 }: {
   isFeatured: boolean;
   pack: CoinPack;
   tier: Tier;
-  onPress: () => void;
 }) {
   const meta = TIER_META[tier];
   return (
-    <PressableScale onPress={onPress} pressedScale={0.99}>
+    <PressableScale accessibilityState={{ disabled: true }} disabled pressedScale={0.99}>
       <View
         className="overflow-hidden rounded-2xl border bg-white/[0.04]"
         style={{
@@ -400,17 +377,10 @@ function PackCard({
 export default function CoinStoreScreen() {
   const { user } = useAuth();
   const cosmeticsQuery = useUserCosmetics(user?.id);
-  const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
     logAnalyticsEvent('coin_store_viewed', { user_id: user?.id });
   }, [user?.id]);
-
-  const showComingSoon = (packId: string) => {
-    haptics.medium();
-    logAnalyticsEvent('coin_store_viewed', { pack_id: packId, user_id: user?.id });
-    setToast('Apple IAP coming soon — your pack will land here.');
-  };
 
   return (
     <ScreenWrapper className="pb-0">
@@ -477,7 +447,6 @@ export default function CoinStoreScreen() {
               <PackCard
                 isFeatured={isFeatured}
                 key={pack.id}
-                onPress={() => showComingSoon(pack.id)}
                 pack={pack}
                 tier={tier}
               />
@@ -499,7 +468,6 @@ export default function CoinStoreScreen() {
           </Text>
         </View>
       </ScrollView>
-      <ToastNotice message={toast} onDismiss={() => setToast(null)} />
     </ScreenWrapper>
   );
 }

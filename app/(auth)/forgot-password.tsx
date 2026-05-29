@@ -66,7 +66,7 @@ export default function ForgotPasswordScreen() {
             {!isSupabaseConfigured ? (
               <View className="rounded-xl border border-coral-red/40 bg-coral-red/10 p-3">
                 <Text className="text-sm font-semibold text-coral-red">
-                  Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY to enable auth.
+                  Account services are unavailable right now. Please try again later.
                 </Text>
               </View>
             ) : null}

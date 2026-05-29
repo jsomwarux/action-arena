@@ -8,7 +8,7 @@ type ArenaLogoProps = {
   size?: 'lg' | 'md';
 };
 
-export function ArenaLogo({ className, eyebrow = 'BEST · SPORTS · PICKS', size = 'lg' }: ArenaLogoProps) {
+export function ArenaLogo({ className, eyebrow = 'ACTION · ARENA', size = 'lg' }: ArenaLogoProps) {
   const wordmarkSize = size === 'lg' ? 48 : 36;
   const wordmarkLeading = size === 'lg' ? 46 : 36;
 

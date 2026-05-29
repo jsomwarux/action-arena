@@ -30,8 +30,10 @@ export function logAnalyticsEvent(name: AnalyticsEventName, payload: AnalyticsPa
     }),
   );
 
-  console.info('[analytics]', name, {
-    ...sanitizedPayload,
-    timestamp: new Date().toISOString(),
-  });
+  if (__DEV__) {
+    console.info('[analytics]', name, {
+      ...sanitizedPayload,
+      timestamp: new Date().toISOString(),
+    });
+  }
 }

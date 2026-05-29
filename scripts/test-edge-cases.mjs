@@ -58,7 +58,7 @@ assertCheck(
   '27.1 network loss returns a retryable message',
   hasAll(straightBetsSource, [
     'Network connection lost.',
-    'Your lineup is still in the slip',
+    'Your card is still in the slip',
     'reconnect and submit again',
   ]),
   'submit errors should tell the player the slip is preserved',
@@ -76,7 +76,7 @@ assertCheck(
 assertCheck(
   '27.2 invalid Odds API responses show friendly errors',
   hasAll(oddsSource, [
-    'Unable to load odds. Check the Odds API key, then try again.',
+    'Unable to load odds right now. Please try again later.',
     'Unable to load odds right now. Check your connection, then try again.',
     'Unable to load odds right now. The Odds API returned status',
   ]),

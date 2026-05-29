@@ -51,7 +51,7 @@ const SLIDES: IntroSlide[] = [
     body: 'Make picks across NFL games. Build multi-pick combos for higher rewards. Level up your strategy.',
     icon: 'pulse',
     kicker: 'Picks',
-    title: 'Build your lineup.',
+    title: 'Build your card.',
   },
 ];
 
