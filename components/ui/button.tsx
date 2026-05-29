@@ -4,7 +4,6 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import {
   ActivityIndicator,
   Pressable,
-  type GestureResponderEvent,
   type PressableProps,
   StyleSheet,
   Text,
@@ -65,7 +64,6 @@ export function Button({
   icon,
   iconColor,
   loading = false,
-  onPress,
   title,
   variant = 'primary',
   ...rest
@@ -73,12 +71,6 @@ export function Button({
   const isDisabled = disabled || loading;
   const contentColor =
     iconColor ?? (variant === 'primary' ? THEME_COLORS.background : THEME_COLORS.textPrimary);
-  console.log('[Button] render', { disabled: isDisabled, loading, title, variant });
-
-  const handlePress = (event: GestureResponderEvent) => {
-    console.log('[Button] onPress', { disabled: isDisabled, loading, title, variant });
-    onPress?.(event);
-  };
 
   return (
     <Pressable
@@ -89,7 +81,6 @@ export function Button({
         fullWidth && 'w-full',
       )}
       disabled={isDisabled}
-      onPress={handlePress}
       {...rest}
       style={({ pressed }) => [
         glowStyles[variant],
