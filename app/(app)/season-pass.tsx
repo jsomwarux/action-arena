@@ -49,6 +49,17 @@ const PASS_FEATURES: {
   },
 ];
 
+const SEASON_PASS_ACTIVE_MESSAGE =
+  'Season Pass active. Exclusive drops and analytics are unlocked.';
+
+function cleanProductionAlertMessage(message: string) {
+  if (__DEV__) {
+    return message;
+  }
+
+  return message.replace(/\n*\[Environment: [^\]]+\]\s*/g, '').trim();
+}
+
 function HeroPriceTag({
   hasPass,
   isLoading,
@@ -133,7 +144,7 @@ function HeroCard({
           <View className="flex-row items-center gap-2 rounded-xl border border-electric-green/45 bg-electric-green/15 px-3 py-2">
             <Ionicons color={THEME_COLORS.electricGreen} name="checkmark-circle" size={14} />
             <Text className="flex-1 text-xs font-bold text-electric-green">
-              Season Pass active. Exclusive drops and analytics are unlocked.
+              {SEASON_PASS_ACTIVE_MESSAGE}
             </Text>
           </View>
         ) : null}
@@ -342,7 +353,7 @@ export default function SeasonPassScreen() {
       haptics.warning();
     }
 
-    Alert.alert(outcome.title, outcome.message);
+    Alert.alert(outcome.title, cleanProductionAlertMessage(outcome.message));
   };
 
   const restorePass = async () => {
@@ -434,7 +445,8 @@ export default function SeasonPassScreen() {
               title="Restore Purchases"
               variant="secondary"
             />
-            {seasonPassPurchase.message ? (
+            {seasonPassPurchase.message &&
+            !(hasPass && seasonPassPurchase.message === SEASON_PASS_ACTIVE_MESSAGE) ? (
               <View className="rounded-2xl border border-electric-green/30 bg-electric-green/10 p-3">
                 <Text className="text-xs font-bold leading-5 text-electric-green">
                   {seasonPassPurchase.message}
