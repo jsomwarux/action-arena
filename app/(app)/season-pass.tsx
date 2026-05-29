@@ -360,9 +360,7 @@ export default function SeasonPassScreen() {
 
   const purchaseButtonTitle = priceLabel
     ? `Buy Pass · ${priceLabel}`
-    : seasonPassPurchase.isLoading
-      ? 'Loading Price'
-      : 'Store Unavailable';
+    : 'Buy Pass';
 
   return (
     <ScreenWrapper className="pb-0">
@@ -421,9 +419,7 @@ export default function SeasonPassScreen() {
             </Text>
             {!hasPass ? (
               <Button
-                disabled={
-                  !priceLabel || seasonPassPurchase.isLoading || seasonPassPurchase.isPurchasing
-                }
+                disabled={seasonPassPurchase.isPurchasing}
                 icon="card"
                 loading={seasonPassPurchase.isPurchasing}
                 onPress={buyPass}
