@@ -14,7 +14,12 @@
       "backgroundColor": "#0A0E1A"
     },
     "ios": {
-      "supportsTablet": true
+      "bundleIdentifier": "com.actionarena.app",
+      "buildNumber": "1",
+      "supportsTablet": false,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -26,10 +31,24 @@
     },
     "plugins": [
       "expo-router",
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "15.1"
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "27811771-1195-4db4-922d-191becdc9065"
+      }
+    },
+    "owner": "jsomwaru"
   }
 }
