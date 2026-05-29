@@ -161,11 +161,13 @@ export function useSeasonPassPurchase(
   } = useIAP({
     onError: (error) => {
       setStoreError(userFacingPurchaseError(error));
+      setStatusMessage(null);
       setProductFetchStatus((current) => (current === 'loading' ? 'error' : current));
     },
     onPurchaseError: (error: ExpoPurchaseError) => {
       setIsPurchasing(false);
       setOperationError(userFacingPurchaseError(error));
+      setStatusMessage(null);
     },
     onPurchaseSuccess: (purchase) => {
       if (!isSeasonPassPurchase(purchase)) {
@@ -354,6 +356,10 @@ export function useSeasonPassPurchase(
   }, [processPurchase]);
 
   const purchase = useCallback(async (): Promise<SeasonPassPurchaseResult> => {
+    console.log('[SeasonPassPurchase] purchase handler entered');
+    setOperationError(null);
+    setStatusMessage(null);
+
     if (!userId) {
       const message = 'Sign in before buying the Season Pass.';
       setOperationError(message);
@@ -366,17 +372,14 @@ export function useSeasonPassPurchase(
       return result(false, 'Purchases unavailable', message);
     }
 
-    if (!product) {
-      const message = storeError ?? STORE_UNAVAILABLE_MESSAGE;
-      setOperationError(message);
-      return result(false, 'Store unavailable', message);
-    }
-
     setIsPurchasing(true);
-    setOperationError(null);
     setStatusMessage('Opening the App Store purchase sheet.');
 
     try {
+      console.log('[SeasonPassPurchase] calling requestPurchase', {
+        sku: SEASON_PASS_PRODUCT_ID,
+        type: 'in-app',
+      });
       const purchased = await requestPurchase({
         request: {
           apple: {
@@ -404,7 +407,7 @@ export function useSeasonPassPurchase(
       setIsPurchasing(false);
       return result(false, 'Could not start purchase', message);
     }
-  }, [processPurchase, product, requestPurchase, storeError, userId]);
+  }, [processPurchase, requestPurchase, userId]);
 
   const restore = useCallback(async (): Promise<SeasonPassPurchaseResult> => {
     if (!userId) {
