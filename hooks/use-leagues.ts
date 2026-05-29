@@ -483,11 +483,13 @@ export function useGenerateScheduleMutation(userId: string | undefined) {
       ]);
     },
     onError: (error, leagueId) => {
-      console.error('[league_schedule_generation_failed]', {
-        error: error instanceof Error ? error.message : String(error),
-        league_id: leagueId,
-        user_id: userId,
-      });
+      if (__DEV__) {
+        console.error('[league_schedule_generation_failed]', {
+          error: error instanceof Error ? error.message : String(error),
+          league_id: leagueId,
+          user_id: userId,
+        });
+      }
     },
   });
 }

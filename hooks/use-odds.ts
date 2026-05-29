@@ -77,7 +77,9 @@ export function useSyncLeagueWeekSlate(
       })
       .then(({ error }) => {
         if (error) {
-          console.warn('Weekly slate sync failed', error.message);
+          if (__DEV__) {
+            console.warn('Weekly slate sync failed', error.message);
+          }
           return;
         }
         void queryClient.invalidateQueries({

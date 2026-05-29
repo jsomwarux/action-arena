@@ -957,10 +957,14 @@ function Achievements({ achievements }: { achievements: AchievementDisplay[] }) 
 // Pick history
 // ============================================================
 
-function getDisplayedHistoryPayout(bet: Pick<BetWithLegs, 'is_lock' | 'potential_payout'>) {
-  return bet.is_lock
-    ? bet.potential_payout * LOCK_OF_THE_WEEK_MULTIPLIER
-    : bet.potential_payout;
+function getDisplayedHistoryPayout(
+  bet: Pick<BetWithLegs, 'amount' | 'is_lock' | 'potential_payout'>,
+) {
+  if (!bet.is_lock) {
+    return bet.potential_payout;
+  }
+
+  return bet.amount + (bet.potential_payout - bet.amount) * LOCK_OF_THE_WEEK_MULTIPLIER;
 }
 
 function isCappedHistoryParlay(bet: Pick<BetWithLegs, 'bet_type' | 'potential_payout'>) {

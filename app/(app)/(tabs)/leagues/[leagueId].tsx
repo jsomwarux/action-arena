@@ -2430,6 +2430,7 @@ function SharedBetCard({
 }) {
   const accent = betTypeAccent(metadata.betType);
   const isLock = metadata.isLock === true;
+  const hasSettledProfit = metadata.result !== 'pending' && typeof metadata.profit === 'number';
 
   return (
     <PressableScale>
@@ -2531,8 +2532,14 @@ function SharedBetCard({
               style={{ letterSpacing: 1.4 }}>
               {formatCurrency(metadata.amount)} played
             </Text>
-            <Text className="shrink-0 text-xs font-black text-electric-green">
-              Reward {formatCurrency(metadata.potentialReward)}
+            <Text
+              className={cn(
+                'shrink-0 text-xs font-black',
+                hasSettledProfit ? getProfitTone(metadata.profit ?? 0) : 'text-electric-green',
+              )}>
+              {hasSettledProfit
+                ? `Profit ${formatProfit(metadata.profit ?? 0)}`
+                : `Reward ${formatCurrency(metadata.potentialReward)}`}
             </Text>
           </View>
         </View>

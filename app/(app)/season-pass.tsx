@@ -312,8 +312,8 @@ export default function SeasonPassScreen() {
   const showPurchasePlaceholder = () => {
     haptics.light();
     Alert.alert(
-      'Coming Soon — payment integration not yet available.',
-      'Use a redeem code for Season Pass testing right now.',
+      'Season Pass purchases are not available yet.',
+      'Season Pass purchases will be available after App Store purchase setup is complete.',
     );
   };
 
@@ -371,7 +371,7 @@ export default function SeasonPassScreen() {
                   autoCapitalize="characters"
                   label="Redeem Code"
                   onChangeText={setCode}
-                  placeholder="ARENA-S1-TEST"
+                  placeholder="ENTER-CODE"
                   value={code}
                 />
                 <Button
@@ -385,7 +385,7 @@ export default function SeasonPassScreen() {
                   variant="secondary"
                 />
                 <Text className="text-[11px] font-medium text-white/45">
-                  Processed through Apple In-App Purchase at launch. No payment SDK is connected in this build.
+                  Purchases will be processed through Apple In-App Purchase when launch setup is complete.
                 </Text>
               </View>
             ) : null}

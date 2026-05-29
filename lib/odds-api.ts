@@ -130,7 +130,7 @@ export async function fetchUpcomingNflOdds(options: FetchUpcomingNflOddsOptions 
   }
 
   if (!ODDS_API_KEY) {
-    throw new Error('Set EXPO_PUBLIC_ODDS_API_KEY to load real NFL lines.');
+    throw new Error('NFL lines are unavailable right now. Please try again later.');
   }
 
   const url = new URL(`${ODDS_API_BASE_URL}/sports/${NFL_SPORT_KEY}/odds`);
@@ -149,7 +149,7 @@ export async function fetchUpcomingNflOdds(options: FetchUpcomingNflOddsOptions 
 
   if (!response.ok) {
     if (response.status === 401 || response.status === 403) {
-      throw new Error('Unable to load odds. Check the Odds API key, then try again.');
+      throw new Error('Unable to load odds right now. Please try again later.');
     }
 
     throw new Error(`Unable to load odds right now. The Odds API returned status ${response.status}.`);

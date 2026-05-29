@@ -20,11 +20,11 @@ export const isSupabaseConfigured =
   hasValidSupabaseUrl && typeof envSupabaseAnonKey === 'string' && envSupabaseAnonKey.length > 0;
 
 const supabaseUrl =
-  hasValidSupabaseUrl && envSupabaseUrl ? envSupabaseUrl : 'https://placeholder.supabase.co';
+  hasValidSupabaseUrl && envSupabaseUrl ? envSupabaseUrl : 'https://not-configured.invalid';
 const supabaseAnonKey =
   typeof envSupabaseAnonKey === 'string' && envSupabaseAnonKey.length > 0
     ? envSupabaseAnonKey
-    : 'placeholder-anon-key';
+    : 'anon-key-not-configured';
 
 const authStorage: SupabaseAuthStorage = AsyncStorage;
 
