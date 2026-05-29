@@ -329,7 +329,8 @@ export default function SeasonPassScreen() {
     }
   };
 
-  const purchase = async () => {
+  const buyPass = async () => {
+    console.log('[SeasonPass] Buy Pass pressed');
     haptics.medium();
     const outcome = await seasonPassPurchase.purchase();
 
@@ -344,7 +345,7 @@ export default function SeasonPassScreen() {
     Alert.alert(outcome.title, outcome.message);
   };
 
-  const restore = async () => {
+  const restorePass = async () => {
     haptics.light();
     const outcome = await seasonPassPurchase.restore();
 
@@ -425,7 +426,7 @@ export default function SeasonPassScreen() {
                 }
                 icon="card"
                 loading={seasonPassPurchase.isPurchasing}
-                onPress={purchase}
+                onPress={buyPass}
                 title={purchaseButtonTitle}
               />
             ) : null}
@@ -433,7 +434,7 @@ export default function SeasonPassScreen() {
               disabled={seasonPassPurchase.isPurchasing}
               icon="refresh"
               loading={seasonPassPurchase.isPurchasing}
-              onPress={restore}
+              onPress={restorePass}
               title="Restore Purchases"
               variant="secondary"
             />
