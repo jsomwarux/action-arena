@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { PUBLIC_USER_SELECT } from '@/constants/public-user-select';
 import { logAnalyticsEvent } from '@/lib/analytics';
 import { TEAM_NAME_MAX_LENGTH } from '@/lib/league-member-display';
+import { isPublicBrowseEligibleLeague } from '@/lib/league-settings';
 import { supabase } from '@/lib/supabase';
 import type {
   LeagueInsert,
@@ -177,14 +178,16 @@ export function usePublicLeagues(search: string) {
         .select('*')
         .eq('visibility', 'public')
         .order('created_at', { ascending: false })
-        .limit(50);
+        .limit(100);
 
       if (search.trim()) {
         query = query.ilike('name', `%${search.trim()}%`);
       }
 
       const { data: leagues, error } = await query;
-      const publicLeagues = assertSupabaseResult(leagues, error);
+      const publicLeagues = assertSupabaseResult(leagues, error)
+        .filter(isPublicBrowseEligibleLeague)
+        .slice(0, 50);
       const leagueIds = publicLeagues.map((league) => league.id);
       const commissionerIds = publicLeagues.map((league) => league.commissioner_id);
 

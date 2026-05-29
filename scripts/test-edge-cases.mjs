@@ -37,6 +37,7 @@ const straightBetsSource = readProjectFile('hooks/use-straight-bets.ts');
 const betBoardSource = readProjectFile('app/(app)/(tabs)/bet-board.tsx');
 const oddsSource = readProjectFile('lib/odds-api.ts');
 const leaguesSource = readProjectFile('hooks/use-leagues.ts');
+const leagueSettingsSource = readProjectFile('lib/league-settings.ts');
 const memberDisplaySource = readProjectFile('lib/league-member-display.ts');
 const settingsSource = readProjectFile('app/(app)/settings.tsx');
 const profileContentSource = readProjectFile('components/profile/profile-content.tsx');
@@ -136,6 +137,18 @@ assertCheck(
     'matchups.flatMap',
   ]),
   'detail hook should filter standings by active members while still loading matchup profiles',
+);
+
+assertCheck(
+  '27.4 public browse excludes fixture and test leagues',
+  hasAll(leaguesSource, ['isPublicBrowseEligibleLeague', '.filter(isPublicBrowseEligibleLeague)']) &&
+    hasAll(leagueSettingsSource, [
+      'app_store_screenshot_fixture',
+      'global_week_test_fixture',
+      'manual_regression_fixture',
+      'publicBrowseBlockedLeagueNamePatterns',
+    ]),
+  'public browse should not render App Review, QA, screenshot, or named test leagues',
 );
 
 assertCheck(
