@@ -224,6 +224,28 @@ assertCheck(
 );
 
 assertCheck(
+  '27.7 same visible straight selection opens edit instead of add',
+  hasAll(betBoardSource, [
+    'const existingSelection = getExistingSlipSelection(game, selection);',
+    'setEditingSlipBet({ bet: existingSelection.bet });',
+    'title={isEditing ? \'Update\' : \'Add to Card\'}',
+    'title="Remove from Card"',
+  ]),
+  'tapping an option already on the straight card should edit or remove that pick, not add another',
+);
+
+assertCheck(
+  '27.7 opposite visible selection confirms replacement',
+  hasAll(betBoardSource, [
+    'Replace your ${existingLabel} pick with ${nextLabel}?',
+    'onPress: () => applySelectionConflictSwap(conflict)',
+    'removeConflictSource(conflict);',
+    'addConflictReplacement(conflict);',
+  ]),
+  'tapping an opposite side should confirm and swap the existing conflict instead of stacking',
+);
+
+assertCheck(
   '27.4 leave-league confirmation warns that the action is permanent',
   hasAll(settingsSource, [
     'Leave league?',

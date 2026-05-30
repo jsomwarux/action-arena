@@ -184,6 +184,11 @@ type SelectionConflict = {
   targetMode: BetMode;
 };
 
+type ExistingSelection = {
+  bet: SlipBet;
+  leg: SlipLeg;
+};
+
 const MARKET_OPTIONS: SegmentedOption<BetMarket>[] = [
   { icon: 'trophy', label: 'Winner', value: 'moneyline' },
   { icon: 'swap-horizontal', label: 'Spread', value: 'spread' },
@@ -619,6 +624,14 @@ function formatSelectedPickReference(leg: SlipLeg) {
 
   if (leg.market === 'moneyline') {
     return `${getNflTeamShortName(side)} to win`;
+  }
+
+  return leg.label;
+}
+
+function formatSwapPromptLabel(leg: SlipLeg) {
+  if (leg.market === 'moneyline') {
+    return `${getNflTeamShortName(getPickConflictSide(leg))} to win`;
   }
 
   return leg.label;
@@ -1346,6 +1359,10 @@ function OddsButton({
     ? getTeaserOddsButtonLabel(selection, teaserPoints)
     : getOddsButtonLabel(selection);
   const conflict = Boolean(conflictSummary && !isSelected);
+  const statusIcon = isSelected ? 'checkmark' : conflict ? 'lock-closed' : null;
+  const statusColor = isSelected ? accentHex : 'rgba(255,255,255,0.68)';
+  const statusBorderColor = isSelected ? `${accentHex}99` : 'rgba(255,255,255,0.20)';
+  const statusBackgroundColor = isSelected ? `${accentHex}24` : 'rgba(255,255,255,0.08)';
   // Odds always read in the electric-green action color so the odds value pops
   // against the white selection label — when selected, the value flips to the
   // active mode accent so the chosen pick reads as a single colored unit.
@@ -1395,7 +1412,7 @@ function OddsButton({
         alignSelf: 'stretch',
         flex: 1,
         flexBasis: 0,
-        minHeight: conflict ? 84 : 68,
+        minHeight: 70,
         minWidth: 0,
         opacity: disabled ? 0.36 : conflict ? 0.68 : pressed ? 0.92 : 1,
         width: '100%',
@@ -1415,9 +1432,11 @@ function OddsButton({
             alignItems: 'center',
             flexDirection: 'row',
             gap: 8,
-            minHeight: conflict ? 84 : 68,
-            paddingHorizontal: 10,
+            minHeight: 70,
+            paddingLeft: 10,
+            paddingRight: 28,
             paddingVertical: 12,
+            position: 'relative',
             shadowColor: isSelected ? accentHex : '#000',
             shadowOffset: { width: 0, height: 0 },
             shadowOpacity: isSelected ? 0.55 : 0,
@@ -1429,8 +1448,6 @@ function OddsButton({
         <OddsLogoChip isSelected={isSelected} selection={selection} />
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text
-            adjustsFontSizeToFit
-            minimumFontScale={0.72}
             numberOfLines={1}
             style={{
               color: primaryTextColor,
@@ -1457,44 +1474,23 @@ function OddsButton({
               {formatAmericanOdds(selection.odds)}
             </Text>
           ) : null}
-          {conflict ? (
-            <View
-              className="mt-1 flex-row items-center gap-1 rounded-full border border-white/15 bg-white/[0.07] px-2 py-1"
-              style={{ alignSelf: 'flex-start', maxWidth: '100%' }}>
-              <Ionicons color="rgba(255,255,255,0.58)" name="lock-closed" size={10} />
-              <Text
-                numberOfLines={1}
-                style={{
-                  color: 'rgba(255,255,255,0.62)',
-                  flexShrink: 1,
-                  fontSize: 10,
-                  fontWeight: '900',
-                  includeFontPadding: false,
-                  letterSpacing: 0,
-                  lineHeight: 12,
-                }}>
-                {conflictSummary}
-              </Text>
-            </View>
-          ) : null}
         </View>
-        {isSelected ? (
+        {statusIcon ? (
           <View
-            className="flex-row items-center gap-1 rounded-full px-2 py-1"
-            style={{ backgroundColor: `${accentHex}24`, marginLeft: 2 }}>
-            <Ionicons color={accentHex} name="checkmark-circle" size={12} />
-            <Text
-              numberOfLines={1}
-              style={{
-                color: accentHex,
-                fontSize: 9,
-                fontWeight: '900',
-                includeFontPadding: false,
-                letterSpacing: 0,
-                lineHeight: 11,
-              }}>
-              Your pick
-            </Text>
+            style={{
+              alignItems: 'center',
+              backgroundColor: statusBackgroundColor,
+              borderColor: statusBorderColor,
+              borderRadius: 999,
+              borderWidth: 1,
+              height: 20,
+              justifyContent: 'center',
+              position: 'absolute',
+              right: 7,
+              top: 7,
+              width: 20,
+            }}>
+            <Ionicons color={statusColor} name={statusIcon} size={11} />
           </View>
         ) : null}
       </View>
@@ -2581,6 +2577,7 @@ function BetSlipSheet({
 function AmountModal({
   editingBet,
   onClose,
+  onRemoveEdit,
   onSaveEdit,
   onSaveStraight,
   pendingSelection,
@@ -2588,6 +2585,7 @@ function AmountModal({
 }: {
   editingBet: EditingSlipBet | null;
   onClose: () => void;
+  onRemoveEdit: (betId: string) => void;
   onSaveEdit: (betId: string, amount: number) => void;
   onSaveStraight: (amount: number) => void;
   pendingSelection: PendingStraightSelection | null;
@@ -2790,8 +2788,18 @@ function AmountModal({
                     }
                     onSaveStraight(amount);
                   }}
-                  title={isEditing ? 'Save Amount' : 'Add to Card'}
+                  title={isEditing ? 'Update' : 'Add to Card'}
                 />
+                {editingBet ? (
+                  <Button
+                    onPress={() => {
+                      haptics.medium();
+                      onRemoveEdit(editingBet.bet.id);
+                    }}
+                    title="Remove from Card"
+                    variant="destructive"
+                  />
+                ) : null}
                 <Button title="Cancel" variant="secondary" onPress={onClose} />
               </View>
             </View>
@@ -4439,8 +4447,9 @@ export default function BetBoardScreen() {
 
   const builderLegSelectionKeys = useMemo(() => {
     const keys = new Set<string>();
-    slipBets.forEach((bet) => bet.legs.forEach((leg) => keys.add(leg.selectionKey)));
-    if (mode === 'parlay') {
+    if (mode === 'straight') {
+      slipBets.forEach((bet) => bet.legs.forEach((leg) => keys.add(leg.selectionKey)));
+    } else if (mode === 'parlay') {
       parlayLegs.forEach((leg) => keys.add(leg.selectionKey));
     } else if (mode === 'teaser') {
       teaserLegs.forEach((leg) => keys.add(leg.selectionKey));
@@ -4624,6 +4633,25 @@ export default function BetBoardScreen() {
     });
   };
 
+  const getExistingSlipSelection = (
+    game: OddsGame,
+    selection: OddsSelection,
+  ): ExistingSelection | null => {
+    const nextLeg = getTargetLegForSelection(game, selection);
+    if (!nextLeg) {
+      return null;
+    }
+
+    for (const bet of slipBets) {
+      const leg = bet.legs.find((item) => item.selectionKey === nextLeg.selectionKey);
+      if (leg) {
+        return { bet, leg };
+      }
+    }
+
+    return null;
+  };
+
   const removeConflictSource = (conflict: SelectionConflict) => {
     if (conflict.source.kind === 'builder') {
       if (conflict.source.mode === 'parlay') {
@@ -4738,6 +4766,23 @@ export default function BetBoardScreen() {
     setSelectionConflict(null);
   };
 
+  const confirmSelectionConflictSwap = (conflict: SelectionConflict) => {
+    const existingLabel = formatSwapPromptLabel(conflict.existingLeg);
+    const nextLabel = formatSwapPromptLabel(conflict.nextLeg);
+
+    haptics.warning();
+    Alert.alert(`Replace your ${existingLabel} pick with ${nextLabel}?`, undefined, [
+      {
+        style: 'cancel',
+        text: 'Cancel',
+      },
+      {
+        onPress: () => applySelectionConflictSwap(conflict),
+        text: 'Replace',
+      },
+    ]);
+  };
+
   const addBuilderLeg = (currentLegs: SlipLeg[], nextLeg: SlipLeg, maxLegs: number) => {
     if (currentLegs.some((leg) => leg.selectionKey === nextLeg.selectionKey)) {
       haptics.light();
@@ -4781,15 +4826,25 @@ export default function BetBoardScreen() {
       return;
     }
 
-    const selectionConflictForTap = getSelectionConflict(game, selection);
-    if (selectionConflictForTap) {
-      haptics.warning();
-      setPickConflictMessage(null);
-      setSelectionConflict(selectionConflictForTap);
-      return;
-    }
-
     if (mode === 'straight') {
+      const existingSelection = getExistingSlipSelection(game, selection);
+      if (existingSelection) {
+        haptics.selection();
+        setPendingStraightSelection(null);
+        setPickConflictMessage(null);
+        setSelectionConflict(null);
+        setEditingSlipBet({ bet: existingSelection.bet });
+        return;
+      }
+
+      const selectionConflictForTap = getSelectionConflict(game, selection);
+      if (selectionConflictForTap) {
+        setPickConflictMessage(null);
+        setSelectionConflict(null);
+        confirmSelectionConflictSwap(selectionConflictForTap);
+        return;
+      }
+
       const nextLeg = makeSlipLeg(game, selection);
       const conflictingLeg = findConflictingPick(
         [...getSlipLegs(slipBets), ...parlayLegs, ...teaserLegs],
@@ -4810,6 +4865,14 @@ export default function BetBoardScreen() {
     }
 
     if (mode === 'parlay') {
+      const selectionConflictForTap = getSelectionConflict(game, selection);
+      if (selectionConflictForTap) {
+        setPickConflictMessage(null);
+        setSelectionConflict(null);
+        confirmSelectionConflictSwap(selectionConflictForTap);
+        return;
+      }
+
       setParlayLegs((current) => addBuilderLeg(current, makeSlipLeg(game, selection), 6));
       return;
     }
@@ -4821,6 +4884,14 @@ export default function BetBoardScreen() {
     }
 
     const adjustedLine = getAdjustedTeaserLine(selection, teaserPoints);
+    const selectionConflictForTap = getSelectionConflict(game, selection);
+    if (selectionConflictForTap) {
+      setPickConflictMessage(null);
+      setSelectionConflict(null);
+      confirmSelectionConflictSwap(selectionConflictForTap);
+      return;
+    }
+
     setTeaserLegs((current) => addBuilderLeg(current, makeSlipLeg(game, selection, adjustedLine), 4));
   };
 
@@ -4870,6 +4941,15 @@ export default function BetBoardScreen() {
     setSelectionConflict(null);
     setEditingSlipBet(null);
     setSlipSnap(1);
+  };
+
+  const removeSlipBet = (id: string) => {
+    if (editingSlipBet?.bet.id === id) {
+      setEditingSlipBet(null);
+    }
+    setPickConflictMessage(null);
+    setSelectionConflict(null);
+    setSlipBets((current) => current.filter((bet) => bet.id !== id));
   };
 
   const handleClearAllPicks = () => {
@@ -5397,6 +5477,7 @@ export default function BetBoardScreen() {
           setPendingStraightSelection(null);
           setEditingSlipBet(null);
         }}
+        onRemoveEdit={removeSlipBet}
         onSaveEdit={handleSaveEditedAmount}
         onSaveStraight={handleSaveStraightAmount}
         pendingSelection={pendingStraightSelection}
@@ -5434,12 +5515,7 @@ export default function BetBoardScreen() {
         }}
         onRemove={(id) => {
           haptics.light();
-          if (editingSlipBet?.bet.id === id) {
-            setEditingSlipBet(null);
-          }
-          setPickConflictMessage(null);
-          setSelectionConflict(null);
-          setSlipBets((current) => current.filter((bet) => bet.id !== id));
+          removeSlipBet(id);
         }}
         onSnapChange={setSlipSnap}
         onSubmit={handleSubmit}
