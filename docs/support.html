@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Action Arena Support</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0a0e1a;
+        --panel: #121827;
+        --text: #f6f8fb;
+        --muted: #a7b0c0;
+        --line: #263145;
+        --accent: #00ff87;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        line-height: 1.6;
+      }
+
+      main {
+        width: min(860px, 100%);
+        margin: 0 auto;
+        padding: 32px 18px 48px;
+      }
+
+      header {
+        padding: 28px 0 18px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      h1,
+      h2,
+      h3 {
+        line-height: 1.15;
+        letter-spacing: 0;
+      }
+
+      h1 {
+        margin: 0 0 10px;
+        font-size: clamp(2rem, 7vw, 3.6rem);
+      }
+
+      h2 {
+        margin: 34px 0 14px;
+        font-size: 1.35rem;
+      }
+
+      h3 {
+        margin: 0 0 6px;
+        font-size: 1rem;
+      }
+
+      p,
+      li {
+        color: var(--muted);
+      }
+
+      a {
+        color: var(--accent);
+      }
+
+      .nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 16px;
+      }
+
+      .nav a {
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 8px 10px;
+        text-decoration: none;
+      }
+
+      .contact,
+      .faq article {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+
+      .contact {
+        margin-top: 18px;
+        padding: 16px;
+      }
+
+      .faq {
+        display: grid;
+        gap: 12px;
+      }
+
+      .faq article {
+        padding: 16px;
+      }
+
+      footer {
+        margin-top: 42px;
+        padding-top: 20px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Action Arena Support</h1>
+        <p>
+          Action Arena is a free-to-play fantasy sports prediction game where league members build weekly cards, compete on virtual profit, and climb the standings. No real money is wagered, won, or redeemable in the app.
+        </p>
+        <nav class="nav" aria-label="Legal pages">
+          <a href="./privacy.html">Privacy Policy</a>
+          <a href="./index.html">Home</a>
+        </nav>
+      </header>
+
+      <section class="contact">
+        <h2>Contact</h2>
+        <p>Email: <a href="mailto:[CONTACT EMAIL]">[CONTACT EMAIL]</a></p>
+        <p>Please include the email address on your Action Arena account and a short description of the issue.</p>
+      </section>
+
+      <section>
+        <h2>FAQ</h2>
+        <div class="faq">
+          <article>
+            <h3>How do I play?</h3>
+            <p>
+              Create or join a league, then build your weekly card before games start. You make straight picks, parlays, or teasers using virtual weekly budget rules. Your picks settle after games finish, and standings update from virtual profit, matchup results, and league rules.
+            </p>
+          </article>
+
+          <article>
+            <h3>What are Arena Coins?</h3>
+            <p>
+              Arena Coins are virtual, cosmetic-only currency used for profile frames, logos, effects, celebrations, stickers, and other app cosmetics. They have no cash value and cannot be exchanged, redeemed, withdrawn, or sold for money.
+            </p>
+          </article>
+
+          <article>
+            <h3>Is there any real money wagering?</h3>
+            <p>
+              No. Action Arena does not offer real-money wagering, cash prizes, cash-out, redemption, or links to real-money sports operators. Coins, points, standings, cosmetics, and league results are virtual.
+            </p>
+          </article>
+
+          <article>
+            <h3>How do I restore the Season Pass?</h3>
+            <p>
+              Sign in with your Action Arena account on iOS, open Settings or the Season Pass screen, and tap Restore Purchases. The app checks Apple for a Season Pass owned by the current Apple ID and reconnects it to your Action Arena account after Apple receipt validation succeeds.
+            </p>
+          </article>
+
+          <article>
+            <h3>How do I delete my account?</h3>
+            <p>
+              Open Settings in the app and choose Delete Account. If you cannot access the app, email [CONTACT EMAIL] from the email address on your Action Arena account and ask for account deletion.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <footer>
+        <p>Action Arena Support</p>
+      </footer>
+    </main>
+  </body>
+</html>
