@@ -135,6 +135,9 @@ as $$
   from line_value
 $$;
 
+alter function public.pick_conflict_side(text, text) immutable;
+alter function public.pick_effective_line(numeric, numeric) immutable;
+
 create unique index if not exists bet_legs_unique_bet_market_side_line_idx
 on public.bet_legs (
   bet_id,
