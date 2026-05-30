@@ -36,8 +36,6 @@ import { isBetLegLocked } from '@/lib/pick-locking';
 import {
   findConflictingPick,
   formatPickConflictReason,
-  getPickConflictKind,
-  getPickConflictSide,
 } from '@/lib/pick-conflicts';
 import type { BetMarket, BetType, TeaserLegCount, TeaserPoints } from '@/types/database';
 
@@ -73,12 +71,6 @@ function marketLabel(market: BetMarket) {
   if (market === 'moneyline') return 'Winner';
   if (market === 'spread') return 'Spread';
   return 'Over/Under';
-}
-
-function conflictMarketLabel(market: BetMarket) {
-  if (market === 'moneyline') return 'moneyline';
-  if (market === 'spread') return 'spread';
-  return 'total';
 }
 
 function formatLine(value: number | null) {
@@ -295,12 +287,6 @@ function formatLegConflictLabel(leg: SlipLeg) {
 }
 
 function formatAddConflictMessage(nextLeg: SlipLeg, existingLeg: SlipLeg) {
-  if (getPickConflictKind(nextLeg, existingLeg) === 'same_team_moneyline_spread') {
-    return `You already have ${getPickConflictSide(existingLeg)} on the ${conflictMarketLabel(
-      existingLeg.market,
-    )}. Same-team moneyline and spread can't be combined.`;
-  }
-
   return `Cannot add ${formatLegConflictLabel(nextLeg)}. It directly conflicts with ${formatLegConflictLabel(
     existingLeg,
   )} on ${formatMatchupLabel(nextLeg)} because ${formatPickConflictReason(

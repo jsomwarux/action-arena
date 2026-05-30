@@ -10,7 +10,7 @@ export type PickConflictLeg = {
   selection: string;
 };
 
-export type PickConflictKind = 'direct_contradiction' | 'same_team_moneyline_spread';
+export type PickConflictKind = 'direct_contradiction';
 
 export type PickConflict<TLeg extends PickConflictLeg> = {
   existingLeg: TLeg;
@@ -57,13 +57,6 @@ function areSpreadLinesOpposed(left: PickConflictLeg, right: PickConflictLeg) {
   return Math.abs(Math.abs(leftLine) - Math.abs(rightLine)) < LINE_EPSILON;
 }
 
-function areMoneylineSpreadPair(left: PickConflictLeg, right: PickConflictLeg) {
-  return (
-    (left.market === 'moneyline' && right.market === 'spread') ||
-    (left.market === 'spread' && right.market === 'moneyline')
-  );
-}
-
 export function areDirectlyContradictingPicks(left: PickConflictLeg, right: PickConflictLeg) {
   if (left.game_id !== right.game_id || left.market !== right.market) {
     return false;
@@ -84,13 +77,15 @@ export function areDirectlyContradictingPicks(left: PickConflictLeg, right: Pick
   return areLinesEqual(getPickEffectiveLine(left), getPickEffectiveLine(right));
 }
 
-export function areSameTeamMoneylineSpreadPicks(left: PickConflictLeg, right: PickConflictLeg) {
-  if (left.game_id !== right.game_id || !areMoneylineSpreadPair(left, right)) {
+export function areDuplicatePickLegs(left: PickConflictLeg, right: PickConflictLeg) {
+  if (left.game_id !== right.game_id || left.market !== right.market) {
     return false;
   }
 
-  const leftSide = getPickConflictSide(left);
-  return leftSide.length > 0 && leftSide === getPickConflictSide(right);
+  return (
+    getPickConflictSide(left) === getPickConflictSide(right) &&
+    areLinesEqual(getPickEffectiveLine(left), getPickEffectiveLine(right))
+  );
 }
 
 export function getPickConflictKind(
@@ -99,10 +94,6 @@ export function getPickConflictKind(
 ): PickConflictKind | null {
   if (areDirectlyContradictingPicks(left, right)) {
     return 'direct_contradiction';
-  }
-
-  if (areSameTeamMoneylineSpreadPicks(left, right)) {
-    return 'same_team_moneyline_spread';
   }
 
   return null;
@@ -152,10 +143,6 @@ export function findPickContradiction<TLeg extends PickConflictLeg>(
 }
 
 export function formatPickConflictReason(left: PickConflictLeg, right: PickConflictLeg) {
-  if (getPickConflictKind(left, right) === 'same_team_moneyline_spread') {
-    return "same-team moneyline and spread can't be combined";
-  }
-
   if (left.market === 'moneyline') {
     return 'both teams cannot win the same game';
   }

@@ -230,7 +230,7 @@ $$;
 do $$
 begin
   perform pg_temp.expect_submission(
-    'blocks Team A ML then Team A spread',
+    'allows Team A ML then Team A spread',
     jsonb_build_array(
       pg_temp.straight('DAL-PHI', 'moneyline', 'Dallas Cowboys', null, null, 120),
       pg_temp.straight('DAL-PHI', 'spread', 'Dallas Cowboys -1.5', -1.5, -1.5, -110),
@@ -238,12 +238,11 @@ begin
       pg_temp.filler_bet(2),
       pg_temp.filler_bet(3)
     ),
-    false,
-    array['same-team moneyline and spread']
+    true
   );
 
   perform pg_temp.expect_submission(
-    'blocks Team A spread then Team A ML',
+    'allows Team A spread then Team A ML',
     jsonb_build_array(
       pg_temp.straight('DAL-PHI', 'spread', 'Dallas Cowboys -1.5', -1.5, -1.5, -110),
       pg_temp.straight('DAL-PHI', 'moneyline', 'Dallas Cowboys', null, null, 120),
@@ -251,8 +250,7 @@ begin
       pg_temp.filler_bet(2),
       pg_temp.filler_bet(3)
     ),
-    false,
-    array['same-team moneyline and spread']
+    true
   );
 
   perform pg_temp.expect_submission(
@@ -306,7 +304,7 @@ begin
   );
 
   perform pg_temp.expect_submission(
-    'blocks same-team ML and spread inside one parlay',
+    'allows same-game ML and spread inside one parlay',
     jsonb_build_array(
       pg_temp.bet(
         'parlay',
@@ -325,12 +323,11 @@ begin
       pg_temp.filler_bet(3),
       pg_temp.filler_bet(4)
     ),
-    false,
-    array['same-team moneyline and spread']
+    true
   );
 
   perform pg_temp.expect_submission(
-    'blocks same-team ML straight plus teaser spread leg',
+    'allows same-team ML straight plus teaser spread leg',
     jsonb_build_array(
       pg_temp.straight('DAL-PHI', 'moneyline', 'Dallas Cowboys', null, null, 120),
       pg_temp.bet(
@@ -349,8 +346,7 @@ begin
       pg_temp.filler_bet(2),
       pg_temp.filler_bet(3)
     ),
-    false,
-    array['same-team moneyline and spread']
+    true
   );
 
   perform pg_temp.expect_submission(
@@ -377,7 +373,7 @@ begin
   );
 
   perform pg_temp.expect_submission(
-    'blocks POTW Team A ML plus Team A spread straight',
+    'allows POTW Team A ML plus Team A spread straight',
     jsonb_build_array(
       pg_temp.straight('DAL-PHI', 'moneyline', 'Dallas Cowboys', null, null, 120, true),
       pg_temp.straight('DAL-PHI', 'spread', 'Dallas Cowboys -1.5', -1.5, -1.5, -110),
@@ -385,8 +381,7 @@ begin
       pg_temp.filler_bet(2),
       pg_temp.filler_bet(3)
     ),
-    false,
-    array['same-team moneyline and spread']
+    true
   );
 end;
 $$;

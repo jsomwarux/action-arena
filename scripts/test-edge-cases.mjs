@@ -1,8 +1,11 @@
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import vm from 'node:vm';
 
 const rootDir = join(dirname(fileURLToPath(import.meta.url)), '..');
+const require = createRequire(import.meta.url);
 const failures = [];
 
 function readProjectFile(path) {
@@ -32,6 +35,62 @@ function hasNumberOfLinesNear(source, needle, radius = 1000) {
   return source.slice(Math.max(0, index - radius), index + radius).includes('numberOfLines={1}');
 }
 
+function stripEmbeddedLine(selection, market) {
+  const trimmed = selection.replace(/\s+/g, ' ').trim();
+  if (market === 'moneyline') return trimmed;
+  if (market === 'over_under') {
+    const side = trimmed.match(/^(over|under)\b/i)?.[1];
+    return side ? side.charAt(0).toUpperCase() + side.slice(1).toLowerCase() : trimmed;
+  }
+  return trimmed.replace(/\s+[+-]\d+(?:\.\d+)?(?:\s+[+-]?\d+(?:\.\d+)?)*$/, '').trim();
+}
+
+function loadPickConflictRules() {
+  const ts = require('typescript');
+  const source = readProjectFile('lib/pick-conflicts.ts');
+  const compiled = ts.transpileModule(source, {
+    compilerOptions: {
+      esModuleInterop: true,
+      module: ts.ModuleKind.CommonJS,
+      target: ts.ScriptTarget.ES2020,
+    },
+  }).outputText;
+  const module = { exports: {} };
+  const localRequire = (id) => {
+    if (id === '@/lib/pick-labels') {
+      return {
+        formatPickLineValue(value, market) {
+          if (value === null || value === undefined) return '';
+          if (market === 'spread' && value > 0) return `+${value}`;
+          return `${value}`;
+        },
+        getPickLegBaseLabel(leg) {
+          return stripEmbeddedLine(leg.selection, leg.market);
+        },
+      };
+    }
+    throw new Error(`Unexpected require in pick conflict test: ${id}`);
+  };
+
+  vm.runInNewContext(compiled, {
+    exports: module.exports,
+    module,
+    require: localRequire,
+  });
+
+  return module.exports;
+}
+
+function pick(gameId, market, selection, originalLine = null, adjustedLine = originalLine) {
+  return {
+    adjusted_line: adjustedLine,
+    game_id: gameId,
+    market,
+    original_line: originalLine,
+    selection,
+  };
+}
+
 const packageJson = JSON.parse(readProjectFile('package.json'));
 const straightBetsSource = readProjectFile('hooks/use-straight-bets.ts');
 const betBoardSource = readProjectFile('app/(app)/(tabs)/bet-board.tsx');
@@ -47,6 +106,7 @@ const matchupSource = readProjectFile('app/(app)/(tabs)/matchups/[matchupId].tsx
 const duplicateGuardMigration = readProjectFile(
   'supabase/migrations/20260518193000_guard_duplicate_weekly_submissions.sql',
 );
+const pickConflictRules = loadPickConflictRules();
 
 const handleConfirmSource = excerpt(
   betBoardSource,
@@ -117,6 +177,50 @@ assertCheck(
   '27.3 duplicate submit taps are ignored while pending',
   handleConfirmSource.includes('if (submitBets.isPending)') && handleConfirmSource.includes('return;'),
   'confirm handler should no-op while the mutation is in flight',
+);
+
+const coltsWin = pick('BAL-IND', 'moneyline', 'Indianapolis Colts');
+const ravensWin = pick('BAL-IND', 'moneyline', 'Baltimore Ravens');
+const coltsSpread = pick('BAL-IND', 'spread', 'Indianapolis Colts +3.5', 3.5);
+const ravensSpread = pick('BAL-IND', 'spread', 'Baltimore Ravens -3.5', -3.5);
+const overTotal = pick('BAL-IND', 'over_under', 'Over 44.5', 44.5);
+const underTotal = pick('BAL-IND', 'over_under', 'Under 44.5', 44.5);
+
+assertCheck(
+  '27.7 winner pick blocks only opposite winner side',
+  pickConflictRules.areConflictingPicks(coltsWin, ravensWin) &&
+    !pickConflictRules.areConflictingPicks(coltsWin, coltsSpread) &&
+    !pickConflictRules.areConflictingPicks(coltsWin, ravensSpread) &&
+    !pickConflictRules.areConflictingPicks(coltsWin, overTotal),
+  'Colts to win should not block either spread side or the total market',
+);
+
+assertCheck(
+  '27.7 opposing sides are blocked anywhere on the card',
+  pickConflictRules.findPickConflict([coltsWin], [ravensWin])?.existingLeg === coltsWin &&
+    pickConflictRules.findPickConflict([coltsSpread], [ravensSpread])?.existingLeg === coltsSpread &&
+    pickConflictRules.findPickConflict([overTotal], [underTotal])?.existingLeg === overTotal,
+  'straight, parlay, and teaser legs should share the same opposite-side guard',
+);
+
+assertCheck(
+  '27.7 same side is reusable across slips',
+  pickConflictRules.findPickConflict([coltsWin], [coltsWin]) === null,
+  'same game, market, and side should be allowed outside duplicate legs in the same builder',
+);
+
+assertCheck(
+  '27.7 winner plus total on one game is allowed',
+  pickConflictRules.findPickConflict([], [coltsWin, overTotal]) === null,
+  'different markets on the same game should be allowed',
+);
+
+assertCheck(
+  '27.7 single parlay duplicate/opposite/different-market rules',
+  pickConflictRules.areDuplicatePickLegs(coltsWin, { ...coltsWin }) &&
+    pickConflictRules.findPickConflict([], [coltsWin, ravensWin]) !== null &&
+    pickConflictRules.findPickConflict([], [coltsWin, coltsSpread, overTotal]) === null,
+  'single builders should reject duplicate or opposite legs while accepting same-game combinations',
 );
 
 assertCheck(

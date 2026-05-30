@@ -91,4 +91,4 @@ from public.leagues league
 join app_review_demo_league_rename_target target on target.id = league.id
 where league.name = target.new_name;
 
-rollback;
+commit;
