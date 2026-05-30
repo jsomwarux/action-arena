@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 
 import { CosmeticAvatar } from '@/components/cosmetics';
+import { LeagueSelectorDropdown } from '@/components/leagues/league-selector-dropdown';
 import {
   Badge,
   Button,
@@ -473,37 +474,13 @@ export default function LeaderboardScreen() {
 
         {!leaderboardQuery.isLoading && leaderboardQuery.data && sortedRows.length > 0 ? (
           <View className="gap-5">
-            {leaderboardQuery.data.leagueOptions.length > 1 ? (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ gap: 8, paddingHorizontal: 20 }}
-                style={{ marginHorizontal: -20 }}>
-                {leaderboardQuery.data.leagueOptions.map((league) => {
-                  const active =
-                    (selectedLeague?.id ?? leaderboardQuery.data?.leagueOptions[0]?.id) === league.id;
-                  return (
-                    <TapTarget key={league.id} onPress={() => setSelectedLeagueId(league.id)}>
-                      <View
-                        className={cn(
-                          'rounded-full border px-4 py-2',
-                          active
-                            ? 'border-electric-green/55 bg-electric-green/15'
-                            : 'border-white/10 bg-white/[0.04]',
-                        )}>
-                        <Text
-                          className={cn(
-                            'text-sm font-bold',
-                            active ? 'text-electric-green' : 'text-white/70',
-                          )}>
-                          {league.label}
-                        </Text>
-                      </View>
-                    </TapTarget>
-                  );
-                })}
-              </ScrollView>
-            ) : null}
+            <LeagueSelectorDropdown
+              contextLabel="Viewing"
+              leagues={leaderboardQuery.data.leagues}
+              modalTitle="Pick a Leaderboard"
+              onSelect={setSelectedLeagueId}
+              selectedLeagueId={selectedLeague?.id ?? selectedLeagueId}
+            />
 
             <SegmentedToggle
               accent="green"
