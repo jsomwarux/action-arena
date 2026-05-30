@@ -221,4 +221,4 @@ select
       and standings.week_number = league.current_week
   ) as members;
 
-rollback;
+commit;

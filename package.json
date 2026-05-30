@@ -4,8 +4,8 @@
   "version": "1.0.0",
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "week:align": "node scripts/align-active-nfl-week.mjs",
     "week:kickoff": "node scripts/simulate-week-kickoff.mjs",
     "week:complete": "node scripts/simulate-week-completion.mjs",
