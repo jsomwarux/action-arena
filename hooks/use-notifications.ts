@@ -139,7 +139,13 @@ function routeFromNotificationData(data: NotificationRouteData) {
   }
 
   if (type === 'bet_board') {
-    return '/bet-board' as const;
+    const leagueId = getString(data.leagueId);
+    return leagueId
+      ? ({
+          pathname: '/bet-board' as const,
+          params: { leagueId },
+        } as const)
+      : '/bet-board' as const;
   }
 
   return null;

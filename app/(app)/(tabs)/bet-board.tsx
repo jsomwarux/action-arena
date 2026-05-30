@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -119,6 +119,10 @@ import type {
   TeaserLegCount,
   TeaserPoints,
 } from '@/types/database';
+
+function getParamValue(param: string | string[] | undefined) {
+  return Array.isArray(param) ? param[0] : param;
+}
 
 type BetMode = BetType;
 
@@ -4518,6 +4522,8 @@ function OddsSkeletons() {
 export default function BetBoardScreen() {
   const { user } = useAuth();
   const router = useRouter();
+  const { leagueId } = useLocalSearchParams();
+  const requestedLeagueId = getParamValue(leagueId);
   const leaguesQuery = useMyLeagues(user?.id);
   const cosmeticsQuery = useUserCosmetics(user?.id);
   const tourFlag = useLocalFlag(LOCAL_FLAG_KEYS.betBoardTourComplete);
@@ -4539,6 +4545,7 @@ export default function BetBoardScreen() {
   const [tourVisible, setTourVisible] = useState(false);
   const [pickConflictMessage, setPickConflictMessage] = useState<string | null>(null);
   const [selectionConflict, setSelectionConflict] = useState<SelectionConflict | null>(null);
+  const lastAppliedRouteLeagueIdRef = useRef<string | null>(null);
   const appStorePrefillKeyRef = useRef<string | null>(null);
 
   const leagueSummaries = leaguesQuery.data ?? [];
@@ -4621,10 +4628,29 @@ export default function BetBoardScreen() {
   }, [mode, parlayLegs, teaserLegs]);
 
   useEffect(() => {
-    if (!selectedLeagueId && leagues[0]) {
+    if (leagues.length === 0) {
+      return;
+    }
+
+    const requestedLeague = requestedLeagueId
+      ? leagues.find((league) => league.id === requestedLeagueId)
+      : undefined;
+
+    if (
+      requestedLeague &&
+      requestedLeagueId !== undefined &&
+      lastAppliedRouteLeagueIdRef.current !== requestedLeagueId
+    ) {
+      lastAppliedRouteLeagueIdRef.current = requestedLeagueId;
+      setSelectedLeagueId(requestedLeague.id);
+      return;
+    }
+
+    const selectedLeagueIsAvailable = leagues.some((league) => league.id === selectedLeagueId);
+    if (!selectedLeagueId || !selectedLeagueIsAvailable) {
       setSelectedLeagueId(leagues[0].id);
     }
-  }, [leagues, selectedLeagueId]);
+  }, [leagues, requestedLeagueId, selectedLeagueId]);
 
   useEffect(() => {
     if (selectedLeague) {

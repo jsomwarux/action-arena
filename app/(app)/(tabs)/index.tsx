@@ -51,6 +51,13 @@ function picksSubmittedLabel(betsPlaced: number) {
   return `${betsPlaced} ${betsPlaced === 1 ? 'pick' : 'picks'} ready`;
 }
 
+function getLeaguePickBoardRoute(leagueId: string) {
+  return {
+    pathname: '/bet-board' as const,
+    params: { leagueId },
+  };
+}
+
 function Header() {
   const router = useRouter();
 
@@ -168,7 +175,7 @@ function ActionNeeded({ cards }: { cards: HomeLeagueCard[] }) {
         const needed = remainingBetsNeeded(card.betsPlaced);
         return (
           <StaggeredItem key={card.league.id} index={index} perItemDelay={70}>
-            <PressableScale onPress={() => router.push('/bet-board')}>
+            <PressableScale onPress={() => router.push(getLeaguePickBoardRoute(card.league.id))}>
               <LivePulse color={THEME_COLORS.amberAccent} intensity={0.55}>
                 <View
                   className="rounded-2xl border border-amber-accent/55 bg-amber-accent/10 p-4"
@@ -440,7 +447,7 @@ function ThisWeekCard({ card, slateOpen }: { card: HomeLeagueCard; slateOpen: bo
                 {showSlateClosed ? 'Slate opens soon' : picksSubmittedLabel(card.betsPlaced)}
               </Text>
             </View>
-            <PressableScale onPress={() => router.push('/bet-board')}>
+            <PressableScale onPress={() => router.push(getLeaguePickBoardRoute(card.league.id))}>
               <View
                 className={cn(
                   'flex-row items-center gap-1 rounded-full border px-3 py-1.5',
