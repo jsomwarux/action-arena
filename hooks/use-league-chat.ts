@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
 import { logAnalyticsEvent } from '@/lib/analytics';
+import { getChatContentFilterMessage } from '@/lib/content-filter';
 import { formatPickTitle } from '@/lib/pick-labels';
 import { supabase } from '@/lib/supabase';
 import type {
@@ -15,7 +16,7 @@ import type {
 } from '@/types/database';
 
 export type LeagueChatMessage = LeagueChatMessageRow & {
-  user: UserRow | null;
+  user: Pick<UserRow, 'avatar_url' | 'created_at' | 'display_name' | 'id' | 'is_premium'> | null;
 };
 
 export type ShareableBet = BetRow & {
@@ -134,20 +135,22 @@ export function useLeagueChat(leagueId: string | undefined, limit: number) {
 
       const { data, error } = await supabase
         .from('league_chat_messages')
-        .select('*, users(*)')
+        .select('*, user:users!league_chat_messages_user_id_fkey(id, display_name, avatar_url, is_premium, created_at)')
         .eq('league_id', leagueId)
+        .eq('is_hidden', false)
+        .eq('moderation_status', 'active')
         .order('created_at', { ascending: false })
         .limit(limit);
 
       const rows = assertSupabaseResult(
-        data as (LeagueChatMessageRow & { users: UserRow | null })[] | null,
+        data as (LeagueChatMessageRow & { user: LeagueChatMessage['user'] })[] | null,
         error,
       );
 
       return rows
         .map((message) => {
-          const { users, ...row } = message;
-          return { ...row, user: users };
+          const { user, ...row } = message;
+          return { ...row, user };
         })
         .reverse();
     },
@@ -162,6 +165,11 @@ export function useSendLeagueChatMessage(leagueId: string | undefined, userId: s
     mutationFn: async (body: string) => {
       if (!leagueId || !userId) {
         throw new Error('League and user are required.');
+      }
+
+      const filterMessage = getChatContentFilterMessage(body);
+      if (filterMessage) {
+        throw new Error(filterMessage);
       }
 
       const payload: LeagueChatMessageInsert = {

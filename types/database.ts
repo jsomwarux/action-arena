@@ -30,6 +30,7 @@ export type NotificationStatus = 'pending' | 'sent' | 'skipped' | 'failed';
 export type ChatMessageType = 'user' | 'system' | 'bet_share' | 'sticker';
 export type ContentReportTargetType = 'chat_message' | 'league' | 'league_member' | 'user_profile';
 export type ContentReportStatus = 'pending' | 'reviewed' | 'removed' | 'dismissed';
+export type MessageReportStatus = 'open' | 'reviewed' | 'removed' | 'dismissed';
 export type SeasonAwardKey =
   | 'season_mvp'
   | 'best_record'
@@ -47,6 +48,8 @@ export type CosmeticCategory =
 export type UserRow = {
   arena_coins: number;
   avatar_url: string | null;
+  chat_banned: boolean;
+  chat_terms_accepted_at: string | null;
   created_at: string;
   display_name: string;
   email: string;
@@ -58,6 +61,8 @@ export type UserRow = {
 export type UserInsert = {
   arena_coins?: number;
   avatar_url?: string | null;
+  chat_banned?: boolean;
+  chat_terms_accepted_at?: string | null;
   created_at?: string;
   display_name: string;
   email: string;
@@ -335,6 +340,7 @@ export type LeagueChatMessageRow = {
   body: string;
   created_at: string;
   id: string;
+  is_hidden: boolean;
   league_id: string;
   message_type: ChatMessageType;
   metadata: Json;
@@ -350,6 +356,7 @@ export type LeagueChatMessageInsert = {
   body?: string;
   created_at?: string;
   id?: string;
+  is_hidden?: boolean;
   league_id: string;
   message_type?: ChatMessageType;
   metadata?: Json;
@@ -363,18 +370,48 @@ export type LeagueChatMessageInsert = {
 export type LeagueChatMessageUpdate = Partial<LeagueChatMessageInsert>;
 
 export type UserBlockRow = {
-  blocked_user_id: string;
-  blocker_user_id: string;
+  blocked_id: string;
+  blocker_id: string;
   created_at: string;
+  id: string;
+  league_id: string | null;
 };
 
 export type UserBlockInsert = {
-  blocked_user_id: string;
-  blocker_user_id: string;
+  blocked_id: string;
+  blocker_id: string;
   created_at?: string;
+  id?: string;
+  league_id?: string | null;
 };
 
 export type UserBlockUpdate = Partial<UserBlockInsert>;
+
+export type MessageReportRow = {
+  created_at: string;
+  details: string | null;
+  id: string;
+  league_id: string | null;
+  reason: string;
+  reported_message_id: string | null;
+  reported_user_id: string;
+  reporter_id: string;
+  status: MessageReportStatus;
+};
+
+export type MessageReportInsert = {
+  created_at?: string;
+  details?: string | null;
+  id?: string;
+  league_id?: string | null;
+  reason: string;
+  reported_message_id?: string | null;
+  reported_user_id: string;
+  reporter_id: string;
+  status?: MessageReportStatus;
+};
+
+export type MessageReportUpdate = Partial<MessageReportInsert>;
 
 export type ContentReportRow = {
   action_taken: string | null;
@@ -731,6 +768,10 @@ export type Database = {
       notification_type: NotificationType;
     };
     Functions: {
+      accept_chat_terms: {
+        Args: Record<PropertyKey, never>;
+        Returns: string;
+      };
       activate_league_and_generate_schedule: {
         Args: {
           p_league_id: string;
@@ -809,11 +850,27 @@ export type Database = {
         Args: Record<PropertyKey, never>;
         Returns: number;
       };
+      get_my_chat_moderation_status: {
+        Args: Record<PropertyKey, never>;
+        Returns: Array<{
+          chat_banned: boolean;
+          chat_terms_accepted_at: string | null;
+        }>;
+      };
       moderate_content_report: {
         Args: {
           p_report_id: string;
           p_review_note?: string | null;
           p_status: ContentReportStatus;
+        };
+        Returns: string;
+      };
+      moderate_message_report: {
+        Args: {
+          p_ban_user?: boolean;
+          p_hide_message?: boolean;
+          p_report_id: string;
+          p_status: MessageReportStatus;
         };
         Returns: string;
       };
@@ -1136,6 +1193,41 @@ export type Database = {
         Row: LeagueChatMessageRow;
         Update: LeagueChatMessageUpdate;
       };
+      message_reports: {
+        Insert: MessageReportInsert;
+        Relationships: [
+          {
+            columns: ['league_id'];
+            foreignKeyName: 'message_reports_league_id_fkey';
+            isOneToOne: false;
+            referencedColumns: ['id'];
+            referencedRelation: 'leagues';
+          },
+          {
+            columns: ['reported_message_id'];
+            foreignKeyName: 'message_reports_reported_message_id_fkey';
+            isOneToOne: false;
+            referencedColumns: ['id'];
+            referencedRelation: 'league_chat_messages';
+          },
+          {
+            columns: ['reported_user_id'];
+            foreignKeyName: 'message_reports_reported_user_id_fkey';
+            isOneToOne: false;
+            referencedColumns: ['id'];
+            referencedRelation: 'users';
+          },
+          {
+            columns: ['reporter_id'];
+            foreignKeyName: 'message_reports_reporter_id_fkey';
+            isOneToOne: false;
+            referencedColumns: ['id'];
+            referencedRelation: 'users';
+          },
+        ];
+        Row: MessageReportRow;
+        Update: MessageReportUpdate;
+      };
       league_week_slate_games: {
         Insert: LeagueWeekSlateGameInsert;
         Relationships: [
@@ -1363,18 +1455,25 @@ export type Database = {
         Insert: UserBlockInsert;
         Relationships: [
           {
-            columns: ['blocked_user_id'];
-            foreignKeyName: 'user_blocks_blocked_user_id_fkey';
+            columns: ['blocked_id'];
+            foreignKeyName: 'user_blocks_blocked_id_fkey';
             isOneToOne: false;
             referencedColumns: ['id'];
             referencedRelation: 'users';
           },
           {
-            columns: ['blocker_user_id'];
-            foreignKeyName: 'user_blocks_blocker_user_id_fkey';
+            columns: ['blocker_id'];
+            foreignKeyName: 'user_blocks_blocker_id_fkey';
             isOneToOne: false;
             referencedColumns: ['id'];
             referencedRelation: 'users';
+          },
+          {
+            columns: ['league_id'];
+            foreignKeyName: 'user_blocks_league_id_fkey';
+            isOneToOne: false;
+            referencedColumns: ['id'];
+            referencedRelation: 'leagues';
           },
         ];
         Row: UserBlockRow;

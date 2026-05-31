@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -36,11 +37,20 @@ import {
   TextInput as AppTextInput,
   WeekNavigator,
 } from '@/components/ui';
+import { SUPPORT_EMAIL } from '@/constants/disclosure';
 import { getCosmeticItem } from '@/constants/cosmetics';
 import { haptics } from '@/lib/haptics';
 import { THEME_COLORS } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
-import { useBlockUserMutation, useReportContentMutation } from '@/hooks/use-content-moderation';
+import {
+  MESSAGE_REPORT_REASONS,
+  type MessageReportReason,
+  useAcceptChatTermsMutation,
+  useBlockUserMutation,
+  useChatModerationStatus,
+  useReportContentMutation,
+  useReportMessageMutation,
+} from '@/hooks/use-content-moderation';
 import { useEquippedCosmeticsForUsers, useUserCosmetics } from '@/hooks/use-cosmetics';
 import {
   type LeagueChatMessage,
@@ -63,6 +73,7 @@ import {
   useWeeklyAwards,
 } from '@/hooks/use-profile-stats';
 import { cn } from '@/lib/cn';
+import { getChatContentFilterMessage } from '@/lib/content-filter';
 import {
   formatAmericanOdds,
   formatCurrency,
@@ -98,6 +109,10 @@ type WeekViewStatus = 'current' | 'future' | 'past';
 type StandingsSnapshot = {
   standings: StandingRow[];
   weekNumber: number | null;
+};
+type ChatActionTarget = {
+  displayName: string;
+  message: LeagueChatMessage;
 };
 
 const TAB_INDICATOR_HEIGHT = 3;
@@ -2674,6 +2689,222 @@ function ChatBubble({
   );
 }
 
+function ChatActionSheet({
+  onBlock,
+  onClose,
+  onReport,
+  target,
+}: {
+  onBlock: () => void;
+  onClose: () => void;
+  onReport: () => void;
+  target: ChatActionTarget | null;
+}) {
+  return (
+    <Modal animationType="slide" onRequestClose={onClose} transparent visible={Boolean(target)}>
+      <ModalShell variant="overlay">
+        <Pressable className="flex-1 justify-end bg-black/70" onPress={onClose}>
+          <Pressable>
+            <View className="rounded-t-3xl border-t border-white/10 bg-arena-surface px-5 pb-8 pt-4">
+              <View className="mb-4 items-center">
+                <View className="h-1 w-12 rounded-full bg-white/20" />
+              </View>
+              <Text className="text-[11px] font-black uppercase text-electric-green" style={{ letterSpacing: 2 }}>
+                Message Options
+              </Text>
+              <Text className="mt-1 text-xl font-black text-white" numberOfLines={1}>
+                {target?.displayName ?? 'League member'}
+              </Text>
+              <View className="mt-5 gap-3">
+                <Button icon="flag" onPress={onReport} title="Report Message" variant="secondary" />
+                <Button icon="ban" onPress={onBlock} title="Block User" variant="destructive" />
+                <Button onPress={onClose} title="Cancel" variant="secondary" />
+              </View>
+            </View>
+          </Pressable>
+        </Pressable>
+      </ModalShell>
+    </Modal>
+  );
+}
+
+function ChatReportSheet({
+  details,
+  isSubmitting,
+  onChangeDetails,
+  onClose,
+  onSelectReason,
+  onSubmit,
+  reason,
+  target,
+}: {
+  details: string;
+  isSubmitting: boolean;
+  onChangeDetails: (value: string) => void;
+  onClose: () => void;
+  onSelectReason: (reason: MessageReportReason) => void;
+  onSubmit: () => void;
+  reason: MessageReportReason;
+  target: ChatActionTarget | null;
+}) {
+  return (
+    <Modal animationType="slide" onRequestClose={onClose} transparent visible={Boolean(target)}>
+      <ModalShell variant="overlay">
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          className="flex-1 justify-end bg-black/70">
+          <View className="rounded-t-3xl border-t border-white/10 bg-arena-surface px-5 pb-8 pt-4">
+            <View className="mb-4 items-center">
+              <View className="h-1 w-12 rounded-full bg-white/20" />
+            </View>
+            <Text className="text-[11px] font-black uppercase text-electric-green" style={{ letterSpacing: 2 }}>
+              Report Message
+            </Text>
+            <Text className="mt-1 text-xl font-black text-white" numberOfLines={1}>
+              {target?.displayName ?? 'League member'}
+            </Text>
+            <View className="mt-5 flex-row flex-wrap gap-2">
+              {MESSAGE_REPORT_REASONS.map((option) => {
+                const selected = option === reason;
+                return (
+                  <Pressable
+                    accessibilityRole="button"
+                    key={option}
+                    onPress={() => onSelectReason(option)}>
+                    <View
+                      className={cn(
+                        'rounded-full border px-3 py-2',
+                        selected
+                          ? 'border-electric-green bg-electric-green/15'
+                          : 'border-white/10 bg-white/[0.04]',
+                      )}>
+                      <Text
+                        className={cn(
+                          'text-[11px] font-black uppercase',
+                          selected ? 'text-electric-green' : 'text-white/60',
+                        )}
+                        style={{ letterSpacing: 0.8 }}>
+                        {option}
+                      </Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <NativeTextInput
+              className="mt-4 min-h-24 rounded-2xl border border-white/10 bg-arena-bg/70 px-3 py-3 text-sm font-semibold text-white"
+              multiline
+              onChangeText={onChangeDetails}
+              placeholder="Optional details for the moderator"
+              placeholderTextColor="rgba(255,255,255,0.35)"
+              textAlignVertical="top"
+              value={details}
+            />
+            <View className="mt-5 flex-row gap-3">
+              <View className="flex-1">
+                <Button disabled={isSubmitting} onPress={onClose} title="Cancel" variant="secondary" />
+              </View>
+              <View className="flex-1">
+                <Button loading={isSubmitting} onPress={onSubmit} title="Submit" />
+              </View>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </ModalShell>
+    </Modal>
+  );
+}
+
+function ChatTermsModal({
+  isSaving,
+  onAccept,
+  onClose,
+  onContactSupport,
+  onViewTerms,
+  visible,
+}: {
+  isSaving: boolean;
+  onAccept: () => void;
+  onClose: () => void;
+  onContactSupport: () => void;
+  onViewTerms: () => void;
+  visible: boolean;
+}) {
+  return (
+    <Modal animationType="fade" onRequestClose={onClose} transparent visible={visible}>
+      <ModalShell variant="overlay">
+        <View className="flex-1 justify-center bg-black/80 px-5">
+          <Card>
+            <View className="items-center gap-4">
+              <View className="h-14 w-14 items-center justify-center rounded-full border border-coral-red/45 bg-coral-red/15">
+                <Ionicons color={THEME_COLORS.coralRed} name="shield-checkmark" size={24} />
+              </View>
+              <View className="items-center gap-2">
+                <Text className="text-[10px] font-black uppercase text-electric-green" style={{ letterSpacing: 2.5 }}>
+                  Chat Terms
+                </Text>
+                <Text className="text-center text-2xl font-black uppercase text-white" style={{ letterSpacing: 0 }}>
+                  Zero Tolerance
+                </Text>
+                <Text className="text-center text-sm font-semibold leading-5 text-white/60">
+                  Objectionable content, harassment, hate speech, explicit content, threats, and abusive behavior are not allowed. Messages can be reported, hidden, and reviewed. Accounts that abuse chat can be blocked or banned.
+                </Text>
+                <Text className="text-center text-xs font-semibold leading-5 text-white/45">
+                  Support: {SUPPORT_EMAIL}
+                </Text>
+              </View>
+              <View className="w-full flex-row gap-3">
+                <View className="flex-1">
+                  <Button onPress={onViewTerms} title="Terms" variant="secondary" />
+                </View>
+                <View className="flex-1">
+                  <Button onPress={onContactSupport} title="Support" variant="secondary" />
+                </View>
+              </View>
+              <Button loading={isSaving} onPress={onAccept} title="Agree & Continue" />
+            </View>
+          </Card>
+        </View>
+      </ModalShell>
+    </Modal>
+  );
+}
+
+type ChatInsertErrorAction = 'ban' | 'filter' | 'terms' | 'unknown';
+
+function getChatInsertErrorAction(error: unknown): {
+  action: ChatInsertErrorAction;
+  message: string;
+} {
+  const rawMessage = error instanceof Error ? error.message : String(error);
+
+  if (/accept the chat terms|chat terms before posting/i.test(rawMessage)) {
+    return {
+      action: 'terms',
+      message: 'Accept the chat terms before posting.',
+    };
+  }
+
+  if (/objectionable|banned term|please revise/i.test(rawMessage)) {
+    return {
+      action: 'filter',
+      message: 'Remove objectionable language before sending.',
+    };
+  }
+
+  if (/not allowed to post|chat banned|chat_banned/i.test(rawMessage)) {
+    return {
+      action: 'ban',
+      message: 'This account is not allowed to post in chat.',
+    };
+  }
+
+  return {
+    action: 'unknown',
+    message: rawMessage || 'Could not send message.',
+  };
+}
+
 function LeagueChat({
   cosmeticsByUserId,
   detail,
@@ -2683,15 +2914,27 @@ function LeagueChat({
   detail: LeagueDetail;
   userId: string;
 }) {
+  const router = useRouter();
   const [limit, setLimit] = useState(30);
   const [draft, setDraft] = useState('');
+  const [sendError, setSendError] = useState<string | null>(null);
   const [hasNewMessages, setHasNewMessages] = useState(false);
   const [isNearBottom, setIsNearBottom] = useState(true);
+  const [actionTarget, setActionTarget] = useState<ChatActionTarget | null>(null);
+  const [reportTarget, setReportTarget] = useState<ChatActionTarget | null>(null);
+  const [reportReason, setReportReason] = useState<MessageReportReason>('Spam');
+  const [reportDetails, setReportDetails] = useState('');
+  const [termsVisible, setTermsVisible] = useState(false);
+  const [locallyBlockedUserIds, setLocallyBlockedUserIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const scrollRef = useRef<ScrollView>(null);
   const previousMessageCount = useRef(0);
   const chatQuery = useLeagueChat(detail.league.id, limit);
-  const reportContent = useReportContentMutation(userId);
+  const reportMessage = useReportMessageMutation(userId);
   const blockUser = useBlockUserMutation(userId);
+  const chatStatus = useChatModerationStatus(userId);
+  const acceptChatTerms = useAcceptChatTermsMutation(userId);
   const sendMessage = useSendLeagueChatMessage(detail.league.id, userId);
   const sendSticker = useSendLeagueChatSticker(detail.league.id, userId);
   const userCosmetics = useUserCosmetics(userId);
@@ -2704,31 +2947,49 @@ function LeagueChat({
       }, {}),
     [detail.members],
   );
-  const canSend = draft.trim().length > 0 && !sendMessage.isPending;
+  const visibleMessages = useMemo(
+    () =>
+      messages.filter(
+        (message) => !message.user_id || !locallyBlockedUserIds.has(message.user_id),
+      ),
+    [locallyBlockedUserIds, messages],
+  );
+  const draftFilterError = draft.trim().length > 0 ? getChatContentFilterMessage(draft) : null;
+  const isChatBanned = chatStatus.data?.chat_banned === true;
+  const hasAcceptedChatTerms = Boolean(chatStatus.data?.chat_terms_accepted_at);
+  const isChatStatusLoading = chatStatus.isLoading || chatStatus.isFetching;
+  const canSend =
+    draft.trim().length > 0 &&
+    !sendMessage.isPending &&
+    !isChatStatusLoading &&
+    !draftFilterError &&
+    !isChatBanned;
   const stickerRows = (userCosmetics.data?.rows ?? []).filter(
     (row) => row.category === 'chat_sticker_pack',
   );
 
-  const reportChatMessage = async (message: LeagueChatMessage, displayName: string) => {
+  const reportChatMessage = async () => {
+    const target = reportTarget;
+    if (!target) {
+      return;
+    }
+
+    const { displayName, message } = target;
     if (!message.user_id) {
       return;
     }
 
     try {
-      await reportContent.mutateAsync({
-        contentSnapshot: {
-          body: message.body,
-          created_at: message.created_at,
-          message_type: message.message_type,
-          metadata: message.metadata,
-          user_display_name: displayName,
-          user_id: message.user_id,
-        },
+      await reportMessage.mutateAsync({
+        details: reportDetails,
         leagueId: detail.league.id,
+        reason: reportReason,
+        reportedMessageId: message.id,
         reportedUserId: message.user_id,
-        targetId: message.id,
-        targetType: 'chat_message',
       });
+      setReportDetails('');
+      setReportReason('Spam');
+      setReportTarget(null);
       haptics.success();
       Alert.alert('Report sent', 'This message was flagged for moderation review.');
     } catch (error) {
@@ -2747,7 +3008,16 @@ function LeagueChat({
           onPress: () => {
             void (async () => {
               try {
-                await blockUser.mutateAsync(blockedUserId);
+                await blockUser.mutateAsync({
+                  blockedUserId,
+                  leagueId: detail.league.id,
+                });
+                setLocallyBlockedUserIds((current) => {
+                  const next = new Set(current);
+                  next.add(blockedUserId);
+                  return next;
+                });
+                setActionTarget(null);
                 haptics.success();
                 Alert.alert('User blocked', `${displayName}'s messages are hidden for you.`);
               } catch (error) {
@@ -2771,41 +3041,106 @@ function LeagueChat({
       return;
     }
 
-    Alert.alert(displayName, 'Choose a moderation action for this message.', [
-      {
-        onPress: () => {
-          void reportChatMessage(message, displayName);
-        },
-        text: 'Report Message',
-      },
-      {
-        onPress: () => confirmBlockUser(message.user_id as string, displayName),
-        style: 'destructive',
-        text: 'Block User',
-      },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+    setActionTarget({ displayName, message });
   };
 
-  const submitMessage = async () => {
-    if (!canSend) {
+  const sendCurrentMessage = async () => {
+    const nextMessage = draft.trim();
+    if (!nextMessage) {
       return;
     }
 
-    const nextMessage = draft.trim();
     setDraft('');
+    setSendError(null);
     haptics.light();
     try {
       await sendMessage.mutateAsync(nextMessage);
-    } catch {
+    } catch (error) {
+      const sendFailure = getChatInsertErrorAction(error);
+      setDraft(nextMessage);
+      setSendError(sendFailure.message);
+      if (sendFailure.action === 'terms') {
+        setTermsVisible(true);
+      }
       haptics.warning();
     }
     requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
   };
 
+  const submitMessage = async () => {
+    if (!draft.trim()) {
+      return;
+    }
+
+    if (isChatStatusLoading) {
+      setSendError('Checking chat access. Try again in a moment.');
+      return;
+    }
+
+    if (draftFilterError) {
+      setSendError(draftFilterError);
+      haptics.warning();
+      return;
+    }
+
+    if (isChatBanned) {
+      setSendError('This account is not allowed to post in chat.');
+      haptics.warning();
+      return;
+    }
+
+    if (!hasAcceptedChatTerms) {
+      setTermsVisible(true);
+      return;
+    }
+
+    await sendCurrentMessage();
+  };
+
+  const acceptTermsAndContinue = async () => {
+    try {
+      await acceptChatTerms.mutateAsync();
+      const refreshedStatus = await chatStatus.refetch();
+      if (!refreshedStatus.data?.chat_terms_accepted_at) {
+        throw new Error('Chat terms acceptance did not refresh. Try again.');
+      }
+      setTermsVisible(false);
+      setSendError(null);
+      haptics.success();
+      if (draft.trim() && !draftFilterError && !isChatBanned) {
+        await sendCurrentMessage();
+      }
+    } catch (error) {
+      haptics.error();
+      Alert.alert('Could not save agreement', error instanceof Error ? error.message : 'Try again.');
+    }
+  };
+
+  const contactSupport = () => {
+    void Linking.openURL(`mailto:${SUPPORT_EMAIL}`).catch(() => {
+      Alert.alert('Support email', SUPPORT_EMAIL);
+    });
+  };
+
   const submitSticker = async (itemId: string) => {
     const item = getCosmeticItem(itemId);
     if (!item) return;
+
+    if (isChatBanned) {
+      setSendError('This account is not allowed to post in chat.');
+      Alert.alert('Chat unavailable', 'This account is not allowed to post in chat.');
+      return;
+    }
+
+    if (isChatStatusLoading) {
+      setSendError('Checking chat access. Try again in a moment.');
+      return;
+    }
+
+    if (!hasAcceptedChatTerms) {
+      setTermsVisible(true);
+      return;
+    }
 
     haptics.light();
     try {
@@ -2813,7 +3148,13 @@ function LeagueChat({
         stickerId: item.id,
         stickerName: item.name,
       });
-    } catch {
+      setSendError(null);
+    } catch (error) {
+      const sendFailure = getChatInsertErrorAction(error);
+      setSendError(sendFailure.message);
+      if (sendFailure.action === 'terms') {
+        setTermsVisible(true);
+      }
       haptics.warning();
     }
     requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
@@ -2831,9 +3172,9 @@ function LeagueChat({
 
   useEffect(() => {
     const previousCount = previousMessageCount.current;
-    previousMessageCount.current = messages.length;
+    previousMessageCount.current = visibleMessages.length;
 
-    if (messages.length === 0 || messages.length <= previousCount) {
+    if (visibleMessages.length === 0 || visibleMessages.length <= previousCount) {
       return;
     }
 
@@ -2842,7 +3183,29 @@ function LeagueChat({
     } else {
       setHasNewMessages(true);
     }
-  }, [isNearBottom, messages.length]);
+  }, [isNearBottom, visibleMessages.length]);
+
+  const openReportSheet = () => {
+    if (!actionTarget) {
+      return;
+    }
+
+    setReportReason('Spam');
+    setReportDetails('');
+    setReportTarget(actionTarget);
+    setActionTarget(null);
+  };
+
+  const blockActionTarget = () => {
+    const blockedUserId = actionTarget?.message.user_id;
+    if (!blockedUserId) {
+      return;
+    }
+
+    const { displayName } = actionTarget;
+    setActionTarget(null);
+    confirmBlockUser(blockedUserId, displayName);
+  };
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -2857,7 +3220,7 @@ function LeagueChat({
                 League Chat
               </Text>
             </View>
-            <Badge label={`${messages.length} shown`} tone="green" />
+            <Badge label={`${visibleMessages.length} shown`} tone="green" />
           </View>
 
           <ScrollView
@@ -2884,7 +3247,7 @@ function LeagueChat({
               </View>
             ) : null}
 
-            {!chatQuery.isLoading && messages.length === 0 ? (
+            {!chatQuery.isLoading && visibleMessages.length === 0 ? (
               <View className="items-center gap-3 py-14">
                 <View className="h-14 w-14 items-center justify-center rounded-full border border-electric-green/30 bg-electric-green/10">
                   <Ionicons color={THEME_COLORS.electricGreen} name="chatbubble-ellipses" size={24} />
@@ -2895,7 +3258,7 @@ function LeagueChat({
               </View>
             ) : null}
 
-            {messages.map((message) => (
+            {visibleMessages.map((message) => (
               <ChatBubble
                 cosmetics={message.user_id ? cosmeticsByUserId[message.user_id] : undefined}
                 isMine={message.user_id === userId}
@@ -2952,11 +3315,21 @@ function LeagueChat({
                 })}
               </ScrollView>
             ) : null}
+            {draftFilterError || sendError || isChatBanned ? (
+              <Text className="mb-2 text-xs font-bold leading-5 text-coral-red">
+                {isChatBanned
+                  ? 'This account is not allowed to post in chat.'
+                  : draftFilterError ?? sendError}
+              </Text>
+            ) : null}
             <View className="flex-row items-end gap-2 rounded-2xl border border-white/10 bg-arena-bg/70 p-2">
               <NativeTextInput
                 className="max-h-28 flex-1 px-2 py-2 text-base font-semibold text-white"
                 multiline
-                onChangeText={setDraft}
+                onChangeText={(value) => {
+                  setDraft(value);
+                  setSendError(null);
+                }}
                 placeholder="Talk your talk..."
                 placeholderTextColor="rgba(255,255,255,0.35)"
                 value={draft}
@@ -2984,6 +3357,34 @@ function LeagueChat({
           </View>
         </View>
       </Card>
+      <ChatActionSheet
+        onBlock={blockActionTarget}
+        onClose={() => setActionTarget(null)}
+        onReport={openReportSheet}
+        target={actionTarget}
+      />
+      <ChatReportSheet
+        details={reportDetails}
+        isSubmitting={reportMessage.isPending}
+        onChangeDetails={setReportDetails}
+        onClose={() => setReportTarget(null)}
+        onSelectReason={setReportReason}
+        onSubmit={() => {
+          void reportChatMessage();
+        }}
+        reason={reportReason}
+        target={reportTarget}
+      />
+      <ChatTermsModal
+        isSaving={acceptChatTerms.isPending}
+        onAccept={() => {
+          void acceptTermsAndContinue();
+        }}
+        onClose={() => setTermsVisible(false)}
+        onContactSupport={contactSupport}
+        onViewTerms={() => router.push('/terms')}
+        visible={termsVisible}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -3420,7 +3821,10 @@ export default function LeagueDetailScreen() {
           onPress: () => {
             void (async () => {
               try {
-                await blockUser.mutateAsync(member.user_id);
+                await blockUser.mutateAsync({
+                  blockedUserId: member.user_id,
+                  leagueId: detail.league.id,
+                });
                 haptics.success();
                 Alert.alert('User blocked', `${displayName}'s messages are hidden for you.`);
               } catch (error) {

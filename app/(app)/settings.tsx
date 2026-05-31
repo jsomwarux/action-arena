@@ -19,6 +19,11 @@ import {
 } from '@/constants/disclosure';
 import { THEME_COLORS } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
+import {
+  type BlockedUser,
+  useBlockedUsers,
+  useUnblockUserMutation,
+} from '@/hooks/use-content-moderation';
 import { useDeleteAccount } from '@/hooks/use-delete-account';
 import { type LeagueSummary, useLeaveLeagueMutation, useMyLeagues } from '@/hooks/use-leagues';
 import {
@@ -87,6 +92,43 @@ function LeagueManagementRow({
   );
 }
 
+function BlockedUserRow({
+  block,
+  onUnblock,
+}: {
+  block: BlockedUser;
+  onUnblock: (block: BlockedUser) => void;
+}) {
+  const displayName = block.blockedUser?.display_name ?? 'Blocked user';
+
+  return (
+    <View className="flex-row items-center gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.04] p-3">
+      <View className="h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-coral-red/30 bg-coral-red/12">
+        <Ionicons color={THEME_COLORS.coralRed} name="ban" size={18} />
+      </View>
+      <View className="min-w-0 flex-1">
+        <Text className="text-base font-black text-white" numberOfLines={1}>
+          {displayName}
+        </Text>
+        <Text className="mt-1 text-xs font-semibold text-white/45">
+          Hidden from your league chat
+        </Text>
+      </View>
+      <Pressable
+        accessibilityRole="button"
+        hitSlop={8}
+        onPress={() => onUnblock(block)}
+        style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
+        <Text
+          className="text-[11px] font-black uppercase text-electric-green"
+          style={{ letterSpacing: 1.2 }}>
+          Unblock
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
 export default function SettingsScreen() {
   const { signOut, user } = useAuth();
   const router = useRouter();
@@ -95,6 +137,7 @@ export default function SettingsScreen() {
     viewerUserId: user?.id,
   });
   const leaguesQuery = useMyLeagues(user?.id);
+  const blockedUsersQuery = useBlockedUsers(user?.id);
   const preferencesQuery = useNotificationPreferences(user?.id);
   const seasonPassQuery = useSeasonPass(user?.id);
   const seasonPassPurchase = useSeasonPassPurchase(user?.id);
@@ -102,6 +145,7 @@ export default function SettingsScreen() {
   const updateProfile = useUpdateUserProfile(user?.id);
   const deleteAccount = useDeleteAccount();
   const leaveLeague = useLeaveLeagueMutation(user?.id);
+  const unblockUser = useUnblockUserMutation(user?.id);
   const [displayName, setDisplayName] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
 
@@ -115,6 +159,7 @@ export default function SettingsScreen() {
   const isLoading =
     profileQuery.isLoading ||
     leaguesQuery.isLoading ||
+    blockedUsersQuery.isLoading ||
     preferencesQuery.isLoading ||
     seasonPassQuery.isLoading;
   const hasSeasonPass = Boolean(seasonPassQuery.data);
@@ -164,6 +209,29 @@ export default function SettingsScreen() {
     );
   };
 
+  const confirmUnblockUser = (block: BlockedUser) => {
+    const displayName = block.blockedUser?.display_name ?? 'this user';
+
+    Alert.alert(
+      `Unblock ${displayName}?`,
+      'Their league chat messages will be visible to you again.',
+      [
+        { style: 'cancel', text: 'Cancel' },
+        {
+          onPress: async () => {
+            try {
+              await unblockUser.mutateAsync(block.id);
+              Alert.alert('User unblocked', `${displayName}'s chat messages can appear again.`);
+            } catch (error) {
+              Alert.alert('Could not unblock user', error instanceof Error ? error.message : 'Try again.');
+            }
+          },
+          text: 'Unblock',
+        },
+      ],
+    );
+  };
+
   const confirmDeleteAccount = () => {
     Alert.alert(
       'Delete account permanently?',
@@ -201,10 +269,16 @@ export default function SettingsScreen() {
         refreshControl={
           <RefreshControl
             tintColor={THEME_COLORS.electricGreen}
-            refreshing={profileQuery.isRefetching || leaguesQuery.isRefetching || preferencesQuery.isRefetching}
+            refreshing={
+              profileQuery.isRefetching ||
+              leaguesQuery.isRefetching ||
+              blockedUsersQuery.isRefetching ||
+              preferencesQuery.isRefetching
+            }
               onRefresh={() => {
                 void profileQuery.refetch();
                 void leaguesQuery.refetch();
+                void blockedUsersQuery.refetch();
                 void preferencesQuery.refetch();
                 void seasonPassQuery.refetch();
               }}
@@ -287,6 +361,27 @@ export default function SettingsScreen() {
                       item={league}
                       key={league.league.id}
                       onLeave={confirmLeaveLeague}
+                    />
+                  ))
+                )}
+              </View>
+            </Card>
+
+            <Card>
+              <View className="gap-3">
+                <Text className="text-[11px] font-semibold uppercase text-electric-green" style={{ letterSpacing: 1.2 }}>
+                  Blocked Users
+                </Text>
+                {(blockedUsersQuery.data ?? []).length === 0 ? (
+                  <Text className="text-sm font-semibold text-white/55">
+                    Blocked league chat users will show here.
+                  </Text>
+                ) : (
+                  (blockedUsersQuery.data ?? []).map((block) => (
+                    <BlockedUserRow
+                      block={block}
+                      key={block.id}
+                      onUnblock={confirmUnblockUser}
                     />
                   ))
                 )}
@@ -438,7 +533,7 @@ export default function SettingsScreen() {
           </>
         ) : null}
 
-        {profileQuery.isError || leaguesQuery.isError || preferencesQuery.isError ? (
+        {profileQuery.isError || leaguesQuery.isError || blockedUsersQuery.isError || preferencesQuery.isError ? (
           <Card>
             <Text className={cn('text-sm font-semibold text-coral-red')}>
               Some settings could not be loaded. Pull to refresh and try again.

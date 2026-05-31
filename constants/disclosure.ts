@@ -1,4 +1,5 @@
 export const ACTION_ARENA_DISCLOSURE_METADATA_KEY = 'action_arena_disclosure_seen_at';
+export const SUPPORT_EMAIL = 'support@actionarena.app';
 
 export const ACTION_ARENA_DISCLOSURE = {
   title: 'How Action Arena Works',

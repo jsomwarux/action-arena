@@ -60,6 +60,11 @@ begin
 end;
 $$;
 
+update public.users users
+set chat_terms_accepted_at = coalesce(users.chat_terms_accepted_at, now())
+from rls_authorization_context context
+where users.id in (context.user_a_id, context.user_b_id);
+
 insert into public.cosmetic_catalog (item_id, category, name, coin_cost, is_season_pass_exclusive)
 values ('rls_auth_test_logo', 'team_logo', 'RLS Auth Test Logo', 0, false)
 on conflict (item_id) do nothing;
