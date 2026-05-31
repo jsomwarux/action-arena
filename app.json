@@ -17,6 +17,9 @@
       "bundleIdentifier": "com.actionarena.app",
       "buildNumber": "1",
       "supportsTablet": false,
+      "config": {
+        "usesNonExemptEncryption": false
+      },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
