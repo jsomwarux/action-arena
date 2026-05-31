@@ -4,8 +4,11 @@ import {
   ErrorCode,
   currentEntitlementIOS,
   getAvailablePurchases as getStoreAvailablePurchases,
+  getTransactionJwsIOS,
   getReceiptDataIOS,
+  isTransactionVerifiedIOS,
   requestReceiptRefreshIOS,
+  syncIOS,
   useIAP,
   type ExpoPurchaseError,
   type Product,
@@ -38,7 +41,8 @@ type ValidateSeasonPassReceiptResponse = {
 type ValidateSeasonPassReceiptBody = {
   originalTransactionId: string | null;
   productId: string;
-  receiptData: string;
+  receiptData?: string | null;
+  restoreExistingEntitlement?: boolean;
   seasonYear: number;
   transactionId: string | null;
   transactionJws: string | null;
@@ -49,6 +53,7 @@ const STORE_UNAVAILABLE_MESSAGE =
 
 const VALIDATION_RETRY_MESSAGE =
   'Apple confirmed the purchase, but Action Arena could not validate it yet. Restore purchases after your connection is back.';
+const RESTORE_RETRY_DELAYS_MS = [350, 900];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -109,6 +114,10 @@ function nullableString(value: unknown) {
 
 function iosOriginalTransactionId(purchase: Purchase) {
   return isRecord(purchase) ? nullableString(purchase.originalTransactionIdentifierIOS) : null;
+}
+
+async function delay(milliseconds: number) {
+  await new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
 async function readReceiptData() {
@@ -254,14 +263,13 @@ export function useSeasonPassPurchase(
         transactionJws: nullableString(purchase.purchaseToken),
       };
 
-      const { data, error } =
-        await supabase.functions.invoke<ValidateSeasonPassReceiptResponse>(
-          'validate-season-pass-receipt',
-          {
-            body,
-            method: 'POST',
-          },
-        );
+      const { data, error } = await supabase.functions.invoke<ValidateSeasonPassReceiptResponse>(
+        'validate-season-pass-receipt',
+        {
+          body,
+          method: 'POST',
+        },
+      );
 
       if (error) {
         throw new Error(VALIDATION_RETRY_MESSAGE);
@@ -276,10 +284,102 @@ export function useSeasonPassPurchase(
     [seasonYear],
   );
 
+  const validateStoreKitEntitlement = useCallback(
+    async (purchase: Purchase) => {
+      const isVerified = await isTransactionVerifiedIOS(SEASON_PASS_PRODUCT_ID);
+
+      if (!isVerified) {
+        throw new Error('Apple has not verified this Season Pass entitlement yet.');
+      }
+
+      const transactionJws =
+        nullableString(purchase.purchaseToken) ??
+        (await getTransactionJwsIOS(SEASON_PASS_PRODUCT_ID));
+      const body: ValidateSeasonPassReceiptBody = {
+        originalTransactionId: iosOriginalTransactionId(purchase),
+        productId: SEASON_PASS_PRODUCT_ID,
+        receiptData: null,
+        seasonYear,
+        transactionId: nullableString(purchase.id),
+        transactionJws,
+      };
+
+      const { data, error } = await supabase.functions.invoke<ValidateSeasonPassReceiptResponse>(
+        'validate-season-pass-receipt',
+        {
+          body,
+          method: 'POST',
+        },
+      );
+
+      if (error) {
+        throw new Error(
+          'Apple found your Season Pass, but Action Arena could not reconnect it yet. Try again in a moment.',
+        );
+      }
+
+      if (!data?.ok) {
+        throw new Error(data?.error ?? 'The Season Pass entitlement could not be restored yet.');
+      }
+
+      return data;
+    },
+    [seasonYear],
+  );
+
+  const restoreServerEntitlement = useCallback(async () => {
+    const body: ValidateSeasonPassReceiptBody = {
+      originalTransactionId: null,
+      productId: SEASON_PASS_PRODUCT_ID,
+      receiptData: null,
+      restoreExistingEntitlement: true,
+      seasonYear,
+      transactionId: null,
+      transactionJws: null,
+    };
+
+    const { data, error } = await supabase.functions.invoke<ValidateSeasonPassReceiptResponse>(
+      'validate-season-pass-receipt',
+      {
+        body,
+        method: 'POST',
+      },
+    );
+
+    if (error || !data?.ok) {
+      return false;
+    }
+
+    return true;
+  }, [seasonYear]);
+
+  const hasServerEntitlement = useCallback(async () => {
+    if (!userId) {
+      return false;
+    }
+
+    const { data, error } = await supabase
+      .from('season_passes')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('season_year', seasonYear)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return Boolean(data);
+  }, [seasonYear, userId]);
+
   const refreshEntitlement = useCallback(async () => {
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: seasonPassKeys.pass(userId, seasonYear) }),
-      queryClient.invalidateQueries({ queryKey: ['cosmetics', 'mine', userId] }),
+      queryClient.invalidateQueries({
+        queryKey: seasonPassKeys.pass(userId, seasonYear),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: ['cosmetics', 'mine', userId],
+      }),
     ]);
   }, [queryClient, seasonYear, userId]);
 
@@ -327,7 +427,11 @@ export function useSeasonPassPurchase(
       );
 
       try {
-        await validateReceipt(purchase);
+        if (mode === 'restore') {
+          await validateStoreKitEntitlement(purchase);
+        } else {
+          await validateReceipt(purchase);
+        }
         await finishTransaction({ isConsumable: false, purchase });
         await refreshEntitlement();
 
@@ -342,13 +446,17 @@ export function useSeasonPassPurchase(
         const message = error instanceof Error ? error.message : VALIDATION_RETRY_MESSAGE;
         setOperationError(message);
         setStatusMessage(null);
-        return result(false, 'Could not validate purchase', message);
+        return result(
+          false,
+          mode === 'restore' ? 'Restore pending' : 'Could not validate purchase',
+          message,
+        );
       } finally {
         processingPurchasesRef.current.delete(key);
         setIsPurchasing(false);
       }
     },
-    [finishTransaction, refreshEntitlement, validateReceipt],
+    [finishTransaction, refreshEntitlement, validateReceipt, validateStoreKitEntitlement],
   );
 
   useEffect(() => {
@@ -409,6 +517,36 @@ export function useSeasonPassPurchase(
     }
   }, [processPurchase, requestPurchase, userId]);
 
+  const findRestorableSeasonPass = useCallback(async () => {
+    await syncIOS().catch(() => undefined);
+
+    for (let attempt = 0; attempt <= RESTORE_RETRY_DELAYS_MS.length; attempt += 1) {
+      const availablePurchases = await getStoreAvailablePurchases({
+        onlyIncludeActiveItemsIOS: true,
+      });
+      const availablePurchase = availablePurchases.find(isSeasonPassPurchase);
+
+      if (availablePurchase) {
+        return availablePurchase;
+      }
+
+      const currentEntitlement = await currentEntitlementIOS(SEASON_PASS_PRODUCT_ID);
+
+      if (currentEntitlement) {
+        return currentEntitlement;
+      }
+
+      const retryDelay = RESTORE_RETRY_DELAYS_MS[attempt];
+
+      if (retryDelay) {
+        setStatusMessage('Apple is still syncing your Season Pass. Checking again.');
+        await delay(retryDelay);
+      }
+    }
+
+    return null;
+  }, []);
+
   const restore = useCallback(async (): Promise<SeasonPassPurchaseResult> => {
     if (!userId) {
       const message = 'Sign in before restoring purchases.';
@@ -427,20 +565,37 @@ export function useSeasonPassPurchase(
     setStatusMessage('Checking Apple for Season Pass purchases.');
 
     try {
+      if (await hasServerEntitlement()) {
+        await restoreServerEntitlement();
+        await refreshEntitlement();
+
+        const message = 'Season Pass active. Exclusive drops and analytics are unlocked.';
+        setStatusMessage(message);
+        setIsPurchasing(false);
+        return result(true, 'Purchases restored', message);
+      }
+
+      await syncIOS().catch(() => undefined);
       await restorePurchases({
         alsoPublishToEventListenerIOS: false,
         onlyIncludeActiveItemsIOS: true,
-      });
+      }).catch(() => undefined);
 
-      const availablePurchases = await getStoreAvailablePurchases({
-        onlyIncludeActiveItemsIOS: true,
-      });
-      const restoredPurchase =
-        availablePurchases.find(isSeasonPassPurchase) ??
-        (await currentEntitlementIOS(SEASON_PASS_PRODUCT_ID));
+      const restoredPurchase = await findRestorableSeasonPass();
 
       if (!restoredPurchase) {
-        const message = 'Apple did not find a Season Pass purchase for this Apple ID.';
+        if (await hasServerEntitlement()) {
+          await restoreServerEntitlement();
+          await refreshEntitlement();
+
+          const message = 'Season Pass active. Exclusive drops and analytics are unlocked.';
+          setStatusMessage(message);
+          setIsPurchasing(false);
+          return result(true, 'Purchases restored', message);
+        }
+
+        const message =
+          'Apple did not return the Season Pass entitlement yet. Try Restore Purchases again in a moment.';
         setStatusMessage(message);
         setIsPurchasing(false);
         return result(false, 'No purchases found', message);
@@ -454,7 +609,15 @@ export function useSeasonPassPurchase(
       setIsPurchasing(false);
       return result(false, 'Restore failed', message);
     }
-  }, [processPurchase, restorePurchases, userId]);
+  }, [
+    findRestorableSeasonPass,
+    hasServerEntitlement,
+    processPurchase,
+    refreshEntitlement,
+    restorePurchases,
+    restoreServerEntitlement,
+    userId,
+  ]);
 
   const isLoading =
     productFetchStatus === 'loading' ||

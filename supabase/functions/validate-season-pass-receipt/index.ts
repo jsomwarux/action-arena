@@ -67,7 +67,8 @@ type SeasonPassReceiptDatabase = {
 type ParsedRequestBody = {
   originalTransactionId: string | null;
   productId: string;
-  receiptData: string;
+  receiptData: string | null;
+  restoreExistingEntitlement: boolean;
   seasonYear: number;
   transactionId: string | null;
   transactionJws: string | null;
@@ -78,6 +79,16 @@ type ApplePurchase = {
   originalTransactionId: string | null;
   productId: string | null;
   purchaseDateMs: string | null;
+  transactionId: string | null;
+};
+
+type StoreKitTransaction = {
+  bundleId: string | null;
+  environment: string | null;
+  originalTransactionId: string | null;
+  productId: string | null;
+  purchaseDateMs: string | null;
+  revocationDateMs: string | null;
   transactionId: string | null;
 };
 
@@ -172,17 +183,25 @@ async function readRequestBody(request: Request): Promise<ParsedRequestBody> {
         ? Number(rawSeasonYear)
         : NaN;
 
-  if (!receiptData || !productId || !Number.isInteger(seasonYear)) {
-    throw new PublicFunctionError('Receipt, product, and season year are required.');
+  const transactionJws = nullableString(body.transactionJws);
+  const restoreExistingEntitlement = body.restoreExistingEntitlement === true;
+
+  if (!productId || !Number.isInteger(seasonYear)) {
+    throw new PublicFunctionError('Product and season year are required.');
+  }
+
+  if (!restoreExistingEntitlement && !receiptData && !transactionJws) {
+    throw new PublicFunctionError('Receipt or StoreKit entitlement is required.');
   }
 
   return {
     originalTransactionId: nullableString(body.originalTransactionId),
     productId,
     receiptData,
+    restoreExistingEntitlement,
     seasonYear,
     transactionId: nullableString(body.transactionId),
-    transactionJws: nullableString(body.transactionJws),
+    transactionJws,
   };
 }
 
@@ -192,7 +211,8 @@ function parseApplePurchase(value: unknown): ApplePurchase | null {
   }
 
   return {
-    cancellationDate: stringField(value, 'cancellation_date') ?? stringField(value, 'cancellation_date_ms'),
+    cancellationDate:
+      stringField(value, 'cancellation_date') ?? stringField(value, 'cancellation_date_ms'),
     originalTransactionId: stringField(value, 'original_transaction_id'),
     productId: stringField(value, 'product_id'),
     purchaseDateMs: stringField(value, 'purchase_date_ms'),
@@ -228,11 +248,7 @@ function parseAppleResponse(value: unknown): AppleReceiptValidation {
   };
 }
 
-async function callAppleVerifyReceipt(
-  endpoint: string,
-  receiptData: string,
-  sharedSecret: string,
-) {
+async function callAppleVerifyReceipt(endpoint: string, receiptData: string, sharedSecret: string) {
   const response = await fetch(endpoint, {
     body: JSON.stringify({
       'exclude-old-transactions': true,
@@ -260,7 +276,11 @@ async function verifyReceiptWithApple(receiptData: string, sharedSecret: string)
   if (validation.status === 21007) {
     validation = await callAppleVerifyReceipt(sandboxVerifyReceiptUrl, receiptData, sharedSecret);
   } else if (validation.status === 21008) {
-    validation = await callAppleVerifyReceipt(productionVerifyReceiptUrl, receiptData, sharedSecret);
+    validation = await callAppleVerifyReceipt(
+      productionVerifyReceiptUrl,
+      receiptData,
+      sharedSecret,
+    );
   }
 
   if (validation.status !== 0) {
@@ -310,6 +330,94 @@ function applePurchaseDate(value: string | null) {
   }
 
   return new Date(milliseconds).toISOString();
+}
+
+function numberOrStringField(record: Record<string, unknown>, key: string) {
+  const value = record[key];
+
+  if (typeof value === 'string' && value.length > 0) {
+    return value;
+  }
+
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return String(value);
+  }
+
+  return null;
+}
+
+function decodeBase64UrlJson(segment: string) {
+  const normalized = segment.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
+  const decoded = atob(padded);
+  return JSON.parse(decoded) as unknown;
+}
+
+function parseStoreKitTransactionJws(transactionJws: string): StoreKitTransaction {
+  const payloadSegment = transactionJws.split('.')[1];
+
+  if (!payloadSegment) {
+    throw new PublicFunctionError('Apple did not return a readable Season Pass entitlement.');
+  }
+
+  const payload = decodeBase64UrlJson(payloadSegment);
+
+  if (!isRecord(payload)) {
+    throw new PublicFunctionError('Apple did not return a readable Season Pass entitlement.');
+  }
+
+  return {
+    bundleId: stringField(payload, 'bundleId'),
+    environment: stringField(payload, 'environment'),
+    originalTransactionId: numberOrStringField(payload, 'originalTransactionId'),
+    productId: stringField(payload, 'productId'),
+    purchaseDateMs: numberOrStringField(payload, 'purchaseDate'),
+    revocationDateMs: numberOrStringField(payload, 'revocationDate'),
+    transactionId: numberOrStringField(payload, 'transactionId'),
+  };
+}
+
+function applePurchaseFromStoreKitTransaction(
+  transaction: StoreKitTransaction,
+  expectedBundleId: string,
+  expectedProductId: string,
+  transactionId: string | null,
+  originalTransactionId: string | null,
+): ApplePurchase {
+  if (transaction.bundleId !== expectedBundleId) {
+    throw new PublicFunctionError('StoreKit entitlement is not for this app.');
+  }
+
+  if (transaction.productId !== expectedProductId) {
+    throw new PublicFunctionError('StoreKit entitlement is not for the Season Pass product.');
+  }
+
+  if (transaction.revocationDateMs) {
+    throw new PublicFunctionError('This Season Pass purchase is no longer active.');
+  }
+
+  const transactionIds = [transaction.transactionId, transaction.originalTransactionId].filter(
+    (value): value is string => Boolean(value),
+  );
+  const requestIds = [transactionId, originalTransactionId].filter((value): value is string =>
+    Boolean(value),
+  );
+
+  if (
+    transactionIds.length > 0 &&
+    requestIds.length > 0 &&
+    !requestIds.some((requestId) => transactionIds.includes(requestId))
+  ) {
+    throw new PublicFunctionError('StoreKit entitlement does not match this transaction.');
+  }
+
+  return {
+    cancellationDate: null,
+    originalTransactionId: transaction.originalTransactionId,
+    productId: transaction.productId,
+    purchaseDateMs: transaction.purchaseDateMs,
+    transactionId: transaction.transactionId,
+  };
 }
 
 function createSupabaseClient() {
@@ -391,6 +499,30 @@ async function grantSeasonPassEntitlement({
     entitlementId = insertedPass.id;
   }
 
+  await grantSeasonPassCosmetics({
+    purchaseSource: 'apple_iap',
+    seasonYear,
+    supabase,
+    userId,
+  });
+
+  return {
+    entitlementId,
+    status: existingPass ? 'already_entitled' : 'granted',
+  };
+}
+
+async function grantSeasonPassCosmetics({
+  purchaseSource,
+  seasonYear,
+  supabase,
+  userId,
+}: {
+  purchaseSource: string;
+  seasonYear: number;
+  supabase: ReturnType<typeof createSupabaseClient>;
+  userId: string;
+}) {
   const { data: cosmetics, error: cosmeticsError } = await supabase
     .from('cosmetic_catalog')
     .select('item_id, category, is_season_pass_exclusive')
@@ -404,7 +536,7 @@ async function grantSeasonPassEntitlement({
     category: item.category,
     item_id: item.item_id,
     metadata: {
-      purchase_source: 'apple_iap',
+      purchase_source: purchaseSource,
       season_year: seasonYear,
       source: 'season_pass',
     },
@@ -423,11 +555,40 @@ async function grantSeasonPassEntitlement({
       throw new Error(cosmeticsGrantError.message);
     }
   }
+}
 
-  return {
-    entitlementId,
-    status: existingPass ? 'already_entitled' : 'granted',
-  };
+async function restoreExistingServerEntitlement({
+  seasonYear,
+  supabase,
+  userId,
+}: {
+  seasonYear: number;
+  supabase: ReturnType<typeof createSupabaseClient>;
+  userId: string;
+}) {
+  const { data: existingPass, error: existingPassError } = await supabase
+    .from('season_passes')
+    .select('id, source')
+    .eq('user_id', userId)
+    .eq('season_year', seasonYear)
+    .maybeSingle();
+
+  if (existingPassError) {
+    throw new Error(existingPassError.message);
+  }
+
+  if (!existingPass) {
+    throw new PublicFunctionError('No active Season Pass entitlement found.', 404);
+  }
+
+  await grantSeasonPassCosmetics({
+    purchaseSource: existingPass.source,
+    seasonYear,
+    supabase,
+    userId,
+  });
+
+  return existingPass.id;
 }
 
 Deno.serve(async (request) => {
@@ -470,28 +631,61 @@ Deno.serve(async (request) => {
       throw new PublicFunctionError('Invalid or expired session.', 401);
     }
 
-    const validation = await verifyReceiptWithApple(
-      body.receiptData,
-      getRequiredEnv('APPLE_IAP_SHARED_SECRET'),
-    );
+    if (body.restoreExistingEntitlement) {
+      const entitlementId = await restoreExistingServerEntitlement({
+        seasonYear: body.seasonYear,
+        supabase,
+        userId: user.id,
+      });
 
-    if (validation.bundleId !== expectedBundleId) {
-      throw new PublicFunctionError('Receipt is not for this app.');
+      return jsonResponse(
+        {
+          entitlementId,
+          ok: true,
+          status: 'already_entitled',
+        },
+        200,
+      );
     }
 
-    const purchase = findSeasonPassPurchase(
-      validation,
-      expectedProductId,
-      body.transactionId,
-      body.originalTransactionId,
-    );
+    let environment: string | null = null;
+    let purchase: ApplePurchase | null = null;
+
+    if (body.receiptData) {
+      const validation = await verifyReceiptWithApple(
+        body.receiptData,
+        getRequiredEnv('APPLE_IAP_SHARED_SECRET'),
+      );
+
+      if (validation.bundleId !== expectedBundleId) {
+        throw new PublicFunctionError('Receipt is not for this app.');
+      }
+
+      environment = validation.environment;
+      purchase = findSeasonPassPurchase(
+        validation,
+        expectedProductId,
+        body.transactionId,
+        body.originalTransactionId,
+      );
+    } else if (body.transactionJws) {
+      const transaction = parseStoreKitTransactionJws(body.transactionJws);
+      environment = transaction.environment;
+      purchase = applePurchaseFromStoreKitTransaction(
+        transaction,
+        expectedBundleId,
+        expectedProductId,
+        body.transactionId,
+        body.originalTransactionId,
+      );
+    }
 
     if (!purchase) {
-      throw new PublicFunctionError('Receipt does not include an active Season Pass purchase.');
+      throw new PublicFunctionError('Apple did not return an active Season Pass purchase.');
     }
 
     const grant = await grantSeasonPassEntitlement({
-      environment: validation.environment,
+      environment,
       expectedProductId,
       purchase,
       seasonYear: body.seasonYear,
