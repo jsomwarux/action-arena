@@ -1,3 +1,16 @@
+-- Weekly pick reminder scheduling.
+-- Vault secrets are managed out-of-band and must not be hardcoded here:
+-- action_arena_process_notifications_url
+-- action_arena_process_notifications_bearer_token
+-- action_arena_notification_cron_secret
+
+create schema if not exists extensions;
+create schema if not exists vault;
+
+create extension if not exists pg_cron with schema pg_catalog;
+create extension if not exists pg_net with schema extensions;
+create extension if not exists supabase_vault with schema vault;
+
 create table if not exists public.pick_reminder_sent_log (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.users(id) on delete cascade,
@@ -229,59 +242,31 @@ revoke execute on function public.enqueue_weekly_pick_reminders(timestamptz, tim
 grant execute on function public.enqueue_weekly_pick_reminders(timestamptz, timestamptz)
   to service_role;
 
-create extension if not exists pg_cron with schema extensions;
-create extension if not exists pg_net with schema extensions;
-create extension if not exists supabase_vault with schema vault;
-
 do $$
 declare
-  existing_job_id bigint;
+  scheduled_job record;
 begin
-  select jobid
-  into existing_job_id
-  from cron.job
-  where jobname = 'weekly-pick-reminders-every-30-minutes'
-  limit 1;
-
-  if existing_job_id is not null then
-    perform cron.unschedule(existing_job_id);
-  end if;
+  for scheduled_job in
+    select jobid
+    from cron.job
+    where jobname in (
+      'weekly-pick-reminders-every-30-minutes',
+      'drain-notification-queue'
+    )
+  loop
+    perform cron.unschedule(scheduled_job.jobid);
+  end loop;
 end;
 $$;
 
--- Vault secrets are set out-of-band. Do not hardcode or commit function bearer
--- tokens. Expected secret names:
---   action_arena_process_notifications_url
---   action_arena_process_notifications_bearer_token
---   action_arena_notification_cron_secret
 select cron.schedule(
   'weekly-pick-reminders-every-30-minutes',
   '*/30 * * * *',
-  $$
-  select net.http_post(
-    url := (
-      select decrypted_secret
-      from vault.decrypted_secrets
-      where name = 'action_arena_process_notifications_url'
-      limit 1
-    ),
-    headers := jsonb_build_object(
-      'Content-Type', 'application/json',
-      'Authorization', 'Bearer ' || (
-        select decrypted_secret
-        from vault.decrypted_secrets
-        where name = 'action_arena_process_notifications_bearer_token'
-        limit 1
-      ),
-      'x-notification-secret', (
-        select decrypted_secret
-        from vault.decrypted_secrets
-        where name = 'action_arena_notification_cron_secret'
-        limit 1
-      )
-    ),
-    body := jsonb_build_object('mode', 'bet_reminders'),
-    timeout_milliseconds := 5000
-  );
-  $$
+  $$ select net.http_post(url := (select decrypted_secret from vault.decrypted_secrets where name = 'action_arena_process_notifications_url' limit 1), headers := jsonb_build_object('Content-Type','application/json','Authorization','Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'action_arena_process_notifications_bearer_token' limit 1),'x-notification-secret', (select decrypted_secret from vault.decrypted_secrets where name = 'action_arena_notification_cron_secret' limit 1)), body := jsonb_build_object('mode','bet_reminders'), timeout_milliseconds := 5000); $$
+);
+
+select cron.schedule(
+  'drain-notification-queue',
+  '*/2 * * * *',
+  $$ select net.http_post(url := (select decrypted_secret from vault.decrypted_secrets where name = 'action_arena_process_notifications_url' limit 1), headers := jsonb_build_object('Content-Type','application/json','Authorization','Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'action_arena_process_notifications_bearer_token' limit 1),'x-notification-secret', (select decrypted_secret from vault.decrypted_secrets where name = 'action_arena_notification_cron_secret' limit 1)), body := jsonb_build_object('mode','process'), timeout_milliseconds := 5000); $$
 );
