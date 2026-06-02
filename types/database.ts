@@ -27,6 +27,7 @@ export type NotificationType =
   | 'weekly_awards'
   | 'opponent_bets_locked';
 export type NotificationStatus = 'pending' | 'sent' | 'skipped' | 'failed';
+export type PickReminderType = 'early' | 'last_call';
 export type ChatMessageType = 'user' | 'system' | 'bet_share' | 'sticker';
 export type ContentReportTargetType = 'chat_message' | 'league' | 'league_member' | 'user_profile';
 export type ContentReportStatus = 'pending' | 'reviewed' | 'removed' | 'dismissed';
@@ -335,6 +336,30 @@ export type NotificationEventInsert = {
 
 export type NotificationEventUpdate = Partial<NotificationEventInsert>;
 
+export type PickReminderSentLogRow = {
+  created_at: string;
+  first_game_starts_at: string;
+  id: string;
+  league_id: string;
+  notification_event_id: string | null;
+  reminder_type: PickReminderType;
+  user_id: string;
+  week_id: number;
+};
+
+export type PickReminderSentLogInsert = {
+  created_at?: string;
+  first_game_starts_at: string;
+  id?: string;
+  league_id: string;
+  notification_event_id?: string | null;
+  reminder_type: PickReminderType;
+  user_id: string;
+  week_id: number;
+};
+
+export type PickReminderSentLogUpdate = Partial<PickReminderSentLogInsert>;
+
 export type LeagueChatMessageRow = {
   bet_id: string | null;
   body: string;
@@ -500,6 +525,33 @@ export type UserCosmeticInsert = {
 export type UserCosmeticUpdate = Partial<UserCosmeticInsert>;
 
 export type EquippedCosmeticsByCategory = Partial<Record<CosmeticCategory, UserCosmeticRow>>;
+
+export type ArenaCoinPurchaseTransactionRow = {
+  apple_original_transaction_id: string | null;
+  apple_transaction_id: string;
+  coin_amount: number;
+  created_at: string;
+  iap_environment: string | null;
+  iap_purchase_date: string | null;
+  product_id: string;
+  receipt_validated_at: string;
+  user_id: string;
+};
+
+export type ArenaCoinPurchaseTransactionInsert = {
+  apple_original_transaction_id?: string | null;
+  apple_transaction_id: string;
+  coin_amount: number;
+  created_at?: string;
+  iap_environment?: string | null;
+  iap_purchase_date?: string | null;
+  product_id: string;
+  receipt_validated_at?: string;
+  user_id: string;
+};
+
+export type ArenaCoinPurchaseTransactionUpdate =
+  Partial<ArenaCoinPurchaseTransactionInsert>;
 
 export type SeasonPassRow = {
   created_at: string;
@@ -850,6 +902,21 @@ export type Database = {
         Args: Record<PropertyKey, never>;
         Returns: number;
       };
+      grant_arena_coin_purchase: {
+        Args: {
+          p_apple_original_transaction_id: string | null;
+          p_apple_transaction_id: string;
+          p_coin_amount: number;
+          p_iap_environment: string | null;
+          p_iap_purchase_date: string | null;
+          p_product_id: string;
+          p_user_id: string;
+        };
+        Returns: Array<{
+          coin_balance: number;
+          granted: boolean;
+        }>;
+      };
       get_my_chat_moderation_status: {
         Args: Record<PropertyKey, never>;
         Returns: Array<{
@@ -944,6 +1011,17 @@ export type Database = {
           p_week_number: number;
         };
         Returns: string | null;
+      };
+      enqueue_weekly_pick_reminders: {
+        Args: {
+          p_first_game_starts_at?: string | null;
+          p_now?: string | null;
+        };
+        Returns: {
+          early: number;
+          enqueued: number;
+          last_call: number;
+        };
       };
       make_invite_code: {
         Args: Record<PropertyKey, never>;
@@ -1056,6 +1134,20 @@ export type Database = {
       };
     };
     Tables: {
+      arena_coin_purchase_transactions: {
+        Insert: ArenaCoinPurchaseTransactionInsert;
+        Relationships: [
+          {
+            columns: ['user_id'];
+            foreignKeyName: 'arena_coin_purchase_transactions_user_id_fkey';
+            isOneToOne: false;
+            referencedColumns: ['id'];
+            referencedRelation: 'users';
+          },
+        ];
+        Row: ArenaCoinPurchaseTransactionRow;
+        Update: ArenaCoinPurchaseTransactionUpdate;
+      };
       cosmetic_catalog: {
         Insert: CosmeticCatalogInsert;
         Relationships: [];
@@ -1331,6 +1423,34 @@ export type Database = {
         ];
         Row: NotificationPreferencesRow;
         Update: NotificationPreferencesUpdate;
+      };
+      pick_reminder_sent_log: {
+        Insert: PickReminderSentLogInsert;
+        Relationships: [
+          {
+            columns: ['league_id'];
+            foreignKeyName: 'pick_reminder_sent_log_league_id_fkey';
+            isOneToOne: false;
+            referencedColumns: ['id'];
+            referencedRelation: 'leagues';
+          },
+          {
+            columns: ['notification_event_id'];
+            foreignKeyName: 'pick_reminder_sent_log_notification_event_id_fkey';
+            isOneToOne: false;
+            referencedColumns: ['id'];
+            referencedRelation: 'notification_events';
+          },
+          {
+            columns: ['user_id'];
+            foreignKeyName: 'pick_reminder_sent_log_user_id_fkey';
+            isOneToOne: false;
+            referencedColumns: ['id'];
+            referencedRelation: 'users';
+          },
+        ];
+        Row: PickReminderSentLogRow;
+        Update: PickReminderSentLogUpdate;
       };
       odds_release_windows: {
         Insert: {

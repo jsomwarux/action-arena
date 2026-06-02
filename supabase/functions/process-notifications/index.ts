@@ -41,6 +41,12 @@ type NotificationPreferencesRow = {
   weekly_awards: boolean;
 };
 
+type PickReminderSummary = {
+  early: number;
+  enqueued: number;
+  last_call: number;
+};
+
 type LeagueRow = {
   current_week: number;
   id: string;
@@ -64,7 +70,15 @@ type NotificationDatabase = {
   public: {
     CompositeTypes: Record<string, never>;
     Enums: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      enqueue_weekly_pick_reminders: {
+        Args: {
+          p_first_game_starts_at?: string | null;
+          p_now?: string | null;
+        };
+        Returns: PickReminderSummary;
+      };
+    };
     Tables: {
       bets: {
         Insert: never;
@@ -127,7 +141,6 @@ type RequestBody = {
 };
 
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
-const MINIMUM_BETS = 5;
 const LEGACY_OPPONENT_SUBMISSION_TITLE_PATTERN = new RegExp(
   `\\b${['Opponent', 'locked', 'in'].join(' ')}\\b`,
   'g',
@@ -410,86 +423,15 @@ async function enqueueBetReminders(
   supabase: ReturnType<typeof createSupabaseClient>,
   firstGameStartsAt: string | null,
 ) {
-  const { data: leagues, error: leaguesError } = await supabase
-    .from('leagues')
-    .select('*')
-    .in('status', ['drafting', 'active']);
-
-  if (leaguesError) {
-    throw new Error(leaguesError.message);
-  }
-
-  const activeLeagues = leagues ?? [];
-  const leagueIds = activeLeagues.map((league) => league.id);
-
-  if (leagueIds.length === 0) {
-    return 0;
-  }
-
-  const { data: members, error: membersError } = await supabase
-    .from('league_members')
-    .select('*')
-    .in('league_id', leagueIds);
-
-  if (membersError) {
-    throw new Error(membersError.message);
-  }
-
-  const leagueById = new Map(activeLeagues.map((league) => [league.id, league]));
-  const rows = [];
-
-  for (const member of members ?? []) {
-    const league = leagueById.get(member.league_id);
-
-    if (!league) {
-      continue;
-    }
-
-    const { count, error } = await supabase
-      .from('bets')
-      .select('id', { count: 'exact', head: true })
-      .eq('league_id', member.league_id)
-      .eq('user_id', member.user_id)
-      .eq('week_number', league.current_week);
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    const placed = count ?? 0;
-
-    if (placed >= MINIMUM_BETS) {
-      continue;
-    }
-
-    rows.push({
-      body: `${league.name}: ${MINIMUM_BETS - placed} picks still needed before kickoff.`,
-      data: {
-        firstGameStartsAt,
-        leagueId: member.league_id,
-        type: 'bet_board',
-      },
-      idempotency_key: `bet_reminder:${member.league_id}:${league.current_week}:${member.user_id}`,
-      league_id: member.league_id,
-      notification_type: 'bet_reminders' as NotificationType,
-      recipient_user_id: member.user_id,
-      title: 'Picks still needed',
-    });
-  }
-
-  if (rows.length === 0) {
-    return 0;
-  }
-
-  const { error } = await supabase
-    .from('notification_events')
-    .upsert(rows, { ignoreDuplicates: true, onConflict: 'idempotency_key' });
+  const { data, error } = await supabase.rpc('enqueue_weekly_pick_reminders', {
+    p_first_game_starts_at: firstGameStartsAt,
+  });
 
   if (error) {
     throw new Error(error.message);
   }
 
-  return rows.length;
+  return data ?? { early: 0, enqueued: 0, last_call: 0 };
 }
 
 Deno.serve(async (request) => {
@@ -522,12 +464,10 @@ Deno.serve(async (request) => {
     if (mode === 'odds_available') {
       result = { enqueued: await enqueueOddsAvailable(supabase) };
     } else if (mode === 'bet_reminders') {
-      result = {
-        enqueued: await enqueueBetReminders(
-          supabase,
-          typeof body.firstGameStartsAt === 'string' ? body.firstGameStartsAt : null,
-        ),
-      };
+      result = await enqueueBetReminders(
+        supabase,
+        typeof body.firstGameStartsAt === 'string' ? body.firstGameStartsAt : null,
+      );
     } else {
       result = await processQueuedNotifications(supabase, limit);
     }

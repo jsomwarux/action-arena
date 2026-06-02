@@ -2,6 +2,7 @@ import type { ComponentProps } from 'react';
 
 import Ionicons from '@expo/vector-icons/Ionicons';
 
+import { ARENA_COIN_PRODUCT_IDS, type ArenaCoinProductId } from './iap';
 import { THEME_COLORS } from './theme';
 import type { CosmeticCategory } from '@/types/database';
 
@@ -21,16 +22,16 @@ export type CoinPack = {
   coins: number;
   id: string;
   label: string;
-  priceLabel: string;
+  productId: ArenaCoinProductId;
 };
 
 export const DEFAULT_ARENA_COINS = 500;
 export const CURRENT_SEASON_YEAR = new Date().getFullYear();
 
 export const COIN_PACKS: CoinPack[] = [
-  { coins: 500, id: 'coins_500', label: 'Starter Stack', priceLabel: 'Soon' },
-  { coins: 1200, id: 'coins_1200', label: 'Playmaker Pack', priceLabel: 'Soon' },
-  { coins: 2800, id: 'coins_2800', label: 'Commissioner Vault', priceLabel: 'Soon' },
+  { coins: 500, id: 'coins_500', label: 'Starter Stack', productId: ARENA_COIN_PRODUCT_IDS.starter },
+  { coins: 1200, id: 'coins_1200', label: 'Playmaker Pack', productId: ARENA_COIN_PRODUCT_IDS.playmaker },
+  { coins: 2800, id: 'coins_2800', label: 'Commissioner Vault', productId: ARENA_COIN_PRODUCT_IDS.commissioner },
 ];
 
 export const COSMETIC_CATEGORY_LABELS: Record<CosmeticCategory, string> = {

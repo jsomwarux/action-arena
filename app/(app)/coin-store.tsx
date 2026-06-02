@@ -4,17 +4,18 @@ import { ScrollView, Text, View } from 'react-native';
 
 import {
   AnimatedNumber,
+  Button,
   Card,
-  PressableScale,
   ScreenWrapper,
   SkeletonLoader,
 } from '@/components/ui';
 import { COIN_PACKS, type CoinPack } from '@/constants/cosmetics';
 import { THEME_COLORS } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
+import { useCoinPurchase } from '@/hooks/use-coin-purchase';
 import { useUserCosmetics } from '@/hooks/use-cosmetics';
 import { logAnalyticsEvent } from '@/lib/analytics';
-import { cn } from '@/lib/cn';
+import { haptics } from '@/lib/haptics';
 
 type Tier = 'pouch' | 'chest' | 'vault';
 
@@ -38,7 +39,7 @@ const TIER_META: Record<
 > = {
   pouch: {
     accent: THEME_COLORS.amberAccent,
-    bonus: 'Starter stack',
+    bonus: 'Base rate',
     icon: 'wallet',
     iconSize: 30,
     plateSize: 80,
@@ -175,59 +176,48 @@ function PackCardBanner({ accent, tagline }: { accent: string; tagline: string }
   );
 }
 
-function PriceBlock({
-  accent,
-  alignment,
-  isFeatured,
+function PackCta({
+  isLoading,
+  isPurchasing,
+  onBuy,
   priceLabel,
 }: {
-  accent: string;
-  alignment: 'end' | 'center';
-  isFeatured: boolean;
-  priceLabel: string;
+  isLoading: boolean;
+  isPurchasing: boolean;
+  onBuy: () => void;
+  priceLabel: string | null;
 }) {
+  const buttonTitle = priceLabel
+    ? `Buy · ${priceLabel}`
+    : isLoading
+      ? 'Loading Prices'
+      : 'Unavailable';
+
   return (
-    <View className={cn('gap-2', alignment === 'center' ? 'items-center' : 'items-end')}>
-      <View
-        className="rounded-2xl border px-3 py-2"
-        style={{
-          backgroundColor: `${accent}26`,
-          borderColor: accent,
-          shadowColor: accent,
-          shadowOffset: { width: 0, height: 0 },
-          shadowOpacity: 0.45,
-          shadowRadius: 8,
-        }}>
-        <Text
-          className={cn('font-extrabold text-white', isFeatured ? 'text-lg' : 'text-base')}
-          numberOfLines={1}>
-          {priceLabel}
-        </Text>
-      </View>
-      <Text
-        className="text-[10px] font-semibold uppercase"
-        style={{ color: accent, letterSpacing: 1 }}>
-        Coming soon
-      </Text>
-    </View>
+    <Button
+      disabled={!priceLabel || isLoading || isPurchasing}
+      icon="card"
+      loading={isPurchasing}
+      onPress={onBuy}
+      title={buttonTitle}
+      variant={priceLabel ? 'primary' : 'secondary'}
+    />
   );
 }
 
 function CompactPackCard({
   accent,
   bonus,
-  isFeatured,
   meta,
   pack,
 }: {
   accent: string;
   bonus: string;
-  isFeatured: boolean;
   meta: (typeof TIER_META)[Tier];
   pack: CoinPack;
 }) {
   return (
-    <View className="flex-row items-center gap-3 p-4">
+    <View className="flex-row items-center gap-3">
       <PackHero accent={accent} icon={meta.icon} plateSize={meta.plateSize} />
       <View className="flex-1 gap-1.5" style={{ minWidth: 0 }}>
         <Text
@@ -251,7 +241,7 @@ function CompactPackCard({
             coins
           </Text>
         </View>
-        <Text className="text-xs font-medium leading-4 text-white/55" numberOfLines={2}>
+        <Text className="text-xs font-medium leading-5 text-white/55">
           {meta.subtitle}
         </Text>
         <View className="mt-1 flex-row items-center gap-2">
@@ -270,7 +260,43 @@ function CompactPackCard({
           </View>
         </View>
       </View>
-      <PriceBlock accent={accent} alignment="end" isFeatured={isFeatured} priceLabel={pack.priceLabel} />
+    </View>
+  );
+}
+
+function CompactPackContent({
+  accent,
+  bonus,
+  isLoading,
+  isPurchasing,
+  meta,
+  onBuy,
+  pack,
+  priceLabel,
+}: {
+  accent: string;
+  bonus: string;
+  isLoading: boolean;
+  isPurchasing: boolean;
+  meta: (typeof TIER_META)[Tier];
+  onBuy: () => void;
+  pack: CoinPack;
+  priceLabel: string | null;
+}) {
+  return (
+    <View className="gap-4 p-4">
+      <CompactPackCard
+        accent={accent}
+        bonus={bonus}
+        meta={meta}
+        pack={pack}
+      />
+      <PackCta
+        isLoading={isLoading}
+        isPurchasing={isPurchasing}
+        onBuy={onBuy}
+        priceLabel={priceLabel}
+      />
     </View>
   );
 }
@@ -278,13 +304,21 @@ function CompactPackCard({
 function FeaturedPackCard({
   accent,
   bonus,
+  isLoading,
+  isPurchasing,
   meta,
+  onBuy,
   pack,
+  priceLabel,
 }: {
   accent: string;
   bonus: string;
+  isLoading: boolean;
+  isPurchasing: boolean;
   meta: (typeof TIER_META)[Tier];
+  onBuy: () => void;
   pack: CoinPack;
+  priceLabel: string | null;
 }) {
   return (
     <View className="items-center gap-3 p-5">
@@ -311,8 +345,7 @@ function FeaturedPackCard({
         </Text>
       </View>
       <Text
-        className="text-center text-xs font-medium leading-5 text-white/65"
-        numberOfLines={3}>
+        className="text-center text-xs font-medium leading-5 text-white/65">
         {meta.subtitle}
       </Text>
       <View
@@ -328,8 +361,13 @@ function FeaturedPackCard({
           {bonus}
         </Text>
       </View>
-      <View className="mt-1 items-center">
-        <PriceBlock accent={accent} alignment="center" isFeatured priceLabel={pack.priceLabel} />
+      <View className="mt-1 w-full">
+        <PackCta
+          isLoading={isLoading}
+          isPurchasing={isPurchasing}
+          onBuy={onBuy}
+          priceLabel={priceLabel}
+        />
       </View>
     </View>
   );
@@ -337,16 +375,24 @@ function FeaturedPackCard({
 
 function PackCard({
   isFeatured,
+  isLoading,
+  isPurchasing,
+  onBuy,
   pack,
+  priceLabel,
   tier,
 }: {
   isFeatured: boolean;
+  isLoading: boolean;
+  isPurchasing: boolean;
+  onBuy: () => void;
   pack: CoinPack;
+  priceLabel: string | null;
   tier: Tier;
 }) {
   const meta = TIER_META[tier];
   return (
-    <PressableScale accessibilityState={{ disabled: true }} disabled pressedScale={0.99}>
+    <View>
       <View
         className="overflow-hidden rounded-2xl border bg-white/[0.04]"
         style={{
@@ -359,33 +405,62 @@ function PackCard({
         }}>
         {isFeatured ? <PackCardBanner accent={meta.accent} tagline={meta.tagline} /> : null}
         {isFeatured ? (
-          <FeaturedPackCard accent={meta.accent} bonus={meta.bonus} meta={meta} pack={pack} />
-        ) : (
-          <CompactPackCard
+          <FeaturedPackCard
             accent={meta.accent}
             bonus={meta.bonus}
-            isFeatured={isFeatured}
+            isLoading={isLoading}
+            isPurchasing={isPurchasing}
             meta={meta}
+            onBuy={onBuy}
             pack={pack}
+            priceLabel={priceLabel}
+          />
+        ) : (
+          <CompactPackContent
+            accent={meta.accent}
+            bonus={meta.bonus}
+            isLoading={isLoading}
+            isPurchasing={isPurchasing}
+            meta={meta}
+            onBuy={onBuy}
+            pack={pack}
+            priceLabel={priceLabel}
           />
         )}
       </View>
-    </PressableScale>
+    </View>
   );
 }
 
 export default function CoinStoreScreen() {
   const { user } = useAuth();
   const cosmeticsQuery = useUserCosmetics(user?.id);
+  const coinPurchase = useCoinPurchase(user?.id);
 
   useEffect(() => {
     logAnalyticsEvent('coin_store_viewed', { user_id: user?.id });
   }, [user?.id]);
 
+  const allProductsLoaded = COIN_PACKS.every((pack) => coinPurchase.productsById[pack.productId]);
+  const showRetryState =
+    coinPurchase.productFetchStatus === 'error' ||
+    (coinPurchase.productFetchStatus === 'loaded' && !allProductsLoaded);
+
+  const buyPack = async (pack: CoinPack) => {
+    haptics.light();
+    const outcome = await coinPurchase.purchase(pack);
+
+    if (outcome.ok) {
+      haptics.success();
+    } else {
+      haptics.warning();
+    }
+  };
+
   return (
-    <ScreenWrapper className="pb-0">
+    <ScreenWrapper className="pb-0 pt-4">
       <ScrollView
-        contentContainerStyle={{ gap: 16, paddingBottom: 36 }}
+        contentContainerStyle={{ gap: 16, paddingBottom: 48, paddingTop: 2 }}
         showsVerticalScrollIndicator={false}>
         <View>
           <View className="flex-row items-center gap-2">
@@ -396,11 +471,6 @@ export default function CoinStoreScreen() {
               Arena Coins
             </Text>
           </View>
-          <Text
-            className="mt-1 text-2xl font-extrabold text-white"
-            style={{ letterSpacing: -0.4 }}>
-            Coin Store
-          </Text>
           <Text className="mt-1 text-sm font-medium text-white/55">
             Stock up on coins to unlock cosmetics in the Arena Locker.
           </Text>
@@ -440,19 +510,59 @@ export default function CoinStoreScreen() {
         </Card>
 
         <View className="gap-3">
+          {showRetryState ? (
+            <View className="rounded-2xl border border-coral-red/30 bg-coral-red/10 p-4">
+              <View className="flex-row items-start gap-3">
+                <Ionicons color={THEME_COLORS.coralRed} name="alert-circle" size={18} />
+                <View className="flex-1 gap-3">
+                  <Text className="text-sm font-bold leading-5 text-coral-red">
+                    {coinPurchase.error ?? 'Arena Coin pricing is not available from Apple yet.'}
+                  </Text>
+                  <Button
+                    icon="refresh"
+                    loading={coinPurchase.isLoading}
+                    onPress={coinPurchase.retryProducts}
+                    title="Retry Store Prices"
+                    variant="secondary"
+                  />
+                </View>
+              </View>
+            </View>
+          ) : null}
+
           {COIN_PACKS.map((pack) => {
             const tier = TIER_BY_PACK[pack.id] ?? 'pouch';
             const isFeatured = tier === 'vault';
+            const product = coinPurchase.productsById[pack.productId];
             return (
               <PackCard
                 isFeatured={isFeatured}
+                isLoading={coinPurchase.isLoading}
+                isPurchasing={coinPurchase.isProductPurchasing(pack.productId)}
                 key={pack.id}
+                onBuy={() => buyPack(pack)}
                 pack={pack}
+                priceLabel={product?.displayPrice ?? null}
                 tier={tier}
               />
             );
           })}
         </View>
+
+        {coinPurchase.message ? (
+          <View className="rounded-2xl border border-electric-green/30 bg-electric-green/10 p-3">
+            <Text className="text-xs font-bold leading-5 text-electric-green">
+              {coinPurchase.message}
+            </Text>
+          </View>
+        ) : null}
+        {coinPurchase.error && !showRetryState ? (
+          <View className="rounded-2xl border border-coral-red/30 bg-coral-red/10 p-3">
+            <Text className="text-xs font-bold leading-5 text-coral-red">
+              {coinPurchase.error}
+            </Text>
+          </View>
+        ) : null}
 
         <View className="rounded-2xl border border-white/[0.07] bg-white/[0.03] p-4">
           <View className="flex-row items-center gap-2">

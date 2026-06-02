@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Action Arena</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0a0e1a;
+        --panel: #121827;
+        --text: #f6f8fb;
+        --muted: #a7b0c0;
+        --line: #263145;
+        --accent: #00ff87;
+        --gold: #ffd700;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        min-height: 100vh;
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        line-height: 1.6;
+      }
+
+      main {
+        width: min(860px, 100%);
+        min-height: 100vh;
+        margin: 0 auto;
+        padding: 36px 18px;
+        display: grid;
+        align-content: center;
+      }
+
+      section {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: clamp(22px, 5vw, 40px);
+      }
+
+      h1 {
+        margin: 0 0 12px;
+        font-size: clamp(2.4rem, 10vw, 5rem);
+        line-height: 1;
+        letter-spacing: 0;
+      }
+
+      p {
+        max-width: 640px;
+        color: var(--muted);
+        font-size: 1.08rem;
+      }
+
+      strong {
+        color: var(--gold);
+      }
+
+      nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 28px;
+      }
+
+      a {
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        color: var(--accent);
+        padding: 10px 12px;
+        text-decoration: none;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section>
+        <h1>Action Arena</h1>
+        <p>
+          Build weekly sports prediction cards, compete with friends on virtual profit, and climb your league standings. <strong>No real money wagering. No cash out.</strong>
+        </p>
+        <nav aria-label="Public links">
+          <a href="./privacy.html">Privacy Policy</a>
+          <a href="./support.html">Support</a>
+        </nav>
+      </section>
+    </main>
+  </body>
+</html>
