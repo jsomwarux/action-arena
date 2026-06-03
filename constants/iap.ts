@@ -9,7 +9,7 @@ export const IOS_BUNDLE_IDENTIFIER =
     ? configuredIosBundleIdentifier
     : fallbackIosBundleIdentifier;
 
-export const SEASON_PASS_PRODUCT_ID = `${IOS_BUNDLE_IDENTIFIER}.seasonpass.s1`;
+export const SEASON_PASS_PRODUCT_ID = `${IOS_BUNDLE_IDENTIFIER}.seasonpass.allaccess`;
 
 export const ARENA_COIN_PRODUCT_IDS = {
   commissioner: 'com.actionarena.app.coins.commissioner',

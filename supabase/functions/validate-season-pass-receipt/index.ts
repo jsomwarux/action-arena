@@ -359,7 +359,7 @@ Deno.serve(async (request) => {
     const expectedBundleId = getOptionalEnv('APPLE_IAP_BUNDLE_ID', fallbackBundleIdentifier);
     const expectedProductId = getOptionalEnv(
       'APPLE_IAP_SEASON_PASS_PRODUCT_ID',
-      `${expectedBundleId}.seasonpass.s1`,
+      `${expectedBundleId}.seasonpass.allaccess`,
     );
 
     if (body.productId !== expectedProductId) {

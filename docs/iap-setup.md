@@ -28,7 +28,7 @@ Sources:
 
 Bundle identifier: `com.actionarena.app`
 
-Season Pass product id: `com.actionarena.app.seasonpass.s1`
+Season Pass product id: `com.actionarena.app.seasonpass.allaccess`
 
 Register this exact product id in App Store Connect. The app derives the product id from the configured iOS bundle id and never hardcodes the display price; StoreKit provides `displayPrice`.
 
@@ -49,7 +49,7 @@ Required secrets:
 
 - `APPLE_IAP_SHARED_SECRET`: App-specific shared secret from App Store Connect.
 - `APPLE_IAP_BUNDLE_ID`: `com.actionarena.app`
-- `APPLE_IAP_SEASON_PASS_PRODUCT_ID`: `com.actionarena.app.seasonpass.s1`
+- `APPLE_IAP_SEASON_PASS_PRODUCT_ID`: `com.actionarena.app.seasonpass.allaccess`
 
 Supabase already provides `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` to deployed Edge Functions.
 
@@ -69,7 +69,7 @@ Set secrets:
 supabase secrets set \
   APPLE_IAP_SHARED_SECRET="paste-app-specific-shared-secret" \
   APPLE_IAP_BUNDLE_ID="com.actionarena.app" \
-  APPLE_IAP_SEASON_PASS_PRODUCT_ID="com.actionarena.app.seasonpass.s1"
+  APPLE_IAP_SEASON_PASS_PRODUCT_ID="com.actionarena.app.seasonpass.allaccess"
 ```
 
 Deploy after secrets are set:
@@ -94,7 +94,7 @@ Steps:
 3. Create one In-App Purchase for the app.
 4. Type: Non-Consumable.
 5. Reference Name: `Season Pass S1`.
-6. Product ID: `com.actionarena.app.seasonpass.s1`.
+6. Product ID: `com.actionarena.app.seasonpass.allaccess`.
 7. Price: set the $9.99 USD price tier/equivalent. The app will show Apple's localized price string.
 8. Add at least one localization:
    - Display Name: `Season Pass`
@@ -102,7 +102,7 @@ Steps:
 9. Upload an App Review screenshot showing the Season Pass screen with the purchase CTA, Restore Purchases, and the included perks.
 10. Add review notes with:
    - Test account credentials.
-   - Product id: `com.actionarena.app.seasonpass.s1`.
+   - Product id: `com.actionarena.app.seasonpass.allaccess`.
    - Purchase path: Season Pass screen.
    - Restore paths: Season Pass screen and Settings > Premium > Restore Purchases.
    - Note that Action Arena has no real-money wagering, no cash out, and the paid item only unlocks cosmetics/analytics/early access/ad-free hooks.
