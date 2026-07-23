@@ -11,6 +11,8 @@
     "week:complete": "node scripts/simulate-week-completion.mjs",
     "settle:mock": "node scripts/settle-mock-results.mjs",
     "prebuild:prod-check": "node scripts/check-prod-mock-data.mjs",
+    "seed:release:local": "node scripts/seed-release-fixtures.mjs",
+    "test:sql:local": "node scripts/run-local-sql-tests.mjs",
     "test:settlement": "supabase db query --linked -f scripts/test-settlement-scenarios.sql",
     "test:simulation-propagation": "supabase db query --linked -f scripts/test-game-simulation-cross-league-propagation.sql",
     "test:global-week": "supabase db query --linked -f scripts/test-global-week-sync-and-simulation.sql",

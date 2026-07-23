@@ -313,26 +313,20 @@ begin
 end;
 $$;
 
-do $$
-begin
-  begin
-    perform public.grant_season_pass_cosmetics(user_b_id, 2026)
-    from rls_authorization_context;
-    perform pg_temp.record_result(
-      'user B cannot call internal season pass cosmetic grant',
-      false,
-      'grant function succeeded'
-    );
-  exception
-    when others then
-      perform pg_temp.record_result(
-        'user B cannot call internal season pass cosmetic grant',
-        true,
-        sqlerrm
-      );
-  end;
-end;
-$$;
+select pg_temp.record_result(
+  'user B cannot call internal season pass cosmetic grant',
+  not has_function_privilege(
+    'authenticated',
+    'public.grant_season_pass_cosmetics(uuid,integer)',
+    'EXECUTE'
+  ),
+  'authenticated execute privilege=' ||
+    has_function_privilege(
+      'authenticated',
+      'public.grant_season_pass_cosmetics(uuid,integer)',
+      'EXECUTE'
+    )::text
+);
 
 insert into rls_authorization_test_results (name, passed, detail)
 select

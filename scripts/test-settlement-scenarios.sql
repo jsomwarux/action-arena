@@ -571,6 +571,10 @@ select pg_temp.add_bet('parlay_push_to_single_leg', '00000000-0000-0000-0000-000
 select pg_temp.add_leg('parlay_push_to_single_leg', 'settle_spread_total_push', 'spread', 'Away Team +3', 3, 3, -110);
 select pg_temp.add_leg('parlay_push_to_single_leg', 'settle_home_win', 'moneyline', 'Home Team', null, null, -150);
 
+select pg_temp.add_bet('parlay_push_to_single_high_odds_leg', '00000000-0000-0000-0000-000000002001'::uuid, pg_temp.test_user(1), 'parlay', 35, 5000);
+select pg_temp.add_leg('parlay_push_to_single_high_odds_leg', 'settle_spread_total_push', 'spread', 'Away Team +3', 3, 3, -110);
+select pg_temp.add_leg('parlay_push_to_single_high_odds_leg', 'settle_home_win', 'moneyline', 'Home Team', null, null, 2000);
+
 select pg_temp.add_bet('parlay_payout_cap', '00000000-0000-0000-0000-000000002001'::uuid, pg_temp.test_user(1), 'parlay', 35, 5000);
 select pg_temp.add_leg('parlay_payout_cap', 'settle_cap_1', 'moneyline', 'Home Team', null, null, 300);
 select pg_temp.add_leg('parlay_payout_cap', 'settle_cap_2', 'moneyline', 'Home Team', null, null, 300);
@@ -662,6 +666,7 @@ select pg_temp.assert_bet('parlay one-loss', 'parlay_one_loss', 'loss', -20);
 select pg_temp.assert_bet('parlay one-push recalculation', 'parlay_one_push_recalculation', 'win', 60);
 select pg_temp.assert_bet('parlay all-push', 'parlay_all_push', 'push', 0);
 select pg_temp.assert_bet('parlay push-to-single-leg', 'parlay_push_to_single_leg', 'win', 13.33);
+select pg_temp.assert_bet('parlay push-to-single high-odds leg uses uncapped straight payout', 'parlay_push_to_single_high_odds_leg', 'win', 700);
 select pg_temp.assert_bet('parlay payout cap at 500', 'parlay_payout_cap', 'win', 465);
 select pg_temp.assert_bet('teaser win against adjusted line', 'teaser_adjusted_line_win', 'win', 18.18);
 select pg_temp.assert_bet('teaser loss against adjusted line', 'teaser_adjusted_line_loss', 'loss', -20);
