@@ -7,7 +7,33 @@ A social sports prediction app. Fantasy football league structure + sports betti
 This is a native mobile app. Target iOS first.
 Build and test against iOS simulator as the primary development
 environment. Expo builds to both platforms from the same codebase.
-No web version — mobile only for now.
+
+### Web Client (`webapp/`)
+A desktop web client lives in `webapp/`. It is a separate Vite + React +
+TypeScript + Tailwind single-page app using `react-router-dom`, mirroring the
+tooling already proven in `landing/` (framer-motion, lucide-react, and
+self-hosted Bebas Neue / Inter via `@fontsource`).
+
+- **Routes:** one file per route under `webapp/src/pages/`, wired up in
+  `webapp/src/App.tsx`. Paths are defined once in `webapp/src/lib/routes.ts` —
+  use those constants rather than hardcoding strings. The route set mirrors the
+  mobile `app/` routes. Desktop replaces the mobile bottom tab bar with a fixed
+  left sidebar; auth and legal routes render outside that shell.
+- **Backend:** webapp reuses the same Supabase project as mobile, unchanged —
+  same schema, same RLS policies, same Edge Functions. Nothing in `supabase/`
+  is web-specific. The browser client is `webapp/src/lib/supabase.ts`, and all
+  environment access goes through `webapp/src/lib/env.ts` (`VITE_*` variables
+  in `webapp/.env`, the web counterparts of the root `EXPO_PUBLIC_*` keys).
+- **Design tokens** are duplicated, not shared: `webapp/tailwind.config.js`
+  carries the same palette as the root `tailwind.config.js` and
+  `constants/theme.ts`. A token added in one place must be added in the other.
+- **Mobile and web code never import from each other.** Nothing outside
+  `webapp/` may import from `webapp/`, and `webapp/` may not import from `app/`,
+  `components/`, `hooks/`, `lib/`, `providers/`, or `constants/`. Shared UI is
+  ported deliberately (see `webapp/src/components/ui/`), never aliased across
+  the boundary — the two runtimes have incompatible primitives.
+- **Verification:** `npm run dev`, `npm run build`, and `npx tsc --noEmit` are
+  run from inside `webapp/`. The root Expo checks do not cover it.
 
 ## Repository Expectations
 - After any change, run `npx expo start` to verify the app compiles.

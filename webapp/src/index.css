@@ -1,0 +1,57 @@
+/* Self-hosted fonts, same set landing/ uses (no Google CDN).
+   Display: Bebas Neue. Body: Inter 400/500/600/700. Latin subset only. */
+@import '@fontsource/bebas-neue/latin-400.css';
+@import '@fontsource/inter/latin-400.css';
+@import '@fontsource/inter/latin-500.css';
+@import '@fontsource/inter/latin-600.css';
+@import '@fontsource/inter/latin-700.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Dark theme only — there is no light mode. */
+    color-scheme: dark;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-arena-bg text-textPrimary font-sans antialiased;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  :where(a, button, input, select, textarea, [role='tab'], [tabindex]):focus-visible {
+    @apply outline-none ring-2 ring-electric-green ring-offset-2 ring-offset-arena-bg;
+  }
+}
+
+@layer components {
+  /* Condensed broadcast headings. Bebas Neue is caps-only by design. */
+  .arena-heading {
+    @apply font-display uppercase tracking-wide text-textPrimary;
+  }
+
+  /* Glassmorphism card treatment — AGENTS.md Design System:
+     slight blur backdrop, 1px semi-transparent border, rounded corners. */
+  .arena-glass {
+    @apply rounded-2xl border border-white/10 bg-white/[0.04] shadow-[0_8px_28px_rgba(0,0,0,0.30)] backdrop-blur-xl;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
