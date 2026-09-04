@@ -37,6 +37,7 @@ export const ROUTES = {
   analytics: '/analytics',
   settings: '/settings',
   notifications: '/notifications',
+  notificationPreferences: '/notifications/preferences',
   seasonPass: '/season-pass',
   shop: '/shop',
   coinStore: '/coin-store',

@@ -1,4 +1,5 @@
-import { ODDS_API_KEY, USE_MOCK_DATA } from '@/lib/env';
+import { USE_MOCK_DATA } from '@/lib/env';
+import { supabase } from '@/lib/supabase';
 import type { BetMarket } from '@/types/database';
 
 import { getNflTeamShortName } from './nfl-teams';
@@ -61,7 +62,6 @@ export type FetchUpcomingNflOddsOptions = {
   allowMockOdds?: boolean;
 };
 
-const ODDS_API_BASE_URL = 'https://api.the-odds-api.com/v4';
 const NFL_SPORT_KEY = 'americanfootball_nfl';
 export const isUsingMockOdds = USE_MOCK_DATA;
 
@@ -243,41 +243,35 @@ function scopeToSlateWindow(games: OddsGame[]): OddsGame[] {
   return upcoming.filter((entry) => entry.kickoff < windowEnd).map((entry) => entry.game);
 }
 
+/**
+ * Live odds come through the `fetch-odds` Supabase Edge Function rather than
+ * from The Odds API directly. Vite inlines every `import.meta.env` read into
+ * the bundle, so an API key held here would be readable in devtools by anyone
+ * who loads the page. The function holds the key server-side and requires a
+ * signed-in Supabase user, and returns The Odds API payload unchanged — so both
+ * branches still run the same normalization and the same week scoping.
+ */
 export async function fetchUpcomingNflOdds(options: FetchUpcomingNflOddsOptions = {}) {
   if (isUsingMockOdds && options.allowMockOdds) {
     return scopeToSlateWindow(getMockNflOddsApiGames().map(normalizeOddsApiGame));
   }
 
-  if (!ODDS_API_KEY) {
-    throw new Error('NFL lines are unavailable right now. Please try again later.');
+  const { data, error } = await supabase.functions.invoke<OddsApiGame[]>('fetch-odds', {
+    body: {
+      dateFormat: 'iso',
+      markets: 'h2h,spreads,totals',
+      oddsFormat: 'american',
+      regions: 'us',
+      sportKey: NFL_SPORT_KEY,
+    },
+    method: 'POST',
+  });
+
+  if (error) {
+    throw new Error('Unable to load odds right now. Please try again later.');
   }
 
-  const url = new URL(`${ODDS_API_BASE_URL}/sports/${NFL_SPORT_KEY}/odds`);
-  url.searchParams.set('apiKey', ODDS_API_KEY);
-  url.searchParams.set('regions', 'us');
-  url.searchParams.set('markets', 'h2h,spreads,totals');
-  url.searchParams.set('oddsFormat', 'american');
-  url.searchParams.set('dateFormat', 'iso');
-
-  let response: Awaited<ReturnType<typeof fetch>>;
-  try {
-    response = await fetch(url.toString());
-  } catch {
-    throw new Error('Unable to load odds right now. Check your connection, then try again.');
-  }
-
-  if (!response.ok) {
-    if (response.status === 401 || response.status === 403) {
-      throw new Error('Unable to load odds right now. Please try again later.');
-    }
-
-    throw new Error(`Unable to load odds right now. The Odds API returned status ${response.status}.`);
-  }
-
-  let data: OddsApiGame[];
-  try {
-    data = (await response.json()) as OddsApiGame[];
-  } catch {
+  if (!Array.isArray(data)) {
     throw new Error('Unable to load odds right now. The Odds API response could not be read.');
   }
 

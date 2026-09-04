@@ -24,13 +24,5 @@ export const SUPABASE_URL = readString(import.meta.env.VITE_SUPABASE_URL);
 /** Supabase anon (publishable) key. Row Level Security is the access boundary. */
 export const SUPABASE_ANON_KEY = readString(import.meta.env.VITE_SUPABASE_ANON_KEY);
 
-/**
- * The Odds API key.
- *
- * TODO(webapp): temporary. Remove once the fetch-odds Supabase Edge Function
- * proxy ships and the browser stops calling The Odds API directly.
- */
-export const ODDS_API_KEY = readString(import.meta.env.VITE_ODDS_API_KEY);
-
 /** When true, screens render fixture data instead of hitting Supabase. */
 export const USE_MOCK_DATA = readBoolean(import.meta.env.VITE_USE_MOCK_DATA);

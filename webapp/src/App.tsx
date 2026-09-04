@@ -33,6 +33,7 @@ import { TermsPage } from '@/pages/legal/Terms';
 import { MatchupDetailPage } from '@/pages/matchups/MatchupDetail';
 import { MatchupsIndexPage } from '@/pages/matchups/MatchupsIndex';
 import { MemberDetailPage } from '@/pages/members/MemberDetail';
+import { NotificationPreferencesPage } from '@/pages/notifications/Preferences';
 
 /**
  * A screen with the auth-page chrome and, optionally, one of the guards.
@@ -122,8 +123,12 @@ export default function App() {
           })}
           path={ROUTES.disclosure}
         />
-        <Route element={bare(<TermsPage />, { width: 'xl' })} path={ROUTES.terms} />
-        <Route element={bare(<PrivacyPage />, { width: 'xl' })} path={ROUTES.privacy} />
+        {/* Terms and Privacy render bare rather than inside <AuthShell>: they
+            are long-form documents with headed sections, lists and a table, and
+            AuthShell's widest tier is a 36rem card. LegalPage supplies their own
+            reading column, wordmark and back control. */}
+        <Route element={<TermsPage />} path={ROUTES.terms} />
+        <Route element={<PrivacyPage />} path={ROUTES.privacy} />
 
         {/* Dense screens — wide content tier. See AppShell's ShellWidth docs.
             Move a <Route> between this group and the one below to change its
@@ -162,6 +167,10 @@ export default function App() {
           <Route element={<AnalyticsPage />} path={ROUTES.analytics} />
           <Route element={<SettingsPage />} path={ROUTES.settings} />
           <Route element={<NotificationsPage />} path={ROUTES.notifications} />
+          <Route
+            element={<NotificationPreferencesPage />}
+            path={ROUTES.notificationPreferences}
+          />
 
           <Route element={<SeasonPassPage />} path={ROUTES.seasonPass} />
           <Route element={<ShopPage />} path={ROUTES.shop} />
