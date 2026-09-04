@@ -1,7 +1,7 @@
 import { ChevronRight, ShieldCheck, ShieldX, BarChart3 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-import { Card } from '@/components/ui';
+import { Badge, Card } from '@/components/ui';
 import type { LeagueDetail } from '@/hooks/use-leagues';
 import { cn } from '@/lib/cn';
 import { formatProfit, formatRecord, getProfitTone } from '@/lib/format';
@@ -12,8 +12,7 @@ import {
 import { buildRoute } from '@/lib/routes';
 import type { EquippedCosmeticsByCategory, StandingRow } from '@/types/database';
 
-import { Badge } from './Badge';
-import { TrophySkinIcon } from './cosmetic-art';
+import { TrophySkinIcon } from '@/components/cosmetics';
 
 export type PlayoffStatus = 'clinched' | 'eliminated' | null;
 
@@ -202,7 +201,7 @@ export function StandingsBoard({
                     accent.ring,
                   )}>
                   {standing.rank === 1 ? (
-                    <TrophySkinIcon cosmetics={cosmeticsByUserId[standing.user_id]} />
+                    <TrophySkinIcon cosmetics={cosmeticsByUserId[standing.user_id]} size={14} />
                   ) : (
                     <span className={cn('text-sm font-black', accent.text)}>{standing.rank}</span>
                   )}

@@ -1,13 +1,12 @@
 import { ArrowRight, User, UserMinus, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-import { Card } from '@/components/ui';
+import { Badge, Card } from '@/components/ui';
 import { cn } from '@/lib/cn';
 import { formatProfit, getProfitTone } from '@/lib/format';
 import { buildRoute } from '@/lib/routes';
 import type { LeagueType } from '@/types/database';
 
-import { Badge } from './Badge';
 
 /**
  * The head-to-head strip from mobile's home card and the hub's fight card,

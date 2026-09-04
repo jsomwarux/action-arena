@@ -3,7 +3,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, ChevronLeft, Globe, Lock } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 
-import { Badge } from '@/components/leagues/Badge';
 import { InviteShare } from '@/components/leagues/InviteShare';
 import { LeagueChatPanel } from '@/components/leagues/LeagueChatPanel';
 import { LeagueSettingsPanel } from '@/components/leagues/LeagueSettingsPanel';
@@ -12,8 +11,7 @@ import { MembersPanel } from '@/components/leagues/MembersPanel';
 import { SchedulePanel } from '@/components/leagues/SchedulePanel';
 import { StandingsBoard } from '@/components/leagues/StandingsBoard';
 import { WeeklyAwardsCard } from '@/components/leagues/WeeklyAwardsCard';
-import { WeekNavigator } from '@/components/leagues/WeekNavigator';
-import { Button, Card, Modal, Notice, Skeleton } from '@/components/ui';
+import { Badge, Button, Card, Modal, Notice, Skeleton, WeekNavigator } from '@/components/ui';
 import { NFL_REGULAR_SEASON_WEEKS } from '@/constants/rules';
 import { useEquippedCosmeticsForUsers } from '@/hooks/use-cosmetics';
 import { useAuth } from '@/hooks/use-auth';

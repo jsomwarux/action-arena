@@ -25,7 +25,6 @@ import {
   BoardModeToggle,
   BoardNotice,
   LeagueSelect,
-  WeekNavigator,
   type BoardMessage,
   type BoardMessageTone,
 } from '@/components/picks/BoardHeader';
@@ -67,7 +66,7 @@ import {
   type SlipLeg,
 } from '@/components/picks/pick-board-model';
 import { useBoardClock } from '@/components/picks/use-board-clock';
-import { Button, Card } from '@/components/ui';
+import { Button, Card, WeekNavigator } from '@/components/ui';
 import {
   MAX_SINGLE_BET,
   TEASER_MAX_LEGS,

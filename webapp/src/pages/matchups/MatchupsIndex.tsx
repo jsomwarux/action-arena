@@ -4,13 +4,8 @@ import { CalendarClock, ChevronRight, Swords, Trophy } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
 import { CosmeticAvatar } from '@/components/cosmetics';
-import {
-  Badge,
-  StaggeredItem,
-  useCurrentWeekMatchups,
-  type CurrentWeekMatchupCard,
-} from '@/components/matchups';
-import { Button, Card, Skeleton } from '@/components/ui';
+import { useCurrentWeekMatchups, type CurrentWeekMatchupCard } from '@/components/matchups';
+import { Badge, Button, Card, Skeleton, StaggeredItem } from '@/components/ui';
 import { useAuth } from '@/hooks/use-auth';
 import { useEquippedCosmeticsForUsers } from '@/hooks/use-cosmetics';
 import { useLeagueDetail } from '@/hooks/use-leagues';

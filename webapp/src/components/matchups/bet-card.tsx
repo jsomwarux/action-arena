@@ -16,8 +16,8 @@ import type {
   LiveGameStateRow,
 } from '@/types/database';
 
-import { LiveBetStatusSummary, LiveLegScoreLine } from './live-pick-status';
-import { Badge, LivePulse, NflTeamLogo } from './primitives';
+import { LiveBetStatusSummary, LiveLegScoreLine } from '@/components/picks/live-pick-status';
+import { Badge, LivePulse, NflTeamLogo } from '@/components/ui';
 
 export const resultLabel: Record<BetResult, string> = {
   loss: 'Loss',

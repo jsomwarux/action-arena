@@ -31,7 +31,7 @@ import {
   NoLockFiledPlaceholder,
   revealMessage,
 } from './bet-card';
-import { AnimatedNumber, Badge, StaggeredItem } from './primitives';
+import { AnimatedNumber, Badge, StaggeredItem } from '@/components/ui';
 
 export type Side = 'home' | 'away';
 

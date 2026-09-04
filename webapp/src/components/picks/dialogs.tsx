@@ -8,14 +8,14 @@
 
 import { Lock, Star } from 'lucide-react';
 
-import { Button, Modal } from '@/components/ui';
+import { Badge, Button, Modal } from '@/components/ui';
 import { LOCK_OF_THE_WEEK_MULTIPLIER } from '@/constants/rules';
 import { THEME_COLORS } from '@/constants/theme';
 import { cn } from '@/lib/cn';
 import { formatAmericanOdds, formatCurrency } from '@/lib/format';
 import type { BetType } from '@/types/database';
 
-import { BetTypeBadge, Pill } from './atoms';
+import { Pill } from './atoms';
 import {
   BET_TYPE_GROUP_LABEL,
   BET_TYPE_TEXT_CLASS,
@@ -47,7 +47,7 @@ function ConfirmRow({ bet }: { bet: SlipBet }) {
 
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
-          <BetTypeBadge betType={bet.bet_type} />
+          <Badge betType={bet.bet_type} />
           <span className="truncate text-[10px] font-black uppercase tracking-[0.14em] text-white/45">
             {formatAmericanOdds(bet.odds)}
           </span>

@@ -1,13 +1,12 @@
 import { Star } from 'lucide-react';
 
+import { Badge } from '@/components/ui';
 import type { SharedBetMetadata } from '@/hooks/use-league-chat';
 import { cn } from '@/lib/cn';
 import { formatAmericanOdds, formatCurrency, formatProfit, getProfitTone } from '@/lib/format';
 import { formatBetLegLabel } from '@/lib/pick-labels';
 import { THEME_COLORS } from '@/constants/theme';
 import type { BetMarket, BetType } from '@/types/database';
-
-import { Badge } from './Badge';
 
 function isBetMarket(value: string): value is BetMarket {
   return value === 'moneyline' || value === 'spread' || value === 'over_under';

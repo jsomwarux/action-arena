@@ -3,7 +3,7 @@ import { useMemo } from 'react';
 import { CalendarClock, ChevronRight, Hourglass, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-import { Card } from '@/components/ui';
+import { Badge, Card } from '@/components/ui';
 import type { LeagueDetail } from '@/hooks/use-leagues';
 import { cn } from '@/lib/cn';
 import { formatProfit, getProfitTone } from '@/lib/format';
@@ -11,7 +11,6 @@ import { getLeagueMemberPrimaryName } from '@/lib/league-member-display';
 import { buildRoute } from '@/lib/routes';
 import type { WeeklyMatchupRow } from '@/types/database';
 
-import { Badge } from './Badge';
 
 const PLAYOFF_PLACEHOLDER_WEEKS = [15, 16, 17];
 

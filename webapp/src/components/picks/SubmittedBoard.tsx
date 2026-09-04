@@ -26,7 +26,7 @@ import {
   XCircle,
 } from 'lucide-react';
 
-import { Button, Card } from '@/components/ui';
+import { Badge, Button, Card, NflTeamLogo } from '@/components/ui';
 import { LOCK_OF_THE_WEEK_MULTIPLIER } from '@/constants/rules';
 import { THEME_COLORS } from '@/constants/theme';
 import type { PlacedBet } from '@/hooks/use-straight-bets';
@@ -45,15 +45,13 @@ import type { LiveGameStateRow } from '@/types/database';
 
 import {
   ARENA_SPRING,
-  BetTypeBadge,
   EmptyState,
   MetricGrid,
   Pill,
-  TeamLogo,
   TotalDirectionChip,
   type Metric,
 } from './atoms';
-import { LiveBetStatusSummary, LiveLegScoreLine } from './LiveStatus';
+import { LiveBetStatusSummary, LiveLegScoreLine } from './live-pick-status';
 import {
   formatTeaserMovement,
   getDisplayedPlacedPayout,
@@ -235,7 +233,7 @@ function PlacedPickCard({
                 onSetPotw={onSetPotw}
                 visible={showPotwStar}
               />
-              <BetTypeBadge betType={bet.bet_type} />
+              <Badge betType={bet.bet_type} />
               {liveStatus ? <LiveBetStatusSummary status={liveStatus} /> : null}
             </div>
             <h3
@@ -289,7 +287,7 @@ function PlacedPickCard({
                         size={22}
                       />
                     ) : (
-                      <TeamLogo size={22} teamName={legLabel} />
+                      <NflTeamLogo size={22} teamName={legLabel} />
                     )}
                     <div className="min-w-0">
                       <p className="truncate text-sm font-black text-white">{legLabel}</p>

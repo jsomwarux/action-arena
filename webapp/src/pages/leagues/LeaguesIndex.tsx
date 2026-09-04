@@ -1,8 +1,7 @@
 import { Plus, Shield, Trophy, UserPlus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-import { Badge } from '@/components/leagues/Badge';
-import { Button, Card, Skeleton } from '@/components/ui';
+import { Badge, Button, Card, Skeleton } from '@/components/ui';
 import { useAuth } from '@/hooks/use-auth';
 import { useMyLeagues, type LeagueSummary } from '@/hooks/use-leagues';
 import { cn } from '@/lib/cn';

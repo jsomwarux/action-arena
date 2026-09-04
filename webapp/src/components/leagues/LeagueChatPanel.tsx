@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState, type UIEvent } from 'react';
 import { ArrowDown, Ban, Flag, MessagesSquare, Send, ShieldCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-import { Button, Card, Modal, Notice, Skeleton } from '@/components/ui';
+import { Badge, Button, Card, Modal, Notice, Skeleton } from '@/components/ui';
 import { SUPPORT_EMAIL } from '@/constants/disclosure';
 import { getCosmeticItem } from '@/constants/cosmetics';
 import { useUserCosmetics } from '@/hooks/use-cosmetics';
@@ -30,8 +30,7 @@ import { getLeagueMemberPrimaryName } from '@/lib/league-member-display';
 import { ROUTES } from '@/lib/routes';
 import type { EquippedCosmeticsByCategory, Json, LeagueMemberRow } from '@/types/database';
 
-import { Badge } from './Badge';
-import { ChatStickerPreview, CosmeticAvatar } from './cosmetic-art';
+import { ChatStickerPreview, CosmeticAvatar } from '@/components/cosmetics';
 import { FieldTextarea } from './FieldTextarea';
 import { SharedBetCard } from './SharedBetCard';
 

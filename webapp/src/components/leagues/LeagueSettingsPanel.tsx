@@ -2,7 +2,7 @@ import { useState } from 'react';
 
 import { Flag, Globe, Lock, Pencil, ShieldCheck } from 'lucide-react';
 
-import { Button, Card, Modal, Notice, TextInput } from '@/components/ui';
+import { Badge, Button, Card, Modal, Notice, TextInput } from '@/components/ui';
 import {
   useGenerateScheduleMutation,
   useUpdateLeagueTeamNameMutation,
@@ -16,7 +16,6 @@ import {
   getLeagueMemberSecondaryName,
 } from '@/lib/league-member-display';
 
-import { Badge } from './Badge';
 
 const LEAGUE_STATUS_LABELS: Record<LeagueDetail['league']['status'], string> = {
   active: 'Active',

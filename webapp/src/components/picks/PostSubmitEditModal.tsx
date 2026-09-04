@@ -16,7 +16,15 @@ import { useEffect, useState } from 'react';
 
 import { AlertCircle, Loader2, Lock, X } from 'lucide-react';
 
-import { Button, Card, Modal, SegmentedToggle, type SegmentedOption } from '@/components/ui';
+import {
+  Badge,
+  Button,
+  Card,
+  Modal,
+  NflTeamLogo,
+  SegmentedToggle,
+  type SegmentedOption,
+} from '@/components/ui';
 import { THEME_COLORS } from '@/constants/theme';
 import type { BetEditSubmission, PlacedBet } from '@/hooks/use-straight-bets';
 import { cn } from '@/lib/cn';
@@ -25,7 +33,7 @@ import type { OddsGame, OddsSelection } from '@/lib/odds-api';
 import { findConflictingPick } from '@/lib/pick-conflicts';
 import type { BetMarket } from '@/types/database';
 
-import { BetTypeBadge, Pill, TeamLogo, TotalDirectionChip } from './atoms';
+import { Pill, TotalDirectionChip } from './atoms';
 import {
   editableLegToSubmissionLeg,
   findOddsGame,
@@ -87,7 +95,7 @@ function EditLegRow({
               size={24}
             />
           ) : (
-            <TeamLogo size={24} teamName={leg.label} />
+            <NflTeamLogo size={24} teamName={leg.label} />
           )}
           <div className="min-w-0">
             <p className="truncate text-sm font-black text-white">{leg.label}</p>
@@ -150,7 +158,7 @@ function EditOddsButton({
       {selection.market === 'over_under' ? (
         <TotalDirectionChip isOver={selection.selection.toLowerCase().startsWith('over')} />
       ) : (
-        <TeamLogo teamName={selection.selection || selection.shortName} />
+        <NflTeamLogo teamName={selection.selection || selection.shortName} />
       )}
       <span className="min-w-0 flex-1">
         <span className="block truncate text-[15px] font-black text-white">{primaryLabel}</span>
@@ -394,7 +402,7 @@ export function PostSubmitEditModal({
       <div className="flex max-h-[65vh] flex-col gap-4 overflow-y-auto pr-1">
         <Card className="flex flex-col gap-3">
           <div className="flex items-center justify-between gap-2">
-            <BetTypeBadge betType={mode} />
+            <Badge betType={mode} />
             <span className="text-[11px] font-black uppercase tracking-[0.14em] text-white/55">
               {formatCurrency(bet.amount)} fixed
             </span>

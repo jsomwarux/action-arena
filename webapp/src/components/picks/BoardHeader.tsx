@@ -7,13 +7,13 @@
  * every spread and total at its teased number.
  */
 
-import { AlertCircle, ChevronLeft, ChevronRight, Info, Link2, TrendingUp, X, Zap } from 'lucide-react';
+import { AlertCircle, Info, Link2, TrendingUp, X, Zap } from 'lucide-react';
 
 import { SegmentedToggle, type SegmentedOption } from '@/components/ui';
 import { cn } from '@/lib/cn';
 import type { LeagueRow } from '@/types/database';
 
-import { REGULAR_SEASON_WEEKS, type BetMode } from './pick-board-model';
+import { type BetMode } from './pick-board-model';
 
 const BET_MODE_OPTIONS: SegmentedOption<BetMode>[] = [
   { accent: 'green', icon: Zap, label: 'Straight', value: 'straight' },
@@ -65,43 +65,6 @@ export function LeagueSelect({
         ))}
       </select>
     </label>
-  );
-}
-
-export function WeekNavigator({
-  maxWeek = REGULAR_SEASON_WEEKS,
-  onChange,
-  week,
-}: {
-  maxWeek?: number;
-  onChange: (week: number) => void;
-  week: number;
-}) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <span className="text-[10px] font-black uppercase tracking-[0.18em] text-white/50">Week</span>
-      <div className="flex min-h-11 items-center gap-1 rounded-xl border border-border bg-white/[0.04] px-1">
-        <button
-          aria-label="Previous week"
-          className="rounded-lg p-1.5 text-white/60 transition hover:bg-white/10 hover:text-white disabled:pointer-events-none disabled:opacity-30"
-          disabled={week <= 1}
-          onClick={() => onChange(week - 1)}
-          type="button">
-          <ChevronLeft aria-hidden className="h-4 w-4" />
-        </button>
-        <span className="min-w-[4.5rem] text-center text-sm font-black uppercase tracking-[0.08em] text-white">
-          Week {week}
-        </span>
-        <button
-          aria-label="Next week"
-          className="rounded-lg p-1.5 text-white/60 transition hover:bg-white/10 hover:text-white disabled:pointer-events-none disabled:opacity-30"
-          disabled={week >= maxWeek}
-          onClick={() => onChange(week + 1)}
-          type="button">
-          <ChevronRight aria-hidden className="h-4 w-4" />
-        </button>
-      </div>
-    </div>
   );
 }
 

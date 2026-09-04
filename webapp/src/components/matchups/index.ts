@@ -15,7 +15,11 @@ export {
   resultTone,
   revealMessage,
 } from './bet-card';
-export { LiveBetStatusSummary, LiveLegScoreLine, LiveStatusPill } from './live-pick-status';
+export {
+  LiveBetStatusSummary,
+  LiveLegScoreLine,
+  LiveStatusPill,
+} from '@/components/picks/live-pick-status';
 export {
   BetColumnSection,
   ByeWeekBanner,
@@ -34,13 +38,3 @@ export {
   type CurrentWeekMatchupCard,
 } from './use-current-week-matchups';
 export { useMatchupLiveRefresh } from './use-matchup-live-refresh';
-export {
-  AnimatedNumber,
-  Badge,
-  LivePulse,
-  LiveRefreshBadge,
-  NflTeamLogo,
-  StaggeredItem,
-  WeekNavigator,
-  type BadgeTone,
-} from './primitives';

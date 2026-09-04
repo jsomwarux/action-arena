@@ -3,8 +3,7 @@ import { useState, type FormEvent } from 'react';
 import { Check, Globe, Lock, TrendingUp, Users, type LucideIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-import { Badge } from '@/components/leagues/Badge';
-import { Button, Card, Notice, TextInput } from '@/components/ui';
+import { Badge, Button, Card, Notice, TextInput } from '@/components/ui';
 import {
   LEAGUE_SPORT_OPTIONS,
   LEAGUE_TYPE_OPTIONS,

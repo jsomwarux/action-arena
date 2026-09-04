@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { Ban, ChevronRight, Flag } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-import { Button, Card, Modal, Notice } from '@/components/ui';
+import { Badge, Button, Card, Modal, Notice } from '@/components/ui';
 import {
   useBlockUserMutation,
   useReportContentMutation,
@@ -18,8 +18,7 @@ import {
 import { buildRoute } from '@/lib/routes';
 import type { EquippedCosmeticsByCategory, LeagueMemberRow } from '@/types/database';
 
-import { Badge } from './Badge';
-import { CosmeticAvatar } from './cosmetic-art';
+import { CosmeticAvatar } from '@/components/cosmetics';
 
 type MemberActionTarget = {
   displayName: string;

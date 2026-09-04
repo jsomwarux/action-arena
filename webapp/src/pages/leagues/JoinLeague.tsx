@@ -3,8 +3,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { Globe, KeyRound, Search } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 
-import { Badge } from '@/components/leagues/Badge';
-import { Button, Card, Notice, Skeleton, TextInput } from '@/components/ui';
+import { Badge, Button, Card, Notice, Skeleton, TextInput } from '@/components/ui';
 import { useAuth } from '@/hooks/use-auth';
 import {
   useJoinLeagueMutation,

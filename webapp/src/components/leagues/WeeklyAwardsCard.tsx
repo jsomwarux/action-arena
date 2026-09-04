@@ -1,12 +1,11 @@
 import { Flame, Lock, Trophy, type LucideIcon } from 'lucide-react';
 
-import { Card } from '@/components/ui';
+import { Badge, Card } from '@/components/ui';
 import type { WeeklyAward, WeeklyAwards } from '@/hooks/use-profile-stats';
 import { cn } from '@/lib/cn';
 import { formatAmericanOdds, formatCurrency, formatProfit, getProfitTone } from '@/lib/format';
 import { formatPickTitle } from '@/lib/pick-labels';
 
-import { Badge } from './Badge';
 
 type AwardKind = 'coldStreak' | 'lock' | 'sharpest';
 

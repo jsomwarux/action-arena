@@ -24,7 +24,16 @@ import {
   X,
 } from 'lucide-react';
 
-import { Button, Card, SegmentedToggle, TextInput, type SegmentedOption } from '@/components/ui';
+import {
+  AnimatedNumber,
+  Badge,
+  Button,
+  Card,
+  NflTeamLogo,
+  SegmentedToggle,
+  TextInput,
+  type SegmentedOption,
+} from '@/components/ui';
 import {
   LOCK_OF_THE_WEEK_MULTIPLIER,
   MAX_SINGLE_BET,
@@ -44,15 +53,7 @@ import {
 } from '@/lib/format';
 import type { TeaserLegCount, TeaserPoints } from '@/types/database';
 
-import {
-  AnimatedNumber,
-  ARENA_SPRING,
-  BetTypeBadge,
-  MeterBar,
-  Pill,
-  TeamLogo,
-  TotalDirectionChip,
-} from './atoms';
+import { ARENA_SPRING, MeterBar, Pill, TotalDirectionChip } from './atoms';
 import {
   calculateParlayReward,
   formatTeaserMovement,
@@ -263,7 +264,7 @@ function BuilderLegRow({
           {isTotal ? (
             <TotalDirectionChip isOver={isOverLeg(leg)} size={24} />
           ) : (
-            <TeamLogo size={24} teamName={leg.label} />
+            <NflTeamLogo size={24} teamName={leg.label} />
           )}
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-black text-white">{leg.label}</p>
@@ -579,14 +580,14 @@ function StagedPickCard({
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <BetTypeBadge betType={bet.bet_type} />
+            <Badge betType={bet.bet_type} />
             <span className="text-[10px] font-black uppercase tracking-[0.14em] text-white/45">
               {formatAmericanOdds(bet.odds)}
             </span>
           </div>
           <div className="mt-2 flex items-center gap-2">
             {bet.legs.length === 1 && firstLeg && firstLeg.market !== 'over_under' ? (
-              <TeamLogo size={22} teamName={firstLeg.label} />
+              <NflTeamLogo size={22} teamName={firstLeg.label} />
             ) : null}
             {bet.legs.length === 1 && firstLeg && firstLeg.market === 'over_under' ? (
               <TotalDirectionChip isOver={isOverLeg(firstLeg)} size={22} />
@@ -617,7 +618,7 @@ function StagedPickCard({
                 {leg.market === 'over_under' ? (
                   <TotalDirectionChip isOver={isOverLeg(leg)} size={20} />
                 ) : (
-                  <TeamLogo size={20} teamName={leg.label} />
+                  <NflTeamLogo size={20} teamName={leg.label} />
                 )}
                 <p className="min-w-0 flex-1 truncate text-xs font-black text-white">{leg.label}</p>
               </div>

@@ -2,11 +2,10 @@ import { useEffect, useState } from 'react';
 
 import { Check, Copy, Link2 } from 'lucide-react';
 
-import { Card } from '@/components/ui';
+import { Badge, Card } from '@/components/ui';
 import { cn } from '@/lib/cn';
 import { buildRoute } from '@/lib/routes';
 
-import { Badge } from './Badge';
 
 type CopyState = 'code' | 'error' | 'link' | null;
 

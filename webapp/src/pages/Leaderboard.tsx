@@ -4,8 +4,7 @@ import { ArrowDown, ArrowUp, ChevronsUpDown, Flame, Globe, Medal, Trophy } from 
 import { Link, useNavigate } from 'react-router-dom';
 
 import { CosmeticAvatar, TrophySkinIcon } from '@/components/cosmetics';
-import { AnimatedNumber, LiveRefreshBadge, StaggeredItem } from '@/components/matchups';
-import { Button, Card, SegmentedToggle, Skeleton, type SegmentedOption } from '@/components/ui';
+import { AnimatedNumber, Button, Card, LiveRefreshBadge, SegmentedToggle, Skeleton, StaggeredItem, type SegmentedOption } from '@/components/ui';
 import { THEME_COLORS } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
 import { useEquippedCosmeticsForUsers } from '@/hooks/use-cosmetics';

@@ -14,14 +14,14 @@ import { Fragment, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Check, Lock } from 'lucide-react';
 
-import { Card } from '@/components/ui';
+import { Card, NflTeamLogo } from '@/components/ui';
 import { cn } from '@/lib/cn';
 import { formatAmericanOdds } from '@/lib/format';
 import type { OddsGame, OddsSelection } from '@/lib/odds-api';
 import type { BetMarket } from '@/types/database';
 import type { TeaserPoints } from '@/types/database';
 
-import { ARENA_SPRING, Pill, TeamLogo, TotalDirectionChip } from './atoms';
+import { ARENA_SPRING, Pill, TotalDirectionChip } from './atoms';
 import {
   formatLine,
   getGameDateParts,
@@ -122,7 +122,7 @@ function OddsButton({
       {selection.market === 'over_under' ? (
         <TotalDirectionChip isOver={isOverSelection(selection)} />
       ) : (
-        <TeamLogo teamName={selection.selection || selection.shortName} />
+        <NflTeamLogo teamName={selection.selection || selection.shortName} />
       )}
 
       <span className="min-w-0 flex-1">
@@ -260,13 +260,13 @@ export function GameCard({
             NFL · {dayLabel} · <span className="text-white/60">{timeLabel}</span>
           </p>
           <h3 className="mt-1 flex items-center gap-2 text-[17px] font-black uppercase leading-tight tracking-[-0.01em] text-white">
-            <TeamLogo size={22} teamName={game.awayTeam} />
+            <NflTeamLogo size={22} teamName={game.awayTeam} />
             <span className="truncate">{game.awayTeam}</span>
             <span className="shrink-0" style={{ color: accentHex }}>
               @
             </span>
             <span className="truncate">{game.homeTeam}</span>
-            <TeamLogo size={22} teamName={game.homeTeam} />
+            <NflTeamLogo size={22} teamName={game.homeTeam} />
           </h3>
         </div>
         {isGameLocked ? (

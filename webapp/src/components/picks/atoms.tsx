@@ -1,10 +1,10 @@
 /**
- * The small pieces the Pick Board repeats everywhere: team crests, bet-type
- * badges, pills, the animated coin counters and the budget meter.
+ * The small pieces the Pick Board repeats everywhere: over/under direction
+ * chips, pills, the budget meter and the summary tiles.
  *
  * These are board-local on purpose. src/components/ui holds the primitives
- * every route shares; nothing outside the board needs a teaser-cyan badge or a
- * budget meter, so they live here rather than widening the shared surface.
+ * every route shares — crest, badge, counter; nothing outside the board needs a
+ * budget meter, so it lives here rather than widening the shared surface.
  *
  * Motion rule for this whole folder: an element's resting state is its visible
  * state. Entrances move transforms, never opacity, and every framer-motion
@@ -13,78 +13,20 @@
  * rather than stuck at zero opacity.
  */
 
-import {
-  useEffect,
-  useRef,
-  useState,
-  type PropsWithChildren,
-  type ReactNode,
-} from 'react';
+import type { PropsWithChildren, ReactNode } from 'react';
 
-import { animate } from 'framer-motion';
 import { ArrowDown, ArrowUp, type LucideIcon } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
-import { getNflTeamLogoUrl, getNflTeamShortName } from '@/lib/nfl-teams';
-import type { BetType } from '@/types/database';
 
-import { BET_TYPE_LABEL, type BetTone } from './pick-board-model';
-
-function prefersReducedMotion() {
-  return (
-    typeof window !== 'undefined' &&
-    window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true
-  );
-}
+import { type BetTone } from './pick-board-model';
 
 /** Spring used for every interactive nudge on the board. */
 export const ARENA_SPRING = { damping: 26, mass: 0.7, stiffness: 320, type: 'spring' } as const;
 
 // ============================================================
-// Team crest
+// Direction chip
 // ============================================================
-
-export function TeamLogo({
-  className,
-  size = 28,
-  teamName,
-}: {
-  className?: string;
-  size?: number;
-  teamName: string;
-}) {
-  const [failed, setFailed] = useState(false);
-  const logoUrl = getNflTeamLogoUrl(teamName);
-  const shortName = getNflTeamShortName(teamName);
-
-  if (!logoUrl || failed) {
-    return (
-      <span
-        aria-hidden
-        className={cn(
-          'flex shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/[0.06] font-black text-white/70',
-          className,
-        )}
-        style={{ fontSize: Math.max(9, Math.round(size * 0.34)), height: size, width: size }}>
-        {shortName.slice(0, 3).toUpperCase()}
-      </span>
-    );
-  }
-
-  return (
-    <img
-      alt=""
-      aria-hidden
-      className={cn('shrink-0 rounded-full object-contain', className)}
-      height={size}
-      loading="lazy"
-      onError={() => setFailed(true)}
-      src={logoUrl}
-      style={{ height: size, width: size }}
-      width={size}
-    />
-  );
-}
 
 /** Over/Under gets an arrow chip where a team gets a crest. */
 export function TotalDirectionChip({ isOver, size = 28 }: { isOver: boolean; size?: number }) {
@@ -101,27 +43,8 @@ export function TotalDirectionChip({ isOver, size = 28 }: { isOver: boolean; siz
 }
 
 // ============================================================
-// Badges and pills
+// Pills
 // ============================================================
-
-const BET_TYPE_BADGE_CLASS: Record<BetType, string> = {
-  parlay: 'border-amber-accent/50 bg-amber-accent/15 text-amber-accent',
-  straight: 'border-electric-green/50 bg-electric-green/15 text-electric-green',
-  teaser: 'border-cyan-accent/50 bg-cyan-accent/15 text-cyan-accent',
-};
-
-export function BetTypeBadge({ betType }: { betType: BetType }) {
-  return (
-    <span
-      className={cn(
-        'inline-flex shrink-0 items-center rounded-full border px-2.5 py-0.5',
-        'text-[10px] font-black uppercase tracking-[0.14em]',
-        BET_TYPE_BADGE_CLASS[betType],
-      )}>
-      {BET_TYPE_LABEL[betType]}
-    </span>
-  );
-}
 
 export type PillTone = BetTone | 'gold' | 'red' | 'muted';
 
@@ -155,71 +78,8 @@ export function Pill({
 }
 
 // ============================================================
-// Counters and meters
+// Meters
 // ============================================================
-
-/**
- * A number that counts to its new value.
- *
- * The truth is `value`, and it is what renders. The tween is an overlay that
- * only exists while it is actually running: if rAF is starved — a hidden tab,
- * reduced motion, animations off — `tween` stays null and the real figure shows
- * immediately rather than sitting at a stale one waiting to be animated into
- * place. The timeout is the belt to that braces: setTimeout is only clamped in
- * background tabs, never paused, so a tween that stops mid-flight still resolves
- * to the true number.
- */
-export function AnimatedNumber({
-  className,
-  decimals = 0,
-  prefix = '',
-  suffix = '',
-  value,
-}: {
-  className?: string;
-  decimals?: number;
-  prefix?: string;
-  suffix?: string;
-  value: number;
-}) {
-  const [tween, setTween] = useState<number | null>(null);
-  const from = useRef(value);
-
-  useEffect(() => {
-    const previous = from.current;
-    from.current = value;
-
-    if (previous === value || prefersReducedMotion()) {
-      setTween(null);
-      return undefined;
-    }
-
-    const controls = animate(previous, value, {
-      duration: 0.42,
-      ease: [0.4, 0, 0.2, 1],
-      onComplete: () => setTween(null),
-      onUpdate: (latest) => setTween(latest),
-    });
-    const settle = window.setTimeout(() => setTween(null), 700);
-
-    return () => {
-      controls.stop();
-      window.clearTimeout(settle);
-      setTween(null);
-    };
-  }, [value]);
-
-  return (
-    <span className={className}>
-      {prefix}
-      {(tween ?? value).toLocaleString('en-US', {
-        maximumFractionDigits: decimals,
-        minimumFractionDigits: decimals,
-      })}
-      {suffix}
-    </span>
-  );
-}
 
 /**
  * The budget bar.

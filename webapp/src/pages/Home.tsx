@@ -14,10 +14,9 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-import { Badge } from '@/components/leagues/Badge';
 import { MatchupSpotlight } from '@/components/leagues/MatchupSpotlight';
 import { WeeklyAwardsCard } from '@/components/leagues/WeeklyAwardsCard';
-import { Button, Card, Skeleton } from '@/components/ui';
+import { Badge, Button, Card, Skeleton } from '@/components/ui';
 import { MINIMUM_BETS_PER_WEEK, WEEKLY_BUDGET } from '@/constants/rules';
 import { useAuth } from '@/hooks/use-auth';
 import { useLeagueDetail } from '@/hooks/use-leagues';

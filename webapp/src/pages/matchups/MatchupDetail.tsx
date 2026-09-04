@@ -8,18 +8,16 @@ import {
   BetColumnSection,
   ByeWeekBanner,
   FightCardHeader,
-  LiveRefreshBadge,
   LockShowdown,
   MatchupUnavailable,
   NoMatchupScheduledCard,
   ProfitTug,
   ReadOnlyPickDetailModal,
-  WeekNavigator,
   WeekUnavailableCard,
   matchupSideName,
   useMatchupLiveRefresh,
 } from '@/components/matchups';
-import { Skeleton } from '@/components/ui';
+import { LiveRefreshBadge, Skeleton, WeekNavigator } from '@/components/ui';
 import { THEME_COLORS } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
 import { useEquippedCosmeticsForUsers } from '@/hooks/use-cosmetics';

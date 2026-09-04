@@ -19,8 +19,8 @@ import {
   marketCopy,
   resultLabel,
 } from './bet-card';
-import { LiveBetStatusSummary, LiveLegScoreLine } from './live-pick-status';
-import { Badge, NflTeamLogo } from './primitives';
+import { LiveBetStatusSummary, LiveLegScoreLine } from '@/components/picks/live-pick-status';
+import { Badge, NflTeamLogo } from '@/components/ui';
 
 /**
  * Read-only view of one pick. Mirrors mobile's ReadOnlyPickDetailModal — this

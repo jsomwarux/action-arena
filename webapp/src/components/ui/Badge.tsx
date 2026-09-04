@@ -16,10 +16,9 @@ export type BadgeProps = {
 /**
  * Port of components/ui/badge.tsx.
  *
- * Mobile's Badge is a shared primitive; the webapp's components/ui/ does not
- * carry one yet, so it lives here with the league screens that need it. Same
- * tones and the same bet-type colour language from AGENTS.md, plus a `neutral`
- * tone the desktop layouts use for non-status chips.
+ * Mobile's five tones, bet-type mapping and default labels verbatim, plus the
+ * two things the desktop layouts need and the phone has no use for: a `neutral`
+ * tone for non-status chips and an optional leading icon.
  */
 const containerByTone: Record<BadgeTone, string> = {
   amber: 'border-amber-accent/40 bg-amber-accent/15',
@@ -58,8 +57,8 @@ export function Badge({ betType, className, icon: Icon, label, tone }: BadgeProp
   return (
     <span
       className={cn(
-        'inline-flex shrink-0 items-center gap-1 self-start rounded-full border px-2.5 py-1',
-        'text-[10px] font-black uppercase tracking-[0.15em]',
+        'inline-flex shrink-0 items-center gap-1 self-start rounded-full border px-3 py-1',
+        'text-[10px] font-black uppercase tracking-[1.5px]',
         containerByTone[resolvedTone],
         textByTone[resolvedTone],
         className,
