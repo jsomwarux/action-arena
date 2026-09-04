@@ -15,7 +15,7 @@ export type CardProps = PropsWithChildren<
  * Port of components/ui/card.tsx.
  *
  * Glassmorphism per AGENTS.md: slight blur backdrop, 1px semi-transparent
- * border, rounded corners. `backdrop-blur-xl` stands in for expo-blur's
+ * border, rounded corners. `backdrop-blur-xl` stands in for the native
  * BlurView intensity.
  */
 export function Card({ children, className, padded = true, tone = 'default', ...rest }: CardProps) {

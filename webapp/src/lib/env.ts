@@ -6,8 +6,8 @@
  * from this file ships to the browser: public values only, never a service
  * role key.
  *
- * Mobile reads the same underlying values through EXPO_PUBLIC_* variables in
- * the repo root .env; the web equivalents are VITE_* in webapp/.env.
+ * Mobile reads the same underlying values through its own public env
+ * variables in the repo root .env; the web equivalents are VITE_* here.
  */
 
 function readString(value: string | undefined): string {
