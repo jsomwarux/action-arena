@@ -28,8 +28,36 @@
     text-rendering: optimizeLegibility;
   }
 
-  :where(a, button, input, select, textarea, [role='tab'], [tabindex]):focus-visible {
+  /* Field inputs opt out: their bordered wrapper already turns green and glows
+     on focus, so an offset ring here would draw a second box inside it.
+     :where(:not(...)) adds no specificity, keeping this rule as overridable as
+     it was. */
+  :where(a, button, input, select, textarea, [role='tab'], [tabindex]):where(
+      :not(.arena-field-input)
+    ):focus-visible {
     @apply outline-none ring-2 ring-electric-green ring-offset-2 ring-offset-arena-bg;
+  }
+
+  /* Field inputs (components/ui/TextInput) must draw nothing themselves — the
+     bordered wrapper around them is the whole visual, exactly as in mobile's
+     components/ui/text-input.tsx.
+     Chrome breaks that on autofilled fields: it repaints the input's background
+     from the UA origin, which outranks any author `background-color`, so a
+     remembered login renders a pale block inside the green wrapper. The stalled
+     transition below is the one author-side lever that suppresses that paint,
+     and -webkit-text-fill-color keeps the value legible on the dark field.
+     Deliberately no opaque inset box-shadow here: that would paint a solid
+     rectangle over the wrapper's translucent fill and reintroduce the inner box
+     on any surface whose backdrop differs from the auth card. */
+  .arena-field-input:-webkit-autofill,
+  .arena-field-input:-webkit-autofill:hover,
+  .arena-field-input:-webkit-autofill:focus,
+  .arena-field-input:-webkit-autofill:active {
+    -webkit-text-fill-color: theme('colors.textPrimary');
+    caret-color: theme('colors.electric-green');
+    transition:
+      background-color 600000s 0s,
+      color 600000s 0s;
   }
 }
 
@@ -43,6 +71,28 @@
      slight blur backdrop, 1px semi-transparent border, rounded corners. */
   .arena-glass {
     @apply rounded-2xl border border-white/10 bg-white/[0.04] shadow-[0_8px_28px_rgba(0,0,0,0.30)] backdrop-blur-xl;
+  }
+}
+
+@layer components {
+  /* Slide-in for a remounted panel (onboarding). Deliberately a CSS animation
+     rather than a JS-driven one: the element's static state is already visible,
+     so if the animation never runs — a backgrounded tab starving rAF, reduced
+     motion, animations disabled — the content is simply there rather than stuck
+     part-way through a fade. */
+  .arena-enter {
+    animation: arena-enter 350ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
+
+@keyframes arena-enter {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
   }
 }
 

@@ -1,7 +1,9 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 
+import { RequireAnon } from '@/components/auth/RequireAnon';
+import { RequireAuth } from '@/components/auth/RequireAuth';
 import { AppShell } from '@/components/layout/AppShell';
-import { AuthShell } from '@/components/layout/AuthShell';
+import { AuthShell, type AuthShellWidth } from '@/components/layout/AuthShell';
 import { ROUTES } from '@/lib/routes';
 import { AnalyticsPage } from '@/pages/Analytics';
 import { CoinStorePage } from '@/pages/CoinStore';
@@ -33,90 +35,105 @@ import { MatchupsIndexPage } from '@/pages/matchups/MatchupsIndex';
 import { MemberDetailPage } from '@/pages/members/MemberDetail';
 
 /**
+ * A screen with the auth-page chrome and, optionally, one of the guards.
+ *
+ * `guard` mirrors the mobile layout files: 'anon' is app/(auth)/_layout.tsx
+ * (signed-in players bounce home, first-run players see onboarding first),
+ * 'auth-pre-disclosure' is app/(app)/_layout.tsx minus the disclosure check,
+ * which only /disclosure itself needs.
+ */
+function bare(
+  element: JSX.Element,
+  {
+    guard,
+    hideWordmark = false,
+    width = 'md',
+  }: {
+    guard?: 'anon' | 'auth-pre-disclosure';
+    hideWordmark?: boolean;
+    width?: AuthShellWidth;
+  } = {},
+) {
+  const shell = (
+    <AuthShell hideWordmark={hideWordmark} width={width}>
+      {element}
+    </AuthShell>
+  );
+
+  if (guard === 'anon') {
+    return <RequireAnon>{shell}</RequireAnon>;
+  }
+
+  if (guard === 'auth-pre-disclosure') {
+    return <RequireAuth allowBeforeDisclosure>{shell}</RequireAuth>;
+  }
+
+  return shell;
+}
+
+/**
  * The whole route tree.
  *
  * Two groups: everything under <AppShell> gets the desktop chrome (sidebar +
- * top bar); auth, onboarding and legal render bare inside <AuthShell>.
- *
- * TODO(webapp): these routes are all public right now. An auth guard wraps the
- * <AppShell> branch once the session provider lands.
+ * top bar) behind <RequireAuth>; auth, onboarding, invite and legal render bare
+ * inside <AuthShell>.
  */
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Auth + onboarding — outside the app shell. */}
+        {/* Auth — outside the app shell.
+
+            /reset-password is deliberately unguarded. A recovery link signs the
+            player in on the way to this screen, so RequireAnon would bounce
+            them home before they could set a password. Mobile carves out the
+            same route with its `isPasswordResetRoute` flag. */}
         <Route
-          element={
-            <AuthShell>
-              <LoginPage />
-            </AuthShell>
-          }
+          element={bare(<LoginPage />, { guard: 'anon', hideWordmark: true })}
           path={ROUTES.login}
         />
         <Route
-          element={
-            <AuthShell>
-              <SignupPage />
-            </AuthShell>
-          }
+          element={bare(<SignupPage />, { guard: 'anon', hideWordmark: true })}
           path={ROUTES.signup}
         />
         <Route
-          element={
-            <AuthShell>
-              <ForgotPasswordPage />
-            </AuthShell>
-          }
+          element={bare(<ForgotPasswordPage />, { guard: 'anon', hideWordmark: true })}
           path={ROUTES.forgotPassword}
         />
         <Route
-          element={
-            <AuthShell>
-              <ResetPasswordPage />
-            </AuthShell>
-          }
+          element={bare(<ResetPasswordPage />, { hideWordmark: true })}
           path={ROUTES.resetPassword}
         />
-        <Route
-          element={
-            <AuthShell>
-              <OnboardingPage />
-            </AuthShell>
-          }
-          path={ROUTES.onboarding}
-        />
+        {/* Onboarding renders bare — it is a full-width pitch screen, not a
+            centred card, so it deliberately skips <AuthShell>. */}
+        <Route element={<OnboardingPage />} path={ROUTES.onboarding} />
 
-        {/* Legal — outside the app shell. */}
+        {/* Invite landing — outside the app shell so a signed-out player can
+            reach it and bank the code before any redirect. */}
+        <Route element={bare(<InviteJoinPage />, { hideWordmark: true })} path={ROUTES.invite} />
+
+        {/* Legal — outside the app shell. The disclosure is a gate, so unlike
+            terms and privacy it needs a session to acknowledge against. */}
         <Route
-          element={
-            <AuthShell>
-              <DisclosurePage />
-            </AuthShell>
-          }
+          element={bare(<DisclosurePage />, {
+            guard: 'auth-pre-disclosure',
+            hideWordmark: true,
+            width: 'xl',
+          })}
           path={ROUTES.disclosure}
         />
-        <Route
-          element={
-            <AuthShell>
-              <TermsPage />
-            </AuthShell>
-          }
-          path={ROUTES.terms}
-        />
-        <Route
-          element={
-            <AuthShell>
-              <PrivacyPage />
-            </AuthShell>
-          }
-          path={ROUTES.privacy}
-        />
+        <Route element={bare(<TermsPage />, { width: 'xl' })} path={ROUTES.terms} />
+        <Route element={bare(<PrivacyPage />, { width: 'xl' })} path={ROUTES.privacy} />
 
         {/* Dense screens — wide content tier. See AppShell's ShellWidth docs.
             Move a <Route> between this group and the one below to change its
             width tier; the page component itself needs no changes. */}
-        <Route element={<AppShell width="wide" />}>
+        <Route
+          element={
+            <RequireAuth>
+              <AppShell width="wide" />
+            </RequireAuth>
+          }>
           <Route element={<PicksPage />} path={ROUTES.picks} />
           <Route element={<LeagueDetailPage />} path={ROUTES.league} />
           <Route element={<MatchupDetailPage />} path={ROUTES.matchup} />
@@ -124,7 +141,12 @@ export default function App() {
         </Route>
 
         {/* Everything else — default (reading) content tier. */}
-        <Route element={<AppShell />}>
+        <Route
+          element={
+            <RequireAuth>
+              <AppShell />
+            </RequireAuth>
+          }>
           <Route element={<HomePage />} index />
 
           <Route element={<LeaguesIndexPage />} path={ROUTES.leagues} />
@@ -144,8 +166,6 @@ export default function App() {
           <Route element={<SeasonPassPage />} path={ROUTES.seasonPass} />
           <Route element={<ShopPage />} path={ROUTES.shop} />
           <Route element={<CoinStorePage />} path={ROUTES.coinStore} />
-
-          <Route element={<InviteJoinPage />} path={ROUTES.invite} />
 
           <Route element={<NotFoundPage />} path="*" />
         </Route>

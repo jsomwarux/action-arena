@@ -26,8 +26,11 @@ const supabaseAnonKey = SUPABASE_ANON_KEY.length > 0 ? SUPABASE_ANON_KEY : 'anon
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,
-    // Web password-reset and magic links arrive as URL fragments, so unlike
-    // the mobile client this must stay on.
+    // supabase-js owns the recovery URL. It consumes the implicit
+    // `#access_token=…` fragment and a verifier-backed `?code=` during client
+    // init, then rewrites the address bar — so nothing else in the app may
+    // parse those. See the ownership note at the top of lib/auth-redirects.ts,
+    // which covers only the shapes auth-js leaves behind.
     detectSessionInUrl: true,
     persistSession: true,
     storage: window.localStorage,

@@ -1,8 +1,36 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { PUBLIC_USER_SELECT } from '@/constants/public-user-select';
 import { supabase } from '@/lib/supabase';
 import type { UserUpdate } from '@/types/database';
+
+/**
+ * The signed-in player's own `users` row.
+ *
+ * The auth session carries `user_metadata.display_name` from signup, but the
+ * `users` table is what Settings writes, so it wins where the two disagree.
+ * Callers fall back to metadata when the row has not been read yet.
+ */
+export function useCurrentUserProfile(userId: string | undefined) {
+  return useQuery({
+    enabled: Boolean(userId),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('users')
+        .select(PUBLIC_USER_SELECT)
+        .eq('id', userId ?? '')
+        .maybeSingle();
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      return data;
+    },
+    queryKey: ['user-profile', userId],
+    staleTime: 60_000,
+  });
+}
 
 export function useUpdateUserProfile(userId: string | undefined) {
   const queryClient = useQueryClient();
