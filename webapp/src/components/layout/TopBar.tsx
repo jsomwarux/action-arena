@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, LogOut, Settings as SettingsIcon, UserCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
+import { LeagueSwitcher } from '@/components/leagues/LeagueSwitcher';
 import { useAuth } from '@/hooks/use-auth';
 import { useCurrentUserProfile } from '@/hooks/use-user-profile';
 import { cn } from '@/lib/cn';
@@ -135,26 +136,13 @@ function UserMenu() {
 /**
  * Top bar: league selector on the left, user menu on the right.
  *
- * TODO(webapp): the league selector becomes a real dropdown once the leagues
- * hook lands. The user menu is wired.
+ * Both halves are wired. The selector lives in components/leagues because it
+ * reads the leagues hook and owns the switching behaviour; see LeagueSwitcher.
  */
 export function TopBar() {
   return (
     <header className="sticky top-0 z-20 flex h-topbar items-center justify-between gap-4 border-b border-border bg-arena-bg/80 px-6 backdrop-blur-xl">
-      <button
-        aria-label="Select league (not wired up yet)"
-        className="flex min-w-0 items-center gap-2 rounded-xl border border-border bg-white/[0.04] px-3 py-2 text-left transition hover:bg-white/[0.07]"
-        disabled
-        type="button">
-        <span className="flex flex-col">
-          <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-textMuted">
-            League
-          </span>
-          <span className="truncate text-sm font-bold text-white/85">Select a league</span>
-        </span>
-        <ChevronDown aria-hidden className="h-4 w-4 shrink-0 text-white/45" />
-      </button>
-
+      <LeagueSwitcher />
       <UserMenu />
     </header>
   );
