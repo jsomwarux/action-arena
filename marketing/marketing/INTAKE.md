@@ -1,7 +1,7 @@
 # Action Arena — Marketing Intake
 
 ## Product summary
-- **Tagline:** Run a private NFL prediction league with friends, no real money.
+- **Tagline:** The private NFL pick league your group chat runs all season.
 - **Problem solved:** Friend groups want sportsbook-style strategy and bragging rights without gambling.
 - **Core value prop:** Weekly virtual-coin budgets turn straight picks, parlays, and teasers into season-long fantasy competition between friends.
 
@@ -34,7 +34,7 @@ Per `AGENTS.md`: "Payment processing and ad SDKs are not integrated yet. Purchas
 ## Compliance considerations
 - **Apple Guideline 5.3 (Gaming, Gambling, Lotteries):** Marketing must position the product as fantasy sports, not gambling. Per `docs/app-store-submission.md`, the App Store keywords explicitly **avoid**: *betting, bet, wager, sportsbook, odds*. Approved keyword set: fantasy sports, fantasy football, sports prediction, fantasy league, NFL fantasy, weekly matchups, sports picks.
 - **Category positioning:** Submit as Sports primary / Games secondary. Do **not** select any gambling category.
-- **No-money disclosure is core to the product story:** no real-money entry, no real-money cash out, no in-app prize fulfillment, no external sportsbook links. League-side prizes (if any) are arranged outside the app by the commissioner. This needs to be explicit in App Store copy, web marketing, and any paid advertising.
+- **No-money disclosure is a core compliance requirement:** no real-money entry, no real-money cash out, no in-app prize fulfillment, no external sportsbook links. League-side prizes (if any) are arranged outside the app by the commissioner. This needs to be explicit in App Store submission copy and the landing page compliance footer. Web marketing and paid advertising should lead with positive value (private leagues, friend competition, weekly stakes) and surface the not-gambling positioning through product framing, not explicit disclaimers.
 - **Age rating:** Submitted as 12+ minimum.
 - **NFL trademarks:** The app uses NFL team names and game data via The Odds API. [TODO: confirm whether marketing creative can use NFL team marks, logos, or just generic football imagery — depends on Odds API license terms and any direct NFL/team licensing.]
 - **Ad targeting:** Even though sports betting / DFS ad networks have higher CPMs, paid acquisition channels should target fantasy-sports audiences. Running on gambling-adjacent ad inventory or using sportsbook-style creative could jeopardize the App Store "not gambling" positioning.
@@ -98,7 +98,7 @@ Product designer at a Brooklyn agency. Was added to two fantasy leagues by frien
   - Group chat invite with one tap to join — if the join flow takes more than 20 seconds she abandons mid-flow.
   - A friend who's already on the app posts a winning matchup screenshot in iMessage with the celebration animation visible — the WinCelebration is what would actually pull her in.
 - **Objections that would make her not try this app:**
-  - **Anything that smells like gambling.** Hard line. "Bet," "wager," "odds boost" in the marketing copy and she closes the App Store page. The "no real money" framing has to be the second sentence she reads, not buried in fine print.
+  - **Anything that smells like gambling.** Hard line. "Bet," "wager," "odds boost" in the marketing copy and she closes the App Store page. She needs the not-gambling reassurance available through product framing (fantasy league language, weekly budgets as game mechanic) and through the soft compliance footer, but it shouldn't be the lead. If the first marketing impression is 'this isn't a sportsbook,' she registers defensive; if the first impression is 'private league with your friends,' she registers a different product category entirely.
   - Complexity in onboarding — if she has to learn what "teaser" means before placing her first pick, she's out.
   - "Just men yelling about football" energy in the app or marketing. If the screenshots are all male avatars, gold/red carnage, sportsbook-style numbers, she doesn't see herself in it.
   - Notifications spam — one push per week is fine, three is uninstall territory.
@@ -119,7 +119,7 @@ First-year at a Big Ten school in a state where mobile sportsbooks are legal at 
   - Extends Sleeper / ESPN Fantasy (he plays in one league with his high school friends), but the prediction format fits his attention span and budget better than weekly roster management does.
   - Could replace the half-joking "Venmo me $5 if Mahomes throws over 2.5 TDs" side bets that float around the floor.
 - **Trigger moments that would make him try this app:**
-  - A TikTok of someone in the same situation ("here's how my fraternity does picks without anyone putting up real money") — direct mirror of his exact problem.
+  - A TikTok of someone in the same situation ("here's how my fraternity runs a season-long pick league without the Google Sheet") — direct mirror of his exact problem.
   - A Twitch streamer or YouTuber in the gaming-adjacent sports content space (Pat McAfee, Jomboy, Barstool-without-the-sportsbook-affiliation) demoing a league on stream.
   - Word of mouth on his college campus once one floor mate gets in — install rate goes near-vertical within a friend group when the network effect kicks in.
 - **Objections that would make him not try this app:**

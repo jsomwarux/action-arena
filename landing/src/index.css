@@ -1,0 +1,49 @@
+/* ── Self-hosted fonts (no Google CDN) ─────────────────────────────
+   Display: Bebas Neue (single weight). Body: Inter 400/500/600.
+   Latin subset only to keep page weight well under budget. */
+@import '@fontsource/bebas-neue/latin-400.css';
+@import '@fontsource/inter/latin-400.css';
+@import '@fontsource/inter/latin-500.css';
+@import '@fontsource/inter/latin-600.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-arena-bg text-textPrimary font-sans antialiased;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Visible, brand-consistent focus ring on every interactive element. */
+  :where(a, button, [role='tab'], [tabindex]):focus-visible {
+    @apply outline-none ring-2 ring-electric-green ring-offset-2 ring-offset-arena-bg;
+  }
+}
+
+/* ── Reduced motion contract (HANDOFF §12) ─────────────────────────
+   Framer Motion collapses its transitions to duration:0 via the
+   useReducedMotion() hook; this guard catches any CSS-driven motion
+   (e.g. smooth scroll) so everything cuts instantly. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

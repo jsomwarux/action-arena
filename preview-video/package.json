@@ -1,0 +1,25 @@
+{
+  "name": "action-arena-preview-video",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Action Arena — App Store preview video (Remotion, 1080x1920, 30s, H.264).",
+  "type": "module",
+  "scripts": {
+    "studio": "remotion studio",
+    "gen:audio": "node scripts/gen-synth-hit.mjs && node scripts/gen-music-bed.mjs",
+    "render": "node scripts/gen-synth-hit.mjs && node scripts/gen-music-bed.mjs && remotion render src/index.ts ActionArenaPreview out/_raw.mp4 --codec h264 && node scripts/finalize.mjs",
+    "still": "remotion still src/index.ts ActionArenaPreview out/frame.png"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.0",
+    "@remotion/google-fonts": "^4.0.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "remotion": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "typescript": "^5.6.3"
+  }
+}
