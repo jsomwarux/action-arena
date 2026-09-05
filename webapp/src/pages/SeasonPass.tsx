@@ -163,9 +163,7 @@ function AnalyticsTeaser() {
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <BarChart3 aria-hidden className="h-3.5 w-3.5 text-cyan-accent" />
-            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-cyan-accent">
-              Inside the Lab
-            </p>
+            <p className="arena-eyebrow text-cyan-accent">Inside the Lab</p>
           </div>
           <Badge label="Pass Only" tone="gold" />
         </div>
@@ -307,11 +305,7 @@ export function SeasonPassPage() {
         <div className="flex flex-col gap-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0">
-              <p
-                className={cn(
-                  'text-[11px] font-semibold uppercase tracking-[0.12em]',
-                  hasPass ? 'text-electric-green' : 'text-gold',
-                )}>
+              <p className={cn('arena-eyebrow', hasPass ? 'text-electric-green' : 'text-gold')}>
                 {hasPass ? 'Pass Active' : 'Apple In-App Purchase'}
               </p>
               <p className="mt-0.5 text-base font-bold text-white">

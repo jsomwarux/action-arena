@@ -50,7 +50,7 @@ function BreakdownRow({ breakdown }: { breakdown: BetTypeBreakdown }) {
           <span className="arena-label text-white/45">
             Win Rate
           </span>
-          <span className={cn('text-[11px] font-black uppercase tracking-[1.2px]', meta.textClass)}>
+          <span className={cn('arena-label', meta.textClass)}>
             {breakdown.winRate.toFixed(1)}%
             {breakdown.type !== 'straight' && breakdown.averageLegs > 0
               ? ` · ${breakdown.averageLegs.toFixed(1)} avg legs`

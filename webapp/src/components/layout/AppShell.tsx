@@ -1,7 +1,10 @@
+import { Suspense } from 'react';
+
 import { Outlet } from 'react-router-dom';
 
 import { cn } from '@/lib/cn';
 
+import { ContentLoader } from './FullPageLoader';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 
@@ -41,6 +44,15 @@ export type AppShellProps = {
  *
  * Auth and legal routes deliberately render outside this shell — see
  * src/App.tsx.
+ *
+ * The <Suspense> around <Outlet> is what keeps that chrome on screen while a
+ * lazy route's chunk is in flight. src/App.tsx also has a boundary, but it sits
+ * above <Routes> — above this component — so it was the one that caught every
+ * lazy page: React hid the whole shell subtree and put <FullPageLoader> in its
+ * place, and the first visit to any of the 23 lazy routes flashed the entire
+ * app to a spinner on an empty page, sidebar and top bar included. A boundary
+ * here is nearer to the lazy element, so only the content column suspends and
+ * the sidebar, top bar and league switcher stay put.
  */
 export function AppShell({ width = 'default' }: AppShellProps) {
   return (
@@ -49,7 +61,9 @@ export function AppShell({ width = 'default' }: AppShellProps) {
       <div className="pl-sidebar">
         <TopBar />
         <main className={cn('mx-auto w-full px-8 py-8', CONTENT_MAX_WIDTH[width])}>
-          <Outlet />
+          <Suspense fallback={<ContentLoader />}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
     </div>

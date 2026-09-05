@@ -265,7 +265,18 @@ export function BetCard({
     ? getRealizedReward(bet)
     : getDisplayedPotentialReward(bet);
   const rewardLabel = isSettled ? 'Outcome' : 'Reward';
-  const rewardTone = isSettled ? getOutcomeRewardTone(bet.result) : '';
+  // A pending reward is money, so it takes the money colours the rest of the app
+  // uses for it: electric green, or gold for the 1.5x Pick of the Week. The
+  // bet-type accent belongs to the badge, border and background — the things
+  // AGENTS.md names — not to the figure. Tinting the figure by bet type made the
+  // *same pick* cyan here and gold on the Pick Board, amber here and green in
+  // profile history and on the member card; three screens agreed and this one
+  // did not.
+  const rewardTone = isSettled
+    ? getOutcomeRewardTone(bet.result)
+    : isLock
+      ? 'text-gold'
+      : 'text-electric-green';
 
   const inner = (
     <div
@@ -330,9 +341,7 @@ export function BetCard({
           <p className="arena-label text-white/40">
             {rewardLabel}
           </p>
-          <p
-            className={cn('mt-1 text-sm font-black text-white', rewardTone)}
-            style={isSettled ? undefined : { color: accent.hex }}>
+          <p className={cn('mt-1 text-sm font-black', rewardTone)}>
             {formatCurrency(displayedReward)}
           </p>
         </div>

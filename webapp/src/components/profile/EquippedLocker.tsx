@@ -33,9 +33,7 @@ export function EquippedLocker({
     <Card className="flex flex-col gap-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[1.2px] text-electric-green">
-            Equipped
-          </p>
+          <p className="arena-eyebrow text-electric-green">Equipped</p>
           <h2 className="mt-0.5 text-lg font-extrabold tracking-[-0.2px] text-white">
             Cosmetics Loadout
           </h2>
