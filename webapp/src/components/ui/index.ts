@@ -1,4 +1,5 @@
 export { AnimatedNumber } from './AnimatedNumber';
+export { AnimatedProfit } from './AnimatedProfit';
 export { ArenaLogo, type ArenaLogoProps } from './ArenaLogo';
 export { Badge, type BadgeProps, type BadgeTone } from './Badge';
 export { Button, type ButtonProps, type ButtonVariant } from './Button';
@@ -8,6 +9,7 @@ export { LiveRefreshBadge } from './LiveRefreshBadge';
 export { Modal, type ModalProps } from './Modal';
 export { NflTeamLogo } from './NflTeamLogo';
 export { Notice, type NoticeProps, type NoticeTone } from './Notice';
+export { QueryErrorState } from './QueryErrorState';
 export {
   SegmentedToggle,
   type SegmentedAccent,

@@ -87,7 +87,9 @@ export function NotificationRow({
         unread
           ? 'border-electric-green/30 bg-electric-green/[0.06]'
           : 'border-white/[0.07] bg-white/[0.03]',
-        destination && 'group-hover:border-white/20 group-hover:bg-white/[0.06]',
+        // The <a> is the hover target, so this row follows it via `group-`
+        // rather than carrying .arena-row-interactive itself.
+        destination && 'group-hover:border-white/20 group-hover:bg-white/[0.07]',
       )}>
       <span
         className={cn(

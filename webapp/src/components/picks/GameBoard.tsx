@@ -14,7 +14,7 @@ import { Fragment, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Check, Lock } from 'lucide-react';
 
-import { Card, NflTeamLogo } from '@/components/ui';
+import { Card, NflTeamLogo, StaggeredItem } from '@/components/ui';
 import { cn } from '@/lib/cn';
 import { formatAmericanOdds } from '@/lib/format';
 import type { OddsGame, OddsSelection } from '@/lib/odds-api';
@@ -195,7 +195,7 @@ function MarketRow({
 
   return (
     <div className="grid grid-cols-[4rem_minmax(0,1fr)_minmax(0,1fr)] items-stretch gap-2">
-      <p className="flex items-center text-[10px] font-black uppercase tracking-[0.14em] text-white/40">
+      <p className="flex items-center arena-label text-white/40">
         {label}
       </p>
 
@@ -324,8 +324,9 @@ export function GameCardSkeletonGrid({ count = 4 }: { count?: number }) {
 /**
  * The slate, grouped by kickoff day.
  *
- * Entrance motion moves the card up into place and never touches opacity, so a
- * card that never gets animated is simply a card sitting where it belongs.
+ * Cards enter through the shared <StaggeredItem>, the same entrance every other
+ * list and grid in the app uses, whose resting state is already visible — a card
+ * that never gets animated is simply a card sitting where it belongs.
  */
 export function GameGrid({
   games,
@@ -370,21 +371,19 @@ export function GameGrid({
             <div className="flex items-center gap-3">
               <h2 className="arena-heading text-xl leading-none text-white/85">{group.label}</h2>
               <span className="h-px flex-1 bg-white/[0.08]" />
-              <span className="text-[10px] font-black uppercase tracking-[0.14em] text-white/35">
+              <span className="arena-label text-white/35">
                 {group.games.length} game{group.games.length === 1 ? '' : 's'}
               </span>
             </div>
 
+            {/* Only the first day group staggers. Later groups are below the
+                fold, so delaying them there just holds cards blank on scroll. */}
             <div className="grid grid-cols-1 gap-4 2xl:grid-cols-2">
               {group.games.map((game, index) => (
-                <motion.div
-                  animate={{ y: 0 }}
-                  initial={{ y: 12 }}
+                <StaggeredItem
+                  index={groupIndex === 0 ? index : 0}
                   key={game.id}
-                  transition={{
-                    ...ARENA_SPRING,
-                    delay: groupIndex === 0 ? Math.min(index, 8) * 0.035 : 0,
-                  }}>
+                  perItemDelay={45}>
                   <GameCard
                     game={game}
                     getSelectionConflict={getSelectionConflict}
@@ -395,7 +394,7 @@ export function GameGrid({
                     selectedKeys={selectedKeys}
                     teaserPoints={teaserPoints}
                   />
-                </motion.div>
+                </StaggeredItem>
               ))}
             </div>
           </section>

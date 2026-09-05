@@ -4,7 +4,7 @@ import { ArrowDown, ArrowUp, ChevronsUpDown, Flame, Globe, Medal, Trophy } from 
 import { Link, useNavigate } from 'react-router-dom';
 
 import { CosmeticAvatar, TrophySkinIcon } from '@/components/cosmetics';
-import { AnimatedNumber, Button, Card, LiveRefreshBadge, SegmentedToggle, Skeleton, StaggeredItem, type SegmentedOption } from '@/components/ui';
+import { AnimatedNumber, Button, Card, LiveRefreshBadge, QueryErrorState, SegmentedToggle, Skeleton, StaggeredItem, type SegmentedOption } from '@/components/ui';
 import { THEME_COLORS } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
 import { useEquippedCosmeticsForUsers } from '@/hooks/use-cosmetics';
@@ -158,6 +158,9 @@ function PodiumCard({
     <Link
       className={cn(
         'flex flex-col items-center rounded-2xl border transition duration-150 ease-arena',
+        // The house card hover is a lift plus a neutral brighten. These cards
+        // already carry a rank-tinted border, fill and glow, so they take the
+        // lift and brighten their own colour instead of washing it to white.
         'hover:-translate-y-0.5 hover:brightness-110',
         featured ? 'p-6' : 'p-5',
         accent.bg,
@@ -206,7 +209,7 @@ function PodiumCard({
       </span>
 
       {isUser ? (
-        <span className="mt-2 rounded-full border border-electric-green/40 bg-electric-green/15 px-2 py-0.5 text-[10px] font-black uppercase tracking-[1.2px] text-electric-green">
+        <span className="mt-2 rounded-full border border-electric-green/40 bg-electric-green/15 px-2 py-0.5 arena-tag text-electric-green">
           You
         </span>
       ) : null}
@@ -397,7 +400,22 @@ export function LeaderboardPage() {
 
       {leaderboardQuery.isLoading ? <LoadingState /> : null}
 
-      {!leaderboardQuery.isLoading && rows.length > 0 ? (
+      {!leaderboardQuery.isLoading && leaderboardQuery.isError ? (
+        // `rows` falls back to [], so a failed fetch used to render the
+        // "No Standings Yet — join a league" empty state to a player who is
+        // already in one.
+        <Card className="p-8">
+          <QueryErrorState
+            error={leaderboardQuery.error}
+            fallback="We could not load the leaderboard right now."
+            onRetry={() => void leaderboardQuery.refetch()}
+            retrying={leaderboardQuery.isFetching}
+            title="Leaderboard Unavailable"
+          />
+        </Card>
+      ) : null}
+
+      {!leaderboardQuery.isLoading && !leaderboardQuery.isError && rows.length > 0 ? (
         <div className="flex flex-col gap-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
             {leagues.length > 1 ? (
@@ -550,7 +568,7 @@ export function LeaderboardPage() {
                         index > 0 && 'border-t border-white/[0.05]',
                         isUser
                           ? 'border-l-[3px] border-l-electric-green bg-electric-green/[0.10] hover:bg-electric-green/[0.16]'
-                          : 'hover:bg-white/[0.05]',
+                          : 'hover:bg-white/[0.07]',
                       )}
                       to={memberRoute(row)}>
                       <span className="flex items-center gap-2">
@@ -631,7 +649,7 @@ export function LeaderboardPage() {
         </div>
       ) : null}
 
-      {!leaderboardQuery.isLoading && rows.length === 0 ? (
+      {!leaderboardQuery.isLoading && !leaderboardQuery.isError && rows.length === 0 ? (
         <Card className="p-8">
           <div className="flex flex-col items-center gap-5">
             <span className="flex h-20 w-20 items-center justify-center rounded-full border border-electric-green/30 bg-electric-green/10">

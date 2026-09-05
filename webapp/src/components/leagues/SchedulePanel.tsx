@@ -3,22 +3,30 @@ import { useMemo } from 'react';
 import { CalendarClock, ChevronRight, Hourglass, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-import { Badge, Card } from '@/components/ui';
+import { AnimatedProfit, Badge, Card } from '@/components/ui';
 import type { LeagueDetail } from '@/hooks/use-leagues';
 import { cn } from '@/lib/cn';
-import { formatProfit, getProfitTone } from '@/lib/format';
+import {
+  NFL_PLAYOFF_ROUND_LABELS,
+  NFL_PLAYOFF_WEEKS,
+  NFL_REGULAR_SEASON_WEEKS,
+} from '@/constants/rules';
 import { getLeagueMemberPrimaryName } from '@/lib/league-member-display';
 import { buildRoute } from '@/lib/routes';
 import type { WeeklyMatchupRow } from '@/types/database';
 
 
-const PLAYOFF_PLACEHOLDER_WEEKS = [15, 16, 17];
+const PLAYOFF_PLACEHOLDER_WEEKS = Array.from(
+  { length: NFL_PLAYOFF_WEEKS },
+  (_unused, index) => NFL_REGULAR_SEASON_WEEKS + index + 1,
+);
 
 function weekLabel(weekNumber: number) {
-  if (weekNumber === 17) return 'Championship';
-  if (weekNumber === 16) return 'Semifinals';
-  if (weekNumber === 15) return 'Playoff Round 1';
-  return `Week ${weekNumber}`;
+  if (weekNumber <= NFL_REGULAR_SEASON_WEEKS) {
+    return `Week ${weekNumber}`;
+  }
+
+  return NFL_PLAYOFF_ROUND_LABELS[weekNumber - NFL_REGULAR_SEASON_WEEKS - 1] ?? `Week ${weekNumber}`;
 }
 
 function MatchupRow({
@@ -49,9 +57,7 @@ function MatchupRow({
         {nameFor(id)}
       </span>
       {isSettled ? (
-        <span className={cn('text-[11px] font-black', getProfitTone(profit ?? 0))}>
-          {formatProfit(profit ?? 0)}
-        </span>
+        <AnimatedProfit className="text-[11px] font-black" value={profit ?? 0} />
       ) : null}
     </span>
   );
@@ -62,11 +68,11 @@ function MatchupRow({
         'flex items-center gap-3 rounded-xl border px-3 py-2.5 transition',
         isMine
           ? 'border-electric-green/30 bg-electric-green/[0.06] hover:bg-electric-green/[0.1]'
-          : 'border-white/[0.07] bg-white/[0.03] hover:bg-white/[0.06]',
+          : 'arena-row-interactive border-white/[0.07] bg-white/[0.03]',
       )}
       to={buildRoute.matchup(matchup.id)}>
       {side(matchup.home_user_id, matchup.home_profit, false)}
-      <span className="shrink-0 text-[10px] font-black uppercase tracking-[0.14em] text-white/35">
+      <span className="shrink-0 arena-label text-white/35">
         vs
       </span>
       {side(matchup.away_user_id, matchup.away_profit, true)}
@@ -155,7 +161,7 @@ export function SchedulePanel({ detail, userId }: { detail: LeagueDetail; userId
   return (
     <Card className="flex h-full flex-col gap-4 overflow-hidden">
       <header className="flex items-center justify-between gap-3">
-        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-electric-green">
+        <p className="arena-eyebrow text-electric-green">
           Season Schedule
         </p>
         <Badge label={`${detail.matchups.length} matchups`} tone="neutral" />

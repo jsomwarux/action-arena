@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
+import { MOTION_DURATION, prefersReducedMotion } from '@/lib/motion';
+
 /**
  * Port of components/ui/animated-number.tsx, with one deliberate divergence.
  *
@@ -23,17 +25,10 @@ import { useEffect, useRef, useState } from 'react';
 /** Backstop headroom over `duration` before the overlay is force-cleared. */
 const SETTLE_GRACE_MS = 280;
 
-function prefersReducedMotion() {
-  return (
-    typeof window !== 'undefined' &&
-    window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true
-  );
-}
-
 export function AnimatedNumber({
   className,
   decimals = 0,
-  duration = 360,
+  duration = MOTION_DURATION.counter,
   formatter,
   prefix = '',
   style,

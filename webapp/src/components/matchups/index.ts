@@ -9,11 +9,13 @@ export {
   ResultPill,
   betTypeAccent,
   formatRevealTime,
+  getPickVisibilityState,
   isInProgress,
   marketCopy,
   resultLabel,
   resultTone,
   revealMessage,
+  type PickVisibilityState,
 } from './bet-card';
 export {
   LiveBetStatusSummary,

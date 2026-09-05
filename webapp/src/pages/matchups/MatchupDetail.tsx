@@ -17,7 +17,7 @@ import {
   matchupSideName,
   useMatchupLiveRefresh,
 } from '@/components/matchups';
-import { LiveRefreshBadge, Skeleton, WeekNavigator } from '@/components/ui';
+import { Card, LiveRefreshBadge, QueryErrorState, Skeleton, WeekNavigator } from '@/components/ui';
 import { THEME_COLORS } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
 import { useEquippedCosmeticsForUsers } from '@/hooks/use-cosmetics';
@@ -32,9 +32,9 @@ import { useSeasonPass } from '@/hooks/use-season-pass';
 import { triggerAdHook } from '@/lib/ad-hooks';
 import { logAnalyticsEvent } from '@/lib/analytics';
 import { isLiveScoreActive } from '@/lib/live-pick-status';
+import { useDocumentTitle } from '@/lib/page-title';
 import { ROUTES } from '@/lib/routes';
 
-const REGULAR_SEASON_WEEKS = 14;
 
 function LoadingState() {
   return (
@@ -224,6 +224,16 @@ export function MatchupDetailPage() {
     initialMatchupQuery.isRefetching ||
     selectedWeekMatchupQuery.isRefetching ||
     activeMatchupQuery.isRefetching;
+  // Named tabs matter most here: this is the screen a player leaves open all
+  // Sunday. Undefined until the detail lands, so the route title stands first.
+  const matchupTitle = detail
+    ? `${matchupSideName(detail, 'away')} at ${matchupSideName(detail, 'home')}`
+    : undefined;
+  useDocumentTitle(matchupTitle);
+
+  const matchupError =
+    initialMatchupQuery.error ??
+    (isInitialWeek ? null : (selectedWeekMatchupQuery.error ?? activeMatchupQuery.error));
 
   const openPick = (bet: BetWithLegs, ownerLabel: string) => setDetailBet({ bet, ownerLabel });
 
@@ -261,13 +271,12 @@ export function MatchupDetailPage() {
             title="Replay win celebration"
             type="button">
             <Trophy aria-hidden className="h-3 w-3 text-gold" />
-            <span className="text-[10px] font-black uppercase tracking-[1.5px] text-gold">
+            <span className="text-[10px] font-black uppercase tracking-[0.15em] text-gold">
               You Won
             </span>
           </button>
         ) : null}
         <WeekNavigator
-          maxWeek={REGULAR_SEASON_WEEKS}
           onChange={(week) => {
             setSelectedWeek(week);
             setDetailBet(null);
@@ -280,6 +289,26 @@ export function MatchupDetailPage() {
 
   if (matchupLoading) {
     return <LoadingState />;
+  }
+
+  // A failed fetch is not "this matchup does not exist", and it is certainly not
+  // "no matchup is scheduled this week" — both of those used to be what a
+  // network or RLS failure rendered.
+  if (matchupError) {
+    return (
+      <div className="flex flex-col gap-6">
+        {weekBar}
+        <Card className="py-10">
+          <QueryErrorState
+            error={matchupError}
+            fallback="We could not load this matchup right now."
+            onRetry={() => void refetchActiveDetail()}
+            retrying={isRefreshing}
+            title="Matchup Unavailable"
+          />
+        </Card>
+      </div>
+    );
   }
 
   if (!initialDetail) {

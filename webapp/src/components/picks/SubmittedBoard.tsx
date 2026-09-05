@@ -13,7 +13,6 @@
 
 import { useMemo } from 'react';
 
-import { motion } from 'framer-motion';
 import {
   CheckCircle2,
   Clock,
@@ -26,11 +25,12 @@ import {
   XCircle,
 } from 'lucide-react';
 
-import { Badge, Button, Card, NflTeamLogo } from '@/components/ui';
+import { Badge, Button, Card, NflTeamLogo, StaggeredItem } from '@/components/ui';
 import { LOCK_OF_THE_WEEK_MULTIPLIER } from '@/constants/rules';
 import { THEME_COLORS } from '@/constants/theme';
 import type { PlacedBet } from '@/hooks/use-straight-bets';
 import { getBetSettlementState } from '@/lib/bet-outcome';
+import { betTypeTheme } from '@/lib/bet-type-theme';
 import { cn } from '@/lib/cn';
 import {
   formatAmericanOdds,
@@ -44,7 +44,6 @@ import { formatBetLegLabel, formatPickTitle } from '@/lib/pick-labels';
 import type { LiveGameStateRow } from '@/types/database';
 
 import {
-  ARENA_SPRING,
   EmptyState,
   MetricGrid,
   Pill,
@@ -205,11 +204,21 @@ function PlacedPickCard({
           ? 'border-white/15 bg-white/[0.05]'
           : null;
 
+  // AGENTS.md: parlays always carry amber, teasers always cyan, "consistent
+  // across every screen". The staged card in the rail already does; this one —
+  // the same pick after submitting — did not, so a parlay and a straight were
+  // indistinguishable on the board apart from the badge. A settled result and
+  // the Pick of the Week still outrank the bet type: those say more.
+  const accent = betTypeTheme(bet.bet_type);
+
   return (
     <div
       className={cn(
-        'flex flex-col overflow-hidden rounded-2xl border bg-white/[0.04] backdrop-blur-xl',
-        settledBorder ?? (isLock ? 'border-gold/70 bg-gold/[0.10]' : 'border-white/[0.08]'),
+        'flex flex-col overflow-hidden rounded-2xl border backdrop-blur-xl',
+        // Every branch supplies its own background — `cn` is a plain join, so
+        // two `bg-` classes here would leave CSS source order to decide.
+        settledBorder ??
+          (isLock ? 'border-gold/70 bg-gold/[0.10]' : cn(accent.borderClass, accent.bgClass)),
       )}
       style={
         isLock && !isSettled
@@ -258,7 +267,7 @@ function PlacedPickCard({
               </Pill>
             ) : (
               <button
-                className="flex items-center gap-1.5 rounded-full border border-electric-green/45 bg-electric-green/15 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-electric-green transition hover:bg-electric-green/25"
+                className="flex items-center gap-1.5 rounded-full border border-electric-green/45 bg-electric-green/15 px-3 py-1.5 arena-label text-electric-green transition hover:bg-electric-green/25"
                 onClick={onEdit}
                 type="button">
                 <Pencil aria-hidden className="h-3 w-3" />
@@ -384,11 +393,7 @@ export function SubmittedPicksGrid({
   return (
     <div className="grid grid-cols-1 gap-4 2xl:grid-cols-2">
       {orderedBets.map((bet, index) => (
-        <motion.div
-          animate={{ y: 0 }}
-          initial={{ y: 12 }}
-          key={bet.id}
-          transition={{ ...ARENA_SPRING, delay: Math.min(index, 8) * 0.035 }}>
+        <StaggeredItem index={index} key={bet.id} perItemDelay={45}>
           <PlacedPickCard
             bet={bet}
             liveScoresByGameId={liveScoresByGameId}
@@ -401,7 +406,7 @@ export function SubmittedPicksGrid({
             readOnly={readOnly}
             shareLoading={sharingBetId === bet.id}
           />
-        </motion.div>
+        </StaggeredItem>
       ))}
     </div>
   );
@@ -522,7 +527,7 @@ export function SubmittedSummaryPanel({
       <header className="shrink-0 border-b border-white/[0.08] p-4">
         <p
           className={cn(
-            'flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em]',
+            'flex items-center gap-2 arena-eyebrow',
             header.textClass,
           )}>
           <header.Icon aria-hidden className="h-3.5 w-3.5" />
@@ -538,7 +543,7 @@ export function SubmittedSummaryPanel({
             <div
               className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.08] bg-white/[0.035] px-3 py-2"
               key={row.label}>
-              <dt className="text-[10px] font-black uppercase tracking-[0.14em] text-white/45">
+              <dt className="arena-label text-white/45">
                 {row.label}
               </dt>
               <dd className={cn('text-sm font-black', row.tone ?? 'text-white')}>{row.value}</dd>
@@ -553,7 +558,7 @@ export function SubmittedSummaryPanel({
           )}>
           <p
             className={cn(
-              'flex shrink-0 items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.14em]',
+              'flex shrink-0 items-center gap-1.5 arena-label',
               lockBet ? 'text-gold' : 'text-white/55',
             )}>
             <Star aria-hidden className={cn('h-3 w-3', lockBet && 'fill-current')} />

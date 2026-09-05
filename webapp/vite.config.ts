@@ -22,4 +22,9 @@ export default defineConfig(({ mode }) => ({
     target: 'es2020',
     cssCodeSplit: false,
   },
+  server: {
+    // Honour an assigned PORT so more than one dev server can run against this
+    // checkout at once. Falls back to Vite's default.
+    port: process.env.PORT ? Number(process.env.PORT) : 5173,
+  },
 }));

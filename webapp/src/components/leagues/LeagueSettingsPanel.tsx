@@ -131,7 +131,7 @@ export function LeagueSettingsPanel({
     <>
       <Card className="flex h-full flex-col gap-5">
         <header className="flex items-center justify-between gap-3">
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-electric-green">
+          <p className="arena-eyebrow text-electric-green">
             League Settings
           </p>
           <Badge
@@ -147,7 +147,7 @@ export function LeagueSettingsPanel({
               <ShieldCheck aria-hidden className="h-5 w-5 text-electric-green" />
             </span>
             <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-electric-green">
+              <p className="arena-eyebrow text-electric-green">
                 Your Team
               </p>
               <p className="mt-1 truncate text-lg font-black text-white">{teamName}</p>
@@ -195,7 +195,7 @@ export function LeagueSettingsPanel({
         {isCommissioner ? (
           <div className="flex flex-col gap-3 rounded-2xl border border-gold/25 bg-gold/[0.05] p-4">
             <div className="flex items-center justify-between gap-2">
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gold">
+              <p className="arena-eyebrow text-gold">
                 Commissioner
               </p>
               <Badge label="You" tone="gold" />
@@ -231,7 +231,7 @@ export function LeagueSettingsPanel({
         <button
           className={cn(
             'mt-auto inline-flex items-center justify-center gap-2 self-start rounded-full border border-white/10 bg-white/[0.04] px-3 py-2',
-            'text-[10px] font-black uppercase tracking-[0.14em] text-white/55 transition hover:border-coral-red/40 hover:text-coral-red',
+            'arena-label text-white/55 transition hover:border-coral-red/40 hover:text-coral-red',
           )}
           onClick={onReportLeague}
           type="button">

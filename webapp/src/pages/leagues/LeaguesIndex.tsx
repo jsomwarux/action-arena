@@ -1,7 +1,7 @@
 import { Plus, Shield, Trophy, UserPlus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-import { Badge, Button, Card, Skeleton } from '@/components/ui';
+import { Badge, Button, Card, Skeleton, StaggeredItem } from '@/components/ui';
 import { useAuth } from '@/hooks/use-auth';
 import { useMyLeagues, type LeagueSummary } from '@/hooks/use-leagues';
 import { cn } from '@/lib/cn';
@@ -186,8 +186,10 @@ export function LeaguesIndexPage() {
         <EmptyState />
       ) : (
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {leagues.map((item) => (
-            <LeagueCard item={item} key={item.league.id} />
+          {leagues.map((item, index) => (
+            <StaggeredItem className="h-full" index={index} key={item.league.id}>
+              <LeagueCard item={item} />
+            </StaggeredItem>
           ))}
         </div>
       )}

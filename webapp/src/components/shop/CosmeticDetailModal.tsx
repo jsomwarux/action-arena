@@ -62,7 +62,9 @@ export function CosmeticDetailModal({
     return null;
   }
 
-  const lockedExclusive = Boolean(item.seasonLabel && !canUseSeasonPassItem && !owned);
+  // Per-item pass coverage, not "holds a pass" — see the note in ShopItemCard.
+  const coveredByPass = Boolean(item.seasonLabel) && canUseSeasonPassItem;
+  const lockedExclusive = Boolean(item.seasonLabel) && !canUseSeasonPassItem && !owned;
   const showsOnPlayerCard = item.category === 'team_logo' || item.category === 'profile_frame';
 
   return (
@@ -71,7 +73,7 @@ export function CosmeticDetailModal({
       footer={
         lockedExclusive ? (
           <Button disabled fullWidth={false} title="Season Pass Required" variant="secondary" />
-        ) : owned || canUseSeasonPassItem ? (
+        ) : owned || coveredByPass ? (
           <Button
             disabled={equipped}
             fullWidth={false}

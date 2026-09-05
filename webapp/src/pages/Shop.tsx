@@ -79,9 +79,11 @@ function CategoryTab({
 
 function CoinHeader({
   coinBalance,
+  hasPass,
   loading,
 }: {
   coinBalance: number;
+  hasPass: boolean;
   loading: boolean;
 }) {
   return (
@@ -114,11 +116,15 @@ function CoinHeader({
         </Link>
       </div>
 
+      {/* A holder is not sold the pass again — the same `seasonPassQuery` the
+          PASS ACTIVE badge reads decides which sentence this is. */}
       <Link
         className="flex items-center justify-center gap-1.5 border-t border-gold/30 bg-gold/[0.05] py-2 text-[11px] font-bold text-gold transition hover:bg-gold/[0.10]"
         to={ROUTES.seasonPass}>
         <Ribbon aria-hidden className="h-3 w-3" />
-        Unlock the Season Pass for exclusive drops
+        {hasPass
+          ? 'Season Pass active — your exclusive drops are unlocked'
+          : 'Unlock the Season Pass for exclusive drops'}
         <ChevronRight aria-hidden className="h-3 w-3" />
       </Link>
     </div>
@@ -242,6 +248,7 @@ export function ShopPage() {
         <div className="w-full max-w-sm">
           <CoinHeader
             coinBalance={cosmeticsQuery.data?.coinBalance ?? 0}
+            hasPass={canUseSeasonPassItem}
             loading={cosmeticsQuery.isLoading}
           />
         </div>

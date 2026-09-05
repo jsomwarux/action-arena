@@ -12,6 +12,7 @@ import {
   LiveRefreshBadge,
   Skeleton,
   type BadgeTone,
+  QueryErrorState,
 } from '@/components/ui';
 import { useAuth } from '@/hooks/use-auth';
 import { useUserCosmetics } from '@/hooks/use-cosmetics';
@@ -114,7 +115,7 @@ export function ProfilePage() {
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {QUICK_ACTIONS.map(({ icon: Icon, label, to }) => (
               <Link
-                className="flex flex-col items-center gap-1.5 rounded-2xl border border-white/10 bg-white/[0.04] px-2 py-3 transition duration-150 ease-arena hover:-translate-y-0.5 hover:bg-white/[0.08]"
+                className="arena-card-interactive flex flex-col items-center gap-1.5 rounded-2xl border border-white/10 bg-white/[0.04] px-2 py-3"
                 key={to}
                 to={to}>
                 <Icon aria-hidden className="h-[17px] w-[17px] text-electric-green" />
@@ -145,7 +146,7 @@ export function ProfilePage() {
           </div>
 
           <Link
-            className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-3 transition duration-150 ease-arena hover:bg-white/[0.08]"
+            className="arena-row-interactive flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-3"
             to={ROUTES.settings}>
             <span className="min-w-0">
               <span className="block text-[11px] font-semibold uppercase tracking-[1.2px] text-electric-green">
@@ -174,7 +175,19 @@ export function ProfilePage() {
         <ProfileContent data={profileQuery.data} title="My Profile" />
       ) : null}
 
-      {!profileQuery.isLoading && !profileQuery.data ? (
+      {!profileQuery.isLoading && profileQuery.isError ? (
+        <Card>
+          <QueryErrorState
+            error={profileQuery.error}
+            fallback="We could not load your profile right now."
+            onRetry={() => void profileQuery.refetch()}
+            retrying={profileQuery.isFetching}
+            title="Profile Unavailable"
+          />
+        </Card>
+      ) : null}
+
+      {!profileQuery.isLoading && !profileQuery.isError && !profileQuery.data ? (
         <Card>
           <p className="text-base font-semibold text-white/55">Profile data is unavailable.</p>
         </Card>

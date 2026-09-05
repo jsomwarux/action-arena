@@ -8,6 +8,8 @@ export type PickLabelLeg = Pick<
 export type PickTitleBet = {
   bet_legs: PickLabelLeg[];
   bet_type: BetType;
+  /** Present on teasers. 6, 6.5 or 7 — it moves every line in the pick. */
+  teaser_points?: number | null;
 };
 
 export type PickChronologyBet = {
@@ -101,6 +103,13 @@ export function formatPickTitle(bet: PickTitleBet) {
 
   if (!firstLeg) {
     return 'Selection unavailable';
+  }
+
+  if (bet.bet_type === 'teaser' && bet.teaser_points) {
+    // The point size changes the odds and every line in the pick, so a teaser
+    // title without it is missing the thing that defines it. The bet detail
+    // screen already said "6-point teaser"; the board card said "2-leg teaser".
+    return `${bet.teaser_points}-point teaser · ${bet.bet_legs.length} legs`;
   }
 
   if (bet.bet_type !== 'straight') {

@@ -16,7 +16,7 @@ import { Link } from 'react-router-dom';
 
 import { MatchupSpotlight } from '@/components/leagues/MatchupSpotlight';
 import { WeeklyAwardsCard } from '@/components/leagues/WeeklyAwardsCard';
-import { Badge, Button, Card, Skeleton } from '@/components/ui';
+import { AnimatedProfit, Badge, Button, Card, QueryErrorState, Skeleton } from '@/components/ui';
 import { MINIMUM_BETS_PER_WEEK, WEEKLY_BUDGET } from '@/constants/rules';
 import { useAuth } from '@/hooks/use-auth';
 import { useLeagueDetail } from '@/hooks/use-leagues';
@@ -27,6 +27,7 @@ import {
   type HomeLeagueCard,
 } from '@/hooks/use-matchups';
 import { useUpcomingNflOdds } from '@/hooks/use-odds';
+import { betTypeTheme } from '@/lib/bet-type-theme';
 import { cn } from '@/lib/cn';
 import {
   formatAmericanOdds,
@@ -153,7 +154,7 @@ function ActionNeeded({ cards }: { cards: HomeLeagueCard[] }) {
               </span>
               <span className="flex shrink-0 flex-col items-center gap-1.5">
                 <Badge label={`${card.betsPlaced}/${MINIMUM_BETS_PER_WEEK}`} tone="amber" />
-                <span className="text-[10px] font-black uppercase tracking-[0.14em] text-amber-accent">
+                <span className="arena-label text-amber-accent">
                   Submit Picks
                 </span>
               </span>
@@ -176,7 +177,7 @@ function LineupSummary({ card, slateOpen }: { card: HomeLeagueCard; slateOpen: b
     <Card className="flex flex-col gap-4">
       <header className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-electric-green">
+          <p className="arena-eyebrow text-electric-green">
             Your Lineup · Week {card.league.current_week}
           </p>
           <p className="mt-1 text-2xl font-black text-white">
@@ -215,7 +216,11 @@ function LineupSummary({ card, slateOpen }: { card: HomeLeagueCard; slateOpen: b
         <ul className="flex flex-col gap-1.5">
           {card.thisWeekBets.map((bet) => (
             <li
-              className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.07] bg-white/[0.03] px-3 py-2"
+              className={cn(
+                'flex items-center justify-between gap-3 rounded-xl border px-3 py-2',
+                betTypeTheme(bet.bet_type).borderClass,
+                betTypeTheme(bet.bet_type).bgClass,
+              )}
               key={bet.id}>
               <span className="flex min-w-0 flex-1 items-center gap-2">
                 <Badge betType={bet.bet_type} />
@@ -253,7 +258,7 @@ function LineupSummary({ card, slateOpen }: { card: HomeLeagueCard; slateOpen: b
 
         <Link
           className={cn(
-            'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] transition',
+            'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 arena-tag transition',
             needed > 0
               ? 'border-electric-green/55 bg-electric-green/15 text-electric-green hover:bg-electric-green/25'
               : 'border-white/15 bg-white/[0.05] text-white/65 hover:bg-white/10',
@@ -352,11 +357,9 @@ function RecentResults({ card }: { card: HomeLeagueCard }) {
             <p className="mt-1 text-base font-black text-white">{card.league.name}</p>
           </div>
           {lastProfit !== null ? (
-            <span className={cn('text-2xl font-black', getProfitTone(lastProfit))}>
-              {formatProfit(lastProfit)}
-            </span>
+            <AnimatedProfit className="text-2xl font-black" value={lastProfit} />
           ) : (
-            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-white/45">
+            <span className="arena-label text-white/45">
               No Result
             </span>
           )}
@@ -376,7 +379,7 @@ function RecentResults({ card }: { card: HomeLeagueCard }) {
 
         {lastWeekMatchup ? (
           <Link
-            className="inline-flex items-center gap-1.5 self-start rounded-full border border-white/15 bg-white/[0.05] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-white transition hover:bg-white/10"
+            className="inline-flex items-center gap-1.5 self-start rounded-full border border-white/15 bg-white/[0.05] px-3 py-1.5 arena-label text-white transition hover:bg-white/10"
             to={buildRoute.matchup(lastWeekMatchup.id)}>
             Open Matchup
             <ArrowRight aria-hidden className="h-3 w-3" />
@@ -408,11 +411,11 @@ function StandingsSnapshot({ card, userId }: { card: HomeLeagueCard; userId: str
   return (
     <Card className="flex flex-col gap-4">
       <header className="flex items-center justify-between gap-3">
-        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-electric-green">
+        <p className="arena-eyebrow text-electric-green">
           Standings
         </p>
         <Link
-          className="text-[10px] font-black uppercase tracking-[0.12em] text-white/55 transition hover:text-electric-green"
+          className="arena-tag text-white/55 transition hover:text-electric-green"
           to={buildRoute.league(card.league.id)}>
           Open league
         </Link>
@@ -424,6 +427,15 @@ function StandingsSnapshot({ card, userId }: { card: HomeLeagueCard; userId: str
             <Skeleton height={34} key={item} radius={10} />
           ))}
         </div>
+      ) : detailQuery.isError ? (
+        <QueryErrorState
+          className="py-4"
+          error={detailQuery.error}
+          fallback="Standings could not be loaded."
+          onRetry={() => void detailQuery.refetch()}
+          retrying={detailQuery.isFetching}
+          title="Standings Unavailable"
+        />
       ) : rows.length === 0 ? (
         <p className="text-sm font-semibold text-white/50">
           Season standings appear once the first week is settled.
@@ -538,6 +550,18 @@ export function HomePage() {
 
       {dashboardQuery.isLoading ? (
         <LoadingState />
+      ) : dashboardQuery.isError ? (
+        // An empty state has to mean empty: `cards` falls back to [], so a
+        // failed dashboard fetch used to render "no leagues yet".
+        <Card>
+          <QueryErrorState
+            error={dashboardQuery.error}
+            fallback="We could not load your leagues right now."
+            onRetry={() => void dashboardQuery.refetch()}
+            retrying={dashboardQuery.isFetching}
+            title="Leagues Unavailable"
+          />
+        </Card>
       ) : cards.length === 0 ? (
         <EmptyState />
       ) : (
@@ -616,7 +640,7 @@ export function HomePage() {
 
                 {cards.length > 1 ? (
                   <Card className="flex flex-col gap-3">
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-electric-green">
+                    <p className="arena-eyebrow text-electric-green">
                       Your Other Leagues
                     </p>
                     <ul className="flex flex-col gap-1.5">
@@ -625,18 +649,15 @@ export function HomePage() {
                         .map((card) => (
                           <li key={card.league.id}>
                             <Link
-                              className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.07] bg-white/[0.03] px-3 py-2 transition hover:bg-white/[0.07]"
+                              className="arena-row-interactive flex items-center justify-between gap-3 rounded-xl border border-white/[0.07] bg-white/[0.03] px-3 py-2"
                               to={buildRoute.league(card.league.id)}>
                               <span className="min-w-0 flex-1 truncate text-sm font-bold text-white/85">
                                 {card.league.name}
                               </span>
-                              <span
-                                className={cn(
-                                  'shrink-0 text-xs font-black',
-                                  getProfitTone(card.weeklyProfit),
-                                )}>
-                                {formatProfit(card.weeklyProfit)}
-                              </span>
+                              <AnimatedProfit
+                                className="shrink-0 text-xs font-black"
+                                value={card.weeklyProfit}
+                              />
                               {hasLiveBets(card.thisWeekBets) ? (
                                 <Radio aria-hidden className="h-3.5 w-3.5 shrink-0 text-gold" />
                               ) : null}

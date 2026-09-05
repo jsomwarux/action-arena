@@ -2,20 +2,15 @@ import { Star } from 'lucide-react';
 
 import { Badge } from '@/components/ui';
 import type { SharedBetMetadata } from '@/hooks/use-league-chat';
+import { betTypeHex } from '@/lib/bet-type-theme';
 import { cn } from '@/lib/cn';
 import { formatAmericanOdds, formatCurrency, formatProfit, getProfitTone } from '@/lib/format';
 import { formatBetLegLabel } from '@/lib/pick-labels';
 import { THEME_COLORS } from '@/constants/theme';
-import type { BetMarket, BetType } from '@/types/database';
+import type { BetMarket } from '@/types/database';
 
 function isBetMarket(value: string): value is BetMarket {
   return value === 'moneyline' || value === 'spread' || value === 'over_under';
-}
-
-function betTypeAccent(type: BetType) {
-  if (type === 'parlay') return THEME_COLORS.amberAccent;
-  if (type === 'teaser') return THEME_COLORS.cyanAccent;
-  return THEME_COLORS.electricGreen;
 }
 
 /**
@@ -24,7 +19,7 @@ function betTypeAccent(type: BetType) {
  * parlays amber, teasers cyan, with the gold Pick of the Week treatment on top.
  */
 export function SharedBetCard({ metadata }: { metadata: SharedBetMetadata }) {
-  const accent = betTypeAccent(metadata.betType);
+  const accent = betTypeHex(metadata.betType);
   const isLock = metadata.isLock === true;
   const hasSettledProfit = metadata.result !== 'pending' && typeof metadata.profit === 'number';
 
@@ -44,7 +39,7 @@ export function SharedBetCard({ metadata }: { metadata: SharedBetMetadata }) {
               Pick of the Week 1.5x
             </span>
           ) : null}
-          <span className="text-[10px] font-black uppercase tracking-[0.14em] text-white/45">
+          <span className="arena-label text-white/45">
             Week {metadata.weekNumber}
           </span>
         </div>

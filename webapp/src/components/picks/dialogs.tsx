@@ -20,6 +20,7 @@ import {
   BET_TYPE_GROUP_LABEL,
   BET_TYPE_TEXT_CLASS,
   formatTeaserMovement,
+  getAllocatedCents,
   getDisplayedPotentialPayout,
   isCappedParlay,
   modeAccentHex,
@@ -48,7 +49,7 @@ function ConfirmRow({ bet }: { bet: SlipBet }) {
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
           <Badge betType={bet.bet_type} />
-          <span className="truncate text-[10px] font-black uppercase tracking-[0.14em] text-white/45">
+          <span className="truncate arena-label text-white/45">
             {formatAmericanOdds(bet.odds)}
           </span>
         </div>
@@ -86,7 +87,9 @@ export function ConfirmSubmitDialog({
   open: boolean;
   slipBets: SlipBet[];
 }) {
-  const totalAllocated = slipBets.reduce((sum, bet) => sum + bet.amount, 0);
+  // Cents, so the review dialog's "Allocated" line is the same figure the
+  // submit gate compared — see WEEKLY_BUDGET_CENTS in pick-board-model.
+  const totalAllocated = getAllocatedCents(slipBets) / 100;
   const totalReward = slipBets.reduce((sum, bet) => sum + getDisplayedPotentialPayout(bet), 0);
 
   return (
@@ -114,7 +117,7 @@ export function ConfirmSubmitDialog({
       subtitle="Coin amounts and lines are frozen at submit. Picks stay editable until their own game kicks off."
       title="Submit Your Card">
       <div className="flex flex-col gap-4">
-        <p className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-electric-green">
+        <p className="flex items-center gap-2 arena-eyebrow text-electric-green">
           <Lock aria-hidden className="h-3.5 w-3.5" />
           Final review
         </p>

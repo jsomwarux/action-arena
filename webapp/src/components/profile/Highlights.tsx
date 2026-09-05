@@ -26,7 +26,7 @@ function BestBetCard({ bet }: { bet: BetWithLegs }) {
 
   return (
     <Link
-      className="block overflow-hidden rounded-2xl border border-gold/40 bg-gold/[0.08] transition duration-150 ease-arena hover:-translate-y-0.5 hover:brightness-110"
+      className="arena-card-interactive block overflow-hidden rounded-2xl border border-gold/40 bg-gold/[0.08] hover:border-gold/60 hover:bg-gold/[0.12]"
       style={{ boxShadow: `0 0 16px ${THEME_COLORS.gold}66` }}
       to={buildRoute.bet(bet.id)}>
       <div aria-hidden className="h-[3px] w-full bg-gold" />
@@ -37,7 +37,7 @@ function BestBetCard({ bet }: { bet: BetWithLegs }) {
               <Trophy aria-hidden className="h-4 w-4 text-gold" />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-[10px] font-black uppercase tracking-[2px] text-gold">
+              <span className="block arena-eyebrow text-gold">
                 Best Pick
               </span>
               <span className="block truncate text-lg font-black uppercase tracking-[-0.3px] text-white">
@@ -52,7 +52,7 @@ function BestBetCard({ bet }: { bet: BetWithLegs }) {
 
         <div className="flex items-end justify-between gap-4">
           <div className="min-w-0">
-            <p className="text-[10px] font-black uppercase tracking-[1.5px] text-white/45">
+            <p className="text-[10px] font-black uppercase tracking-[0.15em] text-white/45">
               Played · Value
             </p>
             <p className="truncate text-sm font-black text-white">
@@ -63,7 +63,7 @@ function BestBetCard({ bet }: { bet: BetWithLegs }) {
             </p>
           </div>
           <div className="shrink-0 text-right">
-            <p className="text-[10px] font-black uppercase tracking-[1.5px] text-white/45">
+            <p className="text-[10px] font-black uppercase tracking-[0.15em] text-white/45">
               Profit
             </p>
             <p className="text-3xl font-black tracking-[-0.8px] text-electric-green">
@@ -74,7 +74,7 @@ function BestBetCard({ bet }: { bet: BetWithLegs }) {
 
         {isMultiLeg ? (
           <div className="flex flex-col gap-2">
-            <p className="text-[10px] font-black uppercase tracking-[1.4px] text-gold">
+            <p className="arena-label text-gold">
               {bet.bet_legs.length}-leg chain · all hit
             </p>
             <div className="flex gap-2.5">
@@ -119,7 +119,7 @@ function BestBetCard({ bet }: { bet: BetWithLegs }) {
 function WorstBetCard({ bet }: { bet: BetWithLegs }) {
   return (
     <Link
-      className="flex flex-col gap-3 rounded-2xl border border-coral-red/20 bg-white/[0.03] p-5 transition duration-150 ease-arena hover:-translate-y-0.5 hover:bg-white/[0.05]"
+      className="arena-card-interactive flex flex-col gap-3 rounded-2xl border border-coral-red/20 bg-white/[0.03] p-5 hover:border-coral-red/40"
       to={buildRoute.bet(bet.id)}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 flex-1 items-center gap-2.5">
@@ -127,7 +127,7 @@ function WorstBetCard({ bet }: { bet: BetWithLegs }) {
             <TrendingDown aria-hidden className="h-3.5 w-3.5 text-coral-red" />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block text-[10px] font-black uppercase tracking-[1.6px] text-white/45">
+            <span className="block text-[10px] font-black uppercase tracking-[0.16em] text-white/45">
               Toughest Pick
             </span>
             <span className="block truncate text-sm font-black tracking-[-0.2px] text-white">

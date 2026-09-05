@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { ArrowLeft, Smartphone } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
+import { PushScopeNotice } from '@/components/notifications/PushScopeNotice';
 import { ToggleRow } from '@/components/settings/ToggleRow';
 import { Badge, Card, Notice, Skeleton } from '@/components/ui';
 import { useAuth } from '@/hooks/use-auth';
@@ -84,28 +85,7 @@ export function NotificationPreferencesPage() {
 
       {!push.isSupported ? (
         <Card>
-          <div className="flex items-start gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/12 bg-white/[0.05] text-white/50">
-              <Smartphone aria-hidden className="h-[18px] w-[18px]" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-white/50">
-                  These control push
-                </p>
-                <Badge label="Mobile only" tone="neutral" />
-              </div>
-              <p className="mt-1.5 text-sm font-medium leading-6 text-white/55">
-                Every switch below decides what the Action Arena iOS app is allowed to push to your
-                phone. They save to your account from here, but this browser receives no push
-                notifications either way — in the browser, all alerts appear in your{' '}
-                <Link className="font-bold text-electric-green hover:underline" to={ROUTES.notifications}>
-                  in-app inbox
-                </Link>
-                , regardless of these settings.
-              </p>
-            </div>
-          </div>
+          <PushScopeNotice />
         </Card>
       ) : null}
 

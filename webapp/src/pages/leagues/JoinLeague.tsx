@@ -181,7 +181,7 @@ export function JoinLeaguePage() {
               <KeyRound aria-hidden className="h-[18px] w-[18px] text-electric-green" />
             </span>
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-electric-green">
+              <p className="arena-eyebrow text-electric-green">
                 Private League
               </p>
               <p className="text-base font-black text-white">Got an Invite Code?</p>

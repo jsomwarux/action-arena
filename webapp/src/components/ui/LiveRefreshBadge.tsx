@@ -52,14 +52,14 @@ export function LiveRefreshBadge({
             style={{ backgroundColor: THEME_COLORS.coralRed }}
             transition={{ duration: 1.6, ease: 'easeInOut', repeat: Infinity }}
           />
-          <span className="text-[10px] font-black uppercase tracking-[1.4px] text-coral-red">
+          <span className="arena-label text-coral-red">
             Live
           </span>
         </span>
       ) : null}
       <button
         aria-label="Refresh"
-        className="flex items-center gap-1.5 rounded-full border border-white/[0.12] bg-white/[0.04] px-2.5 py-1 text-[10px] font-black uppercase tracking-[1.2px] text-white/50 transition hover:bg-white/[0.08] hover:text-white/80 disabled:opacity-50"
+        className="flex items-center gap-1.5 rounded-full border border-white/[0.12] bg-white/[0.04] px-2.5 py-1 arena-tag text-white/50 transition hover:bg-white/[0.08] hover:text-white/80 disabled:opacity-50"
         disabled={isRefreshing}
         onClick={onRefresh}
         type="button">

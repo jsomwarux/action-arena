@@ -1,9 +1,8 @@
 import { ArrowRight, User, UserMinus, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-import { Badge, Card } from '@/components/ui';
+import { AnimatedProfit, Badge, Card } from '@/components/ui';
 import { cn } from '@/lib/cn';
-import { formatProfit, getProfitTone } from '@/lib/format';
 import { buildRoute } from '@/lib/routes';
 import type { LeagueType } from '@/types/database';
 
@@ -46,12 +45,10 @@ export function MatchupSpotlight({
           <Badge label={`Week ${weekNumber}`} tone="green" />
         </div>
         <div className="text-right">
-          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-white/45">
+          <p className="arena-label text-white/45">
             Week profit
           </p>
-          <p className={cn('text-2xl font-black', getProfitTone(weeklyProfit))}>
-            {formatProfit(weeklyProfit)}
-          </p>
+          <AnimatedProfit className="block text-2xl font-black" value={weeklyProfit} />
         </div>
       </div>
 
@@ -60,7 +57,7 @@ export function MatchupSpotlight({
           <User aria-hidden className="h-4 w-4 text-electric-green" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-white/45">You</p>
+          <p className="arena-label text-white/45">You</p>
           <p className="truncate text-sm font-black text-white">{viewerLabel}</p>
           {viewerSecondaryLabel ? (
             <p className="truncate text-[11px] font-semibold text-white/45">
@@ -75,7 +72,7 @@ export function MatchupSpotlight({
               VS
             </span>
             <div className="min-w-0 flex-1 text-right">
-              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-white/45">
+              <p className="arena-label text-white/45">
                 Opponent
               </p>
               <p className="truncate text-sm font-black text-white">{opponentLabel}</p>
@@ -91,7 +88,7 @@ export function MatchupSpotlight({
           </>
         ) : (
           <div className="shrink-0 text-right">
-            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-white/45">
+            <p className="arena-label text-white/45">
               Field
             </p>
             <p className="inline-flex items-center gap-1.5 text-sm font-black text-white">

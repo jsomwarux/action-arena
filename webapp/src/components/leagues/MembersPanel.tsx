@@ -3,14 +3,13 @@ import { useMemo, useState } from 'react';
 import { Ban, ChevronRight, Flag } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-import { Badge, Button, Card, Modal, Notice } from '@/components/ui';
+import { AnimatedProfit, Badge, Button, Card, Modal, Notice, StaggeredItem } from '@/components/ui';
 import {
   useBlockUserMutation,
   useReportContentMutation,
 } from '@/hooks/use-content-moderation';
 import type { LeagueDetail } from '@/hooks/use-leagues';
 import { cn } from '@/lib/cn';
-import { formatProfit, getProfitTone } from '@/lib/format';
 import {
   getLeagueMemberPrimaryName,
   getLeagueMemberSecondaryName,
@@ -104,7 +103,7 @@ export function MembersPanel({
     <>
       <Card className="overflow-hidden" padded={false}>
         <header className="flex items-center justify-between gap-3 px-5 pt-5">
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-electric-green">
+          <p className="arena-eyebrow text-electric-green">
             Members
           </p>
           <Badge label={`${detail.members.length}/${detail.league.max_members}`} tone="gold" />
@@ -132,54 +131,53 @@ export function MembersPanel({
             const lastRow = index === detail.members.length - 1;
 
             return (
-              <li
-                className={cn(
-                  'flex items-center gap-3 px-5 py-4',
-                  !lastRow && 'border-b border-white/[0.05]',
-                )}
-                key={member.id}>
-                <CosmeticAvatar
-                  cosmetics={cosmeticsByUserId[member.user_id]}
-                  name={memberName}
-                  size="md"
-                />
+              <StaggeredItem index={index} key={member.id} perItemDelay={35}>
+                <li
+                  className={cn(
+                    'flex items-center gap-3 px-5 py-4',
+                    !lastRow && 'border-b border-white/[0.05]',
+                  )}>
+                  <CosmeticAvatar
+                    cosmetics={cosmeticsByUserId[member.user_id]}
+                    name={memberName}
+                    size="md"
+                  />
 
-                <Link
-                  className="group min-w-0 flex-1"
-                  state={{ leagueId: detail.league.id }}
-                  to={buildRoute.member(member.user_id)}>
-                  <span className="flex items-center gap-1">
-                    <span className="truncate text-base font-black text-white group-hover:text-electric-green">
-                      {memberName}
+                  <Link
+                    className="group min-w-0 flex-1"
+                    state={{ leagueId: detail.league.id }}
+                    to={buildRoute.member(member.user_id)}>
+                    <span className="flex items-center gap-1">
+                      <span className="truncate text-base font-black text-white group-hover:text-electric-green">
+                        {memberName}
+                      </span>
+                      <ChevronRight
+                        aria-hidden
+                        className="h-4 w-4 shrink-0 text-white/30 group-hover:text-electric-green"
+                      />
                     </span>
-                    <ChevronRight
-                      aria-hidden
-                      className="h-4 w-4 shrink-0 text-white/30 group-hover:text-electric-green"
-                    />
-                  </span>
-                  {secondaryName ? (
-                    <span className="mt-1 block truncate text-[11px] font-semibold text-white/50">
-                      {secondaryName}
-                    </span>
-                  ) : null}
-                </Link>
+                    {secondaryName ? (
+                      <span className="mt-1 block truncate text-[11px] font-semibold text-white/50">
+                        {secondaryName}
+                      </span>
+                    ) : null}
+                  </Link>
 
-                <div className="flex shrink-0 items-center gap-3">
-                  {isCommissioner ? <Badge label="Commish" tone="gold" /> : null}
-                  <span className={cn('text-sm font-black', getProfitTone(totalProfit))}>
-                    {formatProfit(totalProfit)}
-                  </span>
-                  {canModerateMember ? (
-                    <button
-                      aria-label={`Report or block ${memberName}`}
-                      className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/55 transition hover:border-coral-red/40 hover:text-coral-red"
-                      onClick={() => setActionTarget({ displayName: memberName, member })}
-                      type="button">
-                      <Flag aria-hidden className="h-3 w-3" />
-                    </button>
-                  ) : null}
-                </div>
-              </li>
+                  <div className="flex shrink-0 items-center gap-3">
+                    {isCommissioner ? <Badge label="Commish" tone="gold" /> : null}
+                    <AnimatedProfit className="text-sm font-black" value={totalProfit} />
+                    {canModerateMember ? (
+                      <button
+                        aria-label={`Report or block ${memberName}`}
+                        className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/55 transition hover:border-coral-red/40 hover:text-coral-red"
+                        onClick={() => setActionTarget({ displayName: memberName, member })}
+                        type="button">
+                        <Flag aria-hidden className="h-3 w-3" />
+                      </button>
+                    ) : null}
+                  </div>
+                </li>
+              </StaggeredItem>
             );
           })}
         </ul>

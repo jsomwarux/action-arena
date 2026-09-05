@@ -107,7 +107,7 @@ export function BoardNotice({
         <p className="text-sm font-semibold leading-5">{message.text}</p>
         {message.actionLabel && message.onAction ? (
           <button
-            className="rounded-full border border-electric-green/45 bg-electric-green/15 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-electric-green transition hover:bg-electric-green/25"
+            className="rounded-full border border-electric-green/45 bg-electric-green/15 px-3 py-1 arena-tag text-electric-green transition hover:bg-electric-green/25"
             onClick={message.onAction}
             type="button">
             {message.actionLabel}

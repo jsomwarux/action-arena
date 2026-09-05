@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Action Arena">
+  <!-- Arena tokens, straight from tailwind.config.js: #0A0E1A ground, #00FF87 mark. -->
+  <rect width="64" height="64" rx="14" fill="#0A0E1A" />
+  <rect x="1.5" y="1.5" width="61" height="61" rx="12.5" fill="none" stroke="#00FF87" stroke-opacity="0.28" stroke-width="3" />
+  <!-- Double chevron: the "action" mark, and legible down to 16px. -->
+  <path d="M15 18 L30 32 L15 46" fill="none" stroke="#00FF87" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M33 18 L48 32 L33 46" fill="none" stroke="#00FF87" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="0.45" />
+</svg>

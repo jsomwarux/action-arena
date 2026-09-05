@@ -1,9 +1,14 @@
-import { Check, Link2, Minus, Star, TrendingUp, X, Zap, type LucideIcon } from 'lucide-react';
+import { Check, Minus, Star, X, type LucideIcon } from 'lucide-react';
 
 import { type Metric } from '@/components/picks/atoms';
-import { LOCK_OF_THE_WEEK_MULTIPLIER, PARLAY_PAYOUT_CAP } from '@/constants/rules';
 import { THEME_COLORS } from '@/constants/theme';
-import { getRealizedReward, isSettledResult } from '@/lib/bet-outcome';
+import { isCappedPlacedParlay } from '@/components/picks/pick-board-model';
+import { betTypeTheme } from '@/lib/bet-type-theme';
+import {
+  getDisplayedPotentialReward,
+  getRealizedReward,
+  isSettledResult,
+} from '@/lib/bet-outcome';
 import { formatAmericanOdds, formatCurrency, formatProfit } from '@/lib/format';
 import type { BetResult, BetType, BetWithLegs } from '@/types/database';
 
@@ -70,35 +75,28 @@ export type BetTypeMeta = {
   textClass: string;
 };
 
+/**
+ * The profile screen's view of the one shared table. It used to be its own
+ * copy, at 8% amber where the matchup screen's copy said 5%.
+ */
 export const BET_TYPE_META: Record<BetType, BetTypeMeta> = {
-  parlay: {
-    accent: THEME_COLORS.amberAccent,
-    barClass: 'bg-amber-accent',
-    bgClass: 'bg-amber-accent/[0.08]',
-    borderClass: 'border-amber-accent/35',
-    icon: Link2,
-    label: 'Parlays',
-    textClass: 'text-amber-accent',
-  },
-  straight: {
-    accent: THEME_COLORS.electricGreen,
-    barClass: 'bg-electric-green',
-    bgClass: 'bg-white/[0.04]',
-    borderClass: 'border-white/[0.08]',
-    icon: Zap,
-    label: 'Straights',
-    textClass: 'text-electric-green',
-  },
-  teaser: {
-    accent: THEME_COLORS.cyanAccent,
-    barClass: 'bg-cyan-accent',
-    bgClass: 'bg-cyan-accent/[0.08]',
-    borderClass: 'border-cyan-accent/35',
-    icon: TrendingUp,
-    label: 'Teasers',
-    textClass: 'text-cyan-accent',
-  },
+  parlay: fromTheme('parlay'),
+  straight: fromTheme('straight'),
+  teaser: fromTheme('teaser'),
 };
+
+function fromTheme(betType: BetType): BetTypeMeta {
+  const theme = betTypeTheme(betType);
+  return {
+    accent: theme.hex,
+    barClass: theme.barClass,
+    bgClass: theme.bgClass,
+    borderClass: theme.borderClass,
+    icon: theme.icon,
+    label: theme.groupLabel,
+    textClass: theme.textClass,
+  };
+}
 
 /** The `Ionicons` glyph the mobile result pill uses, as a lucide component. */
 export const RESULT_ICON: Record<BetResult, LucideIcon | null> = {
@@ -118,7 +116,7 @@ export function marketCopy(market: string) {
 export function LockPill() {
   return (
     <span
-      className="inline-flex shrink-0 items-center gap-1 self-start rounded-full border border-gold/55 bg-gold/15 px-2.5 py-1 text-[10px] font-black uppercase tracking-[1.2px] text-gold"
+      className="inline-flex shrink-0 items-center gap-1 self-start rounded-full border border-gold/55 bg-gold/15 px-2.5 py-1 arena-tag text-gold"
       style={{ boxShadow: `0 0 8px ${THEME_COLORS.gold}59` }}>
       <Star aria-hidden className="h-[11px] w-[11px] shrink-0" />
       Pick of the Week 1.5x
@@ -136,15 +134,11 @@ export function LockPill() {
 export function getDisplayedHistoryPayout(
   bet: Pick<BetWithLegs, 'amount' | 'is_lock' | 'potential_payout'>,
 ) {
-  if (!bet.is_lock) {
-    return bet.potential_payout;
-  }
-
-  return bet.amount + (bet.potential_payout - bet.amount) * LOCK_OF_THE_WEEK_MULTIPLIER;
+  return getDisplayedPotentialReward(bet);
 }
 
-export function isCappedHistoryParlay(bet: Pick<BetWithLegs, 'bet_type' | 'potential_payout'>) {
-  return bet.bet_type === 'parlay' && bet.potential_payout >= PARLAY_PAYOUT_CAP;
+export function isCappedHistoryParlay(bet: Pick<BetWithLegs, 'amount' | 'bet_type' | 'odds'>) {
+  return isCappedPlacedParlay(bet);
 }
 
 /**

@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 
+import confetti from 'canvas-confetti';
 import { createPortal } from 'react-dom';
 import { motion, type Transition } from 'framer-motion';
 
 import { ALL_COSMETIC_ITEMS, getCosmeticItem } from '@/constants/cosmetics';
 import { THEME_COLORS } from '@/constants/theme';
 import { cn } from '@/lib/cn';
+import { prefersReducedMotion } from '@/lib/motion';
 import type { CosmeticCategory, EquippedCosmeticsByCategory } from '@/types/database';
 
 import { CosmeticIcon } from './icons';
@@ -571,60 +573,69 @@ const CONFETTI_COLORS = [
 ];
 
 /**
- * Stand-in for mobile's shared <Confetti variant="standard" />, which lives in
- * components/ui and has no web counterpart yet. Same palette and same job: the
+ * Web counterpart of mobile's shared <Confetti variant="standard" /> — the
  * default celebration for a player who has not equipped one.
+ *
+ * `canvas-confetti` rather than 46 animated DOM nodes: one canvas, composited
+ * off the main thread, so the burst does not contend with the matchup screen's
+ * own live-score re-renders behind it. The canvas is created here and disposed
+ * on unmount, so nothing survives the celebration.
+ *
+ * Interruptible by construction: `reset()` on cleanup stops it mid-flight, and
+ * reduced-motion skips the burst entirely — the celebration is decoration over
+ * a result that is already on screen, so skipping it costs the player nothing.
  */
 function StandardConfetti({ fireKey }: { fireKey: number }) {
-  const { height, width } = useViewportSize();
-  const pieces = useMemo(
-    () =>
-      Array.from({ length: 46 }, (_, index) => {
-        const seed = (index + 1) * ((Math.abs(fireKey) % 1000) + 1);
-        return {
-          color: CONFETTI_COLORS[Math.floor(seededUnit(seed) * CONFETTI_COLORS.length) % CONFETTI_COLORS.length],
-          delay: seededUnit(seed + 1) * 0.4,
-          drift: (seededUnit(seed + 2) - 0.5) * 160,
-          duration: 1.6 + seededUnit(seed + 3) * 1.4,
-          id: index,
-          rotation: seededUnit(seed + 4) * 720 - 360,
-          round: seededUnit(seed + 5) > 0.72,
-          size: 6 + seededUnit(seed) * 6,
-          startX: seededUnit(seed + 5) * width,
-        };
-      }),
-    [fireKey, width],
-  );
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+
+    if (!canvas || prefersReducedMotion()) {
+      return undefined;
+    }
+
+    const fire = confetti.create(canvas, { resize: true, useWorker: true });
+    // Two off-centre cannons rather than one, so the sweep crosses the whole
+    // window instead of fountaining out of the middle.
+    const bursts: { angle: number; origin: { x: number; y: number } }[] = [
+      { angle: 60, origin: { x: 0, y: 0.7 } },
+      { angle: 120, origin: { x: 1, y: 0.7 } },
+    ];
+    const timers = bursts.flatMap((burst, index) =>
+      [0, 220, 440].map((delay) =>
+        window.setTimeout(
+          () => {
+            void fire({
+              angle: burst.angle,
+              colors: CONFETTI_COLORS,
+              decay: 0.92,
+              disableForReducedMotion: true,
+              origin: burst.origin,
+              particleCount: 34,
+              scalar: 0.95,
+              spread: 62,
+              startVelocity: 52,
+              ticks: 190,
+            });
+          },
+          delay + index * 90,
+        ),
+      ),
+    );
+
+    return () => {
+      timers.forEach((timer) => window.clearTimeout(timer));
+      fire.reset();
+    };
+  }, [fireKey]);
 
   return (
-    <>
-      {pieces.map((piece) => (
-        <motion.span
-          animate={{
-            opacity: [1, 1, 0],
-            rotate: piece.rotation,
-            x: piece.drift,
-            y: height + 60,
-          }}
-          className={piece.round ? 'absolute rounded-full' : 'absolute rounded-[2px]'}
-          initial={{ opacity: 1, rotate: 0, x: 0, y: -40 }}
-          key={piece.id}
-          style={{
-            backgroundColor: piece.color,
-            height: piece.round ? piece.size : piece.size * 1.6,
-            left: piece.startX,
-            top: 0,
-            width: piece.size,
-          }}
-          transition={{
-            delay: piece.delay,
-            duration: piece.duration,
-            ease: 'easeIn',
-            times: [0, 0.82, 1],
-          }}
-        />
-      ))}
-    </>
+    <canvas
+      aria-hidden
+      className="pointer-events-none absolute inset-0 h-full w-full"
+      ref={canvasRef}
+    />
   );
 }
 
@@ -696,7 +707,7 @@ export function WinCelebration({
               borderColor: `${celebration.accent}88`,
             }}>
             <CosmeticIcon color={celebration.accent} name={celebration.icon} size={14} />
-            <span className="text-[10px] font-black uppercase tracking-[1.6px] text-white">
+            <span className="text-[10px] font-black uppercase tracking-[0.16em] text-white">
               {celebration.name}
             </span>
           </div>

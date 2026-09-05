@@ -219,8 +219,7 @@ Stored as 1 bet row + 1 bet_leg row.
 ### Parlays
 Multiple selections combined into one bet. All legs must win or the entire bet loses.
 - Min 2 legs, max 6 legs.
-- No two legs from the same game (no same-game parlays).
-- Markets allowed: moneyline, spread, over/under — any mix across different games.
+- Markets allowed: moneyline, spread, over/under — any mix, including two markets from the same game (e.g. moneyline + total, or spread + total). Same-game combinations were deliberately allowed by `20260507120000_relax_same_game_combo_validation.sql`; the only thing that conflicts is two selections that directly contradict each other (see Core Business Rules).
 - **Payout math:** Convert each leg's American odds to decimal. Multiply all decimals together. That product is the combined decimal odds. Payout = amount × combined decimal odds.
 - **Push handling:** If a leg pushes, it drops out and the parlay recalculates with remaining legs. If only 1 leg remains after pushes, it becomes a straight bet at that leg's odds. If all legs push, entire bet pushes.
 - **Payout cap: $500.** If calculated payout exceeds $500, it is capped at $500.
@@ -230,7 +229,7 @@ Multiple selections combined into one bet. All legs must win or the entire bet l
 A special parlay where the player buys extra points on spreads and/or totals. All legs must win. NFL only.
 - Min 2 legs, max 4 legs.
 - Only spread and over/under markets (no moneylines in teasers).
-- No two legs from the same game.
+- Same-game legs follow the same rule as parlays: allowed unless the two selections directly contradict.
 - Teaser sizes: 6, 6.5, or 7 points. All legs in one teaser use the same point adjustment.
 - Point adjustments are always in the bettor's favor:
   - Spread favorites: line moves down (e.g., -7.5 → -1.5 with 6-pt teaser)
@@ -263,8 +262,8 @@ A special parlay where the player buys extra points on spreads and/or totals. Al
 - The Lock bet receives a 1.5x multiplier on profit and loss (wins pay 1.5x, losses cost 1.5x)
 - Bets cannot be submitted without exactly one Lock designation
 - Bets lock at the leg level — each leg locks when its specific game starts
-- For parlays/teasers: if any leg hasn't locked yet, the entire multi-leg bet can still be edited or cancelled. Once all legs are locked, the bet is fully locked.
-- Cannot place multiple bets on the same side of the same game within the same league. One selection per game per league, across all bet types.
+- For parlays/teasers: the whole pick locks as soon as **any one** of its legs' games has started. A multi-leg pick can be edited or cancelled only while every one of its legs is still open. This is what `public.update_submitted_bet` and `public.set_pick_of_week` enforce (both raise on `bl.locked or bl.game_start_time <= now()` for any leg), mirrored by `isParentPickLocked` in `lib/pick-locking.ts`. Loosening the client here would let a player edit a pick whose first game is already in progress, and Postgres would reject the write.
+- Cannot place two selections that directly contradict each other within the same league, across all bet types — the same market on opposite sides of one game (both sides of a moneyline, a spread and its mirror, over and under the same total). This is `public.picks_directly_conflict` / `public.pick_conflict_kind`, mirrored client-side in `lib/pick-conflicts.ts`. Non-contradicting selections from the same game are allowed: moneyline + total, spread + total, and same-team moneyline + spread all pass.
 - Profit calculation:
   - Win: profit = payout - amount (where payout = amount × decimalOdds, capped at $500 for parlays)
   - Loss: profit = -amount

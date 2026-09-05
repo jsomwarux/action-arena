@@ -42,7 +42,14 @@ export function ShopItemCard({
   owned,
   recentlyPurchased,
 }: ShopItemCardProps) {
-  const lockedExclusive = Boolean(item.seasonLabel && !canUseSeasonPassItem && !owned);
+  // `canUseSeasonPassItem` answers "does this player hold a pass", not "is this
+  // item covered by it". Reading it as the latter made `owned || pass` true for
+  // the whole catalogue, so a pass holder was offered Equip on items they did
+  // not own — which `equip_cosmetic` rejects with "Purchase this cosmetic
+  // before equipping it" — and was never shown a Buy button to get out of it.
+  // Coverage is per item, exactly as the ownership counter computes it.
+  const coveredByPass = Boolean(item.seasonLabel) && canUseSeasonPassItem;
+  const lockedExclusive = Boolean(item.seasonLabel) && !canUseSeasonPassItem && !owned;
 
   return (
     <div
@@ -131,7 +138,7 @@ export function ShopItemCard({
             // Mobile's full "Season Pass Required" truncates in a four-up grid
             // cell; the price line directly above already spells it out.
             <Button disabled title="Pass Required" variant="secondary" />
-          ) : owned || canUseSeasonPassItem ? (
+          ) : owned || coveredByPass ? (
             <Button
               disabled={equipped}
               loading={loading}

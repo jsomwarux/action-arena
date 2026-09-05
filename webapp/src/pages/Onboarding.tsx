@@ -55,7 +55,7 @@ function PickTypeExample({
   return (
     <div className="rounded-2xl border border-white/[0.08] bg-white/[0.04] p-4 xl:p-5">
       <span aria-hidden className={cn('mb-3 block h-1.5 w-8 rounded-full', accent)} />
-      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-white/45">{label}</p>
+      <p className="arena-label text-white/45">{label}</p>
       <p className="mt-1 text-sm font-black text-white xl:text-base">{value}</p>
     </div>
   );

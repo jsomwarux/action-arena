@@ -1,12 +1,18 @@
-import { Check, ChevronRight, Hourglass, Lock, MinusCircle, Receipt, Star, X } from 'lucide-react';
+import { Check, ChevronRight, Lock, MinusCircle, Receipt, Star, X } from 'lucide-react';
 
 import { LockEffect } from '@/components/cosmetics';
 import { THEME_COLORS } from '@/constants/theme';
-import { getOutcomeRewardTone, getRealizedReward, isSettledResult } from '@/lib/bet-outcome';
+import {
+  getDisplayedPotentialReward,
+  getOutcomeRewardTone,
+  getRealizedReward,
+  isSettledResult,
+} from '@/lib/bet-outcome';
+import { betTypeTheme } from '@/lib/bet-type-theme';
 import { cn } from '@/lib/cn';
 import { formatAmericanOdds, formatCurrency, formatProfit, getProfitTone } from '@/lib/format';
 import { evaluateLiveBetStatus } from '@/lib/live-pick-status';
-import type { BetWithLegs } from '@/hooks/use-matchups';
+import type { BetWithLegs, MatchupPickVisibility } from '@/hooks/use-matchups';
 import { formatBetLegLabel, getPickLogoLabel } from '@/lib/pick-labels';
 import { isParentPickLocked } from '@/lib/pick-locking';
 import type {
@@ -43,26 +49,13 @@ export function resultTone(result: BetResult, inProgress = false) {
   return { bg: 'bg-white/[0.05]', border: 'border-white/15', text: 'text-white/60' };
 }
 
+/**
+ * Card surface for a bet type, from the one shared table. It used to be its own
+ * copy, at 5% amber where the profile screen's copy said 8%.
+ */
 export function betTypeAccent(betType: BetType) {
-  if (betType === 'parlay') {
-    return {
-      bg: 'bg-amber-accent/[0.05]',
-      border: 'border-amber-accent/35',
-      hex: THEME_COLORS.amberAccent,
-    };
-  }
-  if (betType === 'teaser') {
-    return {
-      bg: 'bg-cyan-accent/[0.05]',
-      border: 'border-cyan-accent/35',
-      hex: THEME_COLORS.cyanAccent,
-    };
-  }
-  return {
-    bg: 'bg-white/[0.03]',
-    border: 'border-white/[0.08]',
-    hex: THEME_COLORS.electricGreen,
-  };
+  const theme = betTypeTheme(betType);
+  return { bg: theme.bgClass, border: theme.borderClass, hex: theme.hex };
 }
 
 export function isInProgress(bet: BetWithLegs) {
@@ -97,6 +90,45 @@ export function revealMessage(revealAt: string | null) {
   return { body: 'Cards reveal at first game kickoff', time: formatRevealTime(revealAt) };
 }
 
+export type PickVisibilityState = 'own' | 'revealed' | 'sealed' | 'did_not_submit';
+
+/**
+ * `get_matchup_detail` already answers "why can't I see this card" precisely,
+ * on the `hiddenReason` discriminant. Deriving the answer from `isVisible`
+ * alone cannot separate "submitted, sealed until kickoff" from "filed nothing":
+ * both are invisible, so a player who never submitted was reported to their
+ * opponent as holding a card that reveals at first kickoff — in a settled week,
+ * a kickoff that had already passed, with `revealAt` null so the notice could
+ * not even name a time.
+ *
+ * Only `'hidden_until_kickoff'` may produce a reveal notice. Everything else
+ * that is invisible is a player who did not file, and gets the same
+ * "Did not submit" treatment the viewer's own side already gets.
+ */
+export function getPickVisibilityState(
+  visibility: MatchupPickVisibility,
+  isUser: boolean,
+): PickVisibilityState {
+  if (isUser || visibility.hiddenReason === 'own_card') {
+    return 'own';
+  }
+
+  if (visibility.hiddenReason === 'hidden_until_kickoff') {
+    return 'sealed';
+  }
+
+  if (visibility.hiddenReason === 'not_submitted') {
+    return 'did_not_submit';
+  }
+
+  // 'revealed', 'no_user', or an older server that sends no discriminant.
+  if (!visibility.isVisible) {
+    return visibility.isSubmitted ? 'sealed' : 'did_not_submit';
+  }
+
+  return visibility.isSubmitted ? 'revealed' : 'did_not_submit';
+}
+
 export function ResultPill({ bet }: { bet: BetWithLegs }) {
   const inProgress = isInProgress(bet);
   const tone = resultTone(bet.result, inProgress);
@@ -116,7 +148,7 @@ export function ResultPill({ bet }: { bet: BetWithLegs }) {
       ) : bet.result === 'loss' ? (
         <X aria-hidden className="h-3 w-3 text-coral-red" />
       ) : null}
-      <span className={cn('text-[10px] font-black uppercase tracking-[1.4px]', tone.text)}>
+      <span className={cn('arena-label', tone.text)}>
         {label}
       </span>
     </span>
@@ -129,7 +161,7 @@ export function LockPill() {
       className="inline-flex items-center gap-1 rounded-full border border-gold/55 bg-gold/15 px-2.5 py-1"
       style={{ boxShadow: `0 0 8px ${THEME_COLORS.gold}59` }}>
       <Star aria-hidden className="h-3 w-3 text-gold" fill={THEME_COLORS.gold} />
-      <span className="text-[10px] font-black uppercase tracking-[1.2px] text-gold">
+      <span className="arena-tag text-gold">
         Pick of the Week 1.5x
       </span>
     </span>
@@ -160,24 +192,22 @@ export function EmptyBets({ side }: { side: 'You' | 'Opponent' | 'Player' }) {
   );
 }
 
-export function HiddenPicksPlaceholder({
-  revealAt,
-  submitted,
-}: {
-  revealAt: string | null;
-  submitted: boolean;
-}) {
+/**
+ * The sealed-card notice. Reached only from `getPickVisibilityState` returning
+ * `'sealed'`, which means the opponent has submitted and the card is waiting on
+ * kickoff — so this always says something true.
+ */
+export function HiddenPicksPlaceholder({ revealAt }: { revealAt: string | null }) {
   const message = revealMessage(revealAt);
-  const Icon = submitted ? Lock : Hourglass;
 
   return (
     <div className="flex items-center gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.035] px-3 py-3">
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/15 bg-white/[0.06]">
-        <Icon aria-hidden className="h-4 w-4 text-white/60" />
+        <Lock aria-hidden className="h-4 w-4 text-white/60" />
       </span>
       <div className="min-w-0">
         <p className="text-xs font-semibold text-white/55">{message.body}</p>
-        <p className="mt-0.5 text-[10px] font-black uppercase tracking-[1.2px] text-electric-green">
+        <p className="mt-0.5 arena-tag text-electric-green">
           {message.time}
         </p>
       </div>
@@ -229,7 +259,11 @@ export function BetCard({
   const isLock = bet.is_lock;
   const liveStatus = evaluateLiveBetStatus(bet, liveScoresByGameId);
   const isSettled = isSettledResult(bet.result);
-  const displayedReward = isSettled ? getRealizedReward(bet) : bet.potential_payout;
+  // The Lock multiplies profit, so a pending Pick of the Week pays 1.5x. The
+  // badge above says so; the number has to agree. Shared rule, one definition.
+  const displayedReward = isSettled
+    ? getRealizedReward(bet)
+    : getDisplayedPotentialReward(bet);
   const rewardLabel = isSettled ? 'Outcome' : 'Reward';
   const rewardTone = isSettled ? getOutcomeRewardTone(bet.result) : '';
 
@@ -238,7 +272,7 @@ export function BetCard({
       className={cn(
         'flex flex-col gap-3 rounded-2xl border p-4 text-left',
         isLock ? 'border-white/15 bg-white/[0.04]' : cn(accent.border, accent.bg),
-        onOpen && 'transition duration-150 ease-arena hover:border-white/25 hover:bg-white/[0.07]',
+        onOpen && 'arena-card-interactive',
       )}
       style={isUser ? { boxShadow: `0 0 10px ${accent.hex}2e` } : undefined}>
       {isLock ? (
@@ -251,7 +285,7 @@ export function BetCard({
         <div className="flex min-w-0 flex-1 flex-col gap-2">
           <div className="flex items-center gap-2">
             <Badge betType={bet.bet_type} />
-            <span className="text-[10px] font-black uppercase tracking-[1.4px] text-white/45">
+            <span className="arena-label text-white/45">
               {formatAmericanOdds(bet.odds)}
             </span>
           </div>
@@ -289,11 +323,11 @@ export function BetCard({
 
       <div className="flex justify-between rounded-xl bg-white/[0.04] px-3 py-3">
         <div>
-          <p className="text-[10px] font-black uppercase tracking-[1.4px] text-white/40">Played</p>
+          <p className="arena-label text-white/40">Played</p>
           <p className="mt-1 text-sm font-black text-white">{formatCurrency(bet.amount)}</p>
         </div>
         <div className="text-center">
-          <p className="text-[10px] font-black uppercase tracking-[1.4px] text-white/40">
+          <p className="arena-label text-white/40">
             {rewardLabel}
           </p>
           <p
@@ -303,7 +337,7 @@ export function BetCard({
           </p>
         </div>
         <div className="text-right">
-          <p className="text-[10px] font-black uppercase tracking-[1.4px] text-white/40">Profit</p>
+          <p className="arena-label text-white/40">Profit</p>
           <p className={cn('mt-1 text-sm font-black', getProfitTone(bet.profit ?? 0))}>
             {bet.profit === null ? '–' : formatProfit(bet.profit)}
           </p>

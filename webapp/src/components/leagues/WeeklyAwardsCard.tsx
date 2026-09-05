@@ -2,6 +2,7 @@ import { Flame, Lock, Trophy, type LucideIcon } from 'lucide-react';
 
 import { Badge, Card } from '@/components/ui';
 import type { WeeklyAward, WeeklyAwards } from '@/hooks/use-profile-stats';
+import { betTypeTheme } from '@/lib/bet-type-theme';
 import { cn } from '@/lib/cn';
 import { formatAmericanOdds, formatCurrency, formatProfit, getProfitTone } from '@/lib/format';
 import { formatPickTitle } from '@/lib/pick-labels';
@@ -66,13 +67,13 @@ function AwardTrophy({ award, kind }: { award: WeeklyAward; kind: AwardKind }) {
             <Icon aria-hidden className={cn('h-5 w-5', theme.text)} />
           </span>
           <div className="min-w-0 flex-1">
-            <p className={cn('text-[10px] font-black uppercase tracking-[0.2em]', theme.text)}>
+            <p className={cn('arena-eyebrow', theme.text)}>
               {theme.title}
             </p>
             <p className="truncate text-base font-black text-white">{winnerName}</p>
           </div>
           <div className="shrink-0 text-right">
-            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-white/45">
+            <p className="arena-label text-white/45">
               {kind === 'sharpest' ? 'ROI' : 'Profit'}
             </p>
             <p
@@ -90,10 +91,18 @@ function AwardTrophy({ award, kind }: { award: WeeklyAward; kind: AwardKind }) {
         <p className="text-[11px] font-semibold text-white/55">{theme.subtitle}</p>
 
         {bet ? (
-          <div className="rounded-xl border border-electric-green/25 bg-arena-bg/40 p-3">
+          <div
+            className={cn(
+              'rounded-xl border bg-arena-bg/40 p-3',
+              betTypeTheme(bet.bet_type).borderClass,
+            )}>
             <div className="flex items-center justify-between gap-2">
               <Badge betType={bet.bet_type} />
-              <span className="text-[10px] font-black uppercase tracking-[0.14em] text-electric-green">
+              <span
+                className={cn(
+                  'arena-label',
+                  betTypeTheme(bet.bet_type).textClass,
+                )}>
                 {formatAmericanOdds(bet.odds)}
               </span>
             </div>
@@ -128,7 +137,7 @@ export function WeeklyAwardsCard({
   return (
     <Card className={cn('flex flex-col gap-4', className)}>
       <header className="flex items-center justify-between gap-3">
-        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gold">Trophy Case</p>
+        <p className="arena-eyebrow text-gold">Trophy Case</p>
         <Badge label={`Week ${weekNumber}`} tone="neutral" />
       </header>
 

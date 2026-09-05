@@ -1,7 +1,12 @@
 import { Lock } from 'lucide-react';
 
 import { Card, Modal } from '@/components/ui';
-import { getOutcomeRewardTone, getRealizedReward, isSettledResult } from '@/lib/bet-outcome';
+import {
+  getDisplayedPotentialReward,
+  getOutcomeRewardTone,
+  getRealizedReward,
+  isSettledResult,
+} from '@/lib/bet-outcome';
 import { cn } from '@/lib/cn';
 import { formatAmericanOdds, formatCurrency, formatGameTime, formatProfit, getProfitTone } from '@/lib/format';
 import { evaluateLiveBetStatus } from '@/lib/live-pick-status';
@@ -48,7 +53,11 @@ export function ReadOnlyPickDetailModal({
   const outcomeLabel = inProgress ? 'Live' : resultLabel[bet.result];
   const liveStatus = evaluateLiveBetStatus(bet, liveScoresByGameId);
   const isSettled = isSettledResult(bet.result);
-  const displayedReward = isSettled ? getRealizedReward(bet) : bet.potential_payout;
+  // The Lock multiplies profit, so a pending Pick of the Week pays 1.5x. The
+  // badge above says so; the number has to agree. Shared rule, one definition.
+  const displayedReward = isSettled
+    ? getRealizedReward(bet)
+    : getDisplayedPotentialReward(bet);
   const rewardLabel = isSettled ? 'Outcome' : 'Reward';
   const rewardTone = isSettled ? getOutcomeRewardTone(bet.result) : '';
 
@@ -76,13 +85,13 @@ export function ReadOnlyPickDetailModal({
 
             <div className="flex justify-between rounded-xl bg-white/[0.04] px-3 py-3">
               <div>
-                <p className="text-[10px] font-black uppercase tracking-[1.4px] text-white/40">
+                <p className="arena-label text-white/40">
                   Played
                 </p>
                 <p className="mt-1 text-sm font-black text-white">{formatCurrency(bet.amount)}</p>
               </div>
               <div className="text-center">
-                <p className="text-[10px] font-black uppercase tracking-[1.4px] text-white/40">
+                <p className="arena-label text-white/40">
                   {rewardLabel}
                 </p>
                 <p
@@ -92,7 +101,7 @@ export function ReadOnlyPickDetailModal({
                 </p>
               </div>
               <div className="text-right">
-                <p className="text-[10px] font-black uppercase tracking-[1.4px] text-white/40">
+                <p className="arena-label text-white/40">
                   Profit
                 </p>
                 <p className={cn('mt-1 text-sm font-black', getProfitTone(bet.profit ?? 0))}>
@@ -104,7 +113,7 @@ export function ReadOnlyPickDetailModal({
         </Card>
 
         <div className="flex flex-col gap-2">
-          <p className="text-[10px] font-black uppercase tracking-[2px] text-white/50">
+          <p className="arena-eyebrow text-white/50">
             {isMultiLeg ? 'Legs' : 'Selection'}
           </p>
           {bet.bet_legs.map((leg, index) => {

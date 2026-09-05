@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 
-import { Check, Filter, Link2, Minus, TrendingUp, X, Zap } from 'lucide-react';
+import { Check, EyeOff, Filter, Link2, Minus, TrendingUp, X, Zap } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import { MetricGrid } from '@/components/picks/atoms';
@@ -112,7 +112,7 @@ function BetHistoryCard({
             <div className="flex flex-wrap items-center gap-2">
               <Badge betType={bet.bet_type} />
               {isLock ? <LockPill /> : null}
-              <span className="min-w-0 truncate text-[10px] font-black uppercase tracking-[1.2px] text-white/45">
+              <span className="min-w-0 truncate arena-tag text-white/45">
                 Week {bet.week_number} · {leagueName}
               </span>
             </div>
@@ -127,7 +127,7 @@ function BetHistoryCard({
             <span
               className={cn(
                 'flex items-center gap-1 rounded-full border px-2.5 py-1',
-                'text-[10px] font-black uppercase tracking-[1.4px]',
+                'arena-label',
                 tone.pillBg,
                 tone.pillBorder,
                 tone.pill,
@@ -168,7 +168,7 @@ function BetHistoryCard({
                   </span>
                   <span
                     className={cn(
-                      'shrink-0 text-[10px] font-black uppercase tracking-[1.2px]',
+                      'shrink-0 arena-tag',
                       legTone.text,
                     )}>
                     {legTone.label}
@@ -204,7 +204,7 @@ function WeekFilterChip({
   return (
     <button
       className={cn(
-        'rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-[1.2px]',
+        'rounded-full border px-3 py-1.5 arena-tag',
         'transition duration-150 ease-arena',
         active
           ? 'border-electric-green/55 bg-electric-green/15 text-electric-green'
@@ -227,11 +227,20 @@ function WeekFilterChip({
  */
 export function PickHistory({
   bets,
+  emptyHint,
   leagueId,
   leagueNameById,
   scopeLabel,
 }: {
   bets: BetWithLegs[];
+  /**
+   * What to say when there is nothing here *before* any filter runs. On another
+   * player's profile that is usually redaction, not absence: RLS returns zero
+   * rows for an opponent's pending picks until first kickoff, and a bare
+   * "0 picks" reads as data loss to someone who can see on the league's Members
+   * list that this player has submitted.
+   */
+  emptyHint?: string;
   leagueId: string | 'all';
   leagueNameById: LeagueNameById;
   scopeLabel: string;
@@ -295,7 +304,7 @@ export function PickHistory({
       <div className="flex items-end justify-between gap-4">
         <div className="flex items-center gap-2">
           <span aria-hidden className="h-1 w-6 rounded-full bg-electric-green" />
-          <h2 className="text-[10px] font-black uppercase tracking-[2.2px] text-electric-green">
+          <h2 className="text-[10px] font-black uppercase tracking-[0.22em] text-electric-green">
             Pick History
           </h2>
         </div>
@@ -350,8 +359,21 @@ export function PickHistory({
       {visible.length === 0 ? (
         <Card>
           <div className="flex flex-col items-center gap-2 py-5">
-            <Filter aria-hidden className="h-5 w-5 text-white/45" />
-            <p className="text-sm font-semibold text-white/55">No picks match these filters.</p>
+            {bets.length === 0 && emptyHint ? (
+              <>
+                <EyeOff aria-hidden className="h-5 w-5 text-cyan-accent/70" />
+                <p className="max-w-md text-center text-sm font-semibold text-white/55">
+                  {emptyHint}
+                </p>
+              </>
+            ) : (
+              <>
+                <Filter aria-hidden className="h-5 w-5 text-white/45" />
+                <p className="text-sm font-semibold text-white/55">
+                  No picks match these filters.
+                </p>
+              </>
+            )}
           </div>
         </Card>
       ) : (

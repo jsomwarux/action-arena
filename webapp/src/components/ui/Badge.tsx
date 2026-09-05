@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react';
 
+import { BET_TYPE_THEME } from '@/lib/bet-type-theme';
 import { cn } from '@/lib/cn';
 import type { BetType } from '@/types/database';
 
@@ -38,16 +39,18 @@ const textByTone: Record<BadgeTone, string> = {
   red: 'text-coral-red',
 };
 
+// Straights are the default green scheme; parlays amber, teasers cyan. Read off
+// the one bet-type table so a change to the accent reaches the badge too.
 const toneByBetType: Record<BetType, BadgeTone> = {
-  parlay: 'amber',
+  parlay: BET_TYPE_THEME.parlay.tone,
   straight: 'green',
-  teaser: 'cyan',
+  teaser: BET_TYPE_THEME.teaser.tone,
 };
 
 const defaultBetTypeLabels: Record<BetType, string> = {
-  parlay: 'Parlay',
-  straight: 'Straight',
-  teaser: 'Teaser',
+  parlay: BET_TYPE_THEME.parlay.label,
+  straight: BET_TYPE_THEME.straight.label,
+  teaser: BET_TYPE_THEME.teaser.label,
 };
 
 export function Badge({ betType, className, icon: Icon, label, tone }: BadgeProps) {
@@ -58,7 +61,7 @@ export function Badge({ betType, className, icon: Icon, label, tone }: BadgeProp
     <span
       className={cn(
         'inline-flex shrink-0 items-center gap-1 self-start rounded-full border px-3 py-1',
-        'text-[10px] font-black uppercase tracking-[1.5px]',
+        'text-[10px] font-black uppercase tracking-[0.15em]',
         containerByTone[resolvedTone],
         textByTone[resolvedTone],
         className,

@@ -53,7 +53,7 @@ export function HeroStats({ summary }: { summary: ProfileSummary }) {
           <span
             className={cn(
               'flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1',
-              'text-[10px] font-black uppercase tracking-[1.4px]',
+              'arena-label',
               isStreakWin
                 ? 'border-electric-green/45 bg-electric-green/15 text-electric-green'
                 : isStreakLoss

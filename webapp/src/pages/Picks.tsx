@@ -56,7 +56,6 @@ import {
   makeTeaserSlipBet,
   PARLAY_MAX_LEGS,
   PARLAY_MIN_LEGS,
-  REGULAR_SEASON_WEEKS,
   reteaseSlipLeg,
   updateSlipBetAmount,
   type BetMode,
@@ -827,7 +826,6 @@ export function PicksPage() {
           />
           {viewedWeek ? (
             <WeekNavigator
-              maxWeek={REGULAR_SEASON_WEEKS}
               onChange={setSelectedWeek}
               week={viewedWeek}
             />

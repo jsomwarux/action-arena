@@ -121,7 +121,7 @@ function ChatBubble({
   if (isSystem) {
     return (
       <li className="flex justify-center px-2">
-        <span className="max-w-[80%] rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-center text-[10px] font-black uppercase tracking-[0.14em] text-white/55">
+        <span className="max-w-[80%] rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-center arena-label text-white/55">
           {message.body}
         </span>
       </li>
@@ -461,7 +461,7 @@ export function LeagueChatPanel({
     <>
       <Card className={cn('flex flex-col overflow-hidden', className)} padded={false}>
         <header className="flex shrink-0 items-center justify-between border-b border-white/[0.08] px-4 py-3">
-          <span className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-electric-green">
+          <span className="inline-flex items-center gap-2 arena-eyebrow text-electric-green">
             <MessagesSquare aria-hidden className="h-4 w-4" />
             League Chat
           </span>
@@ -518,7 +518,7 @@ export function LeagueChatPanel({
           {hasNewMessages ? (
             <div className="pointer-events-none absolute bottom-3 left-0 right-0 flex justify-center">
               <button
-                className="pointer-events-auto inline-flex items-center gap-2 rounded-full border border-electric-green/45 bg-arena-bg px-4 py-2 text-[10px] font-black uppercase tracking-[0.12em] text-electric-green"
+                className="pointer-events-auto inline-flex items-center gap-2 rounded-full border border-electric-green/45 bg-arena-bg px-4 py-2 arena-tag text-electric-green"
                 onClick={() => {
                   setHasNewMessages(false);
                   scrollToBottom();

@@ -40,7 +40,7 @@ export function EquippedLocker({
             Cosmetics Loadout
           </h2>
         </div>
-        <span className="shrink-0 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[10px] font-black uppercase tracking-[1.2px] text-white/55">
+        <span className="shrink-0 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 arena-tag text-white/55">
           {isLoading ? '—' : `${String(equippedCount)}/${String(COSMETIC_CATEGORIES.length)}`}
         </span>
       </div>
@@ -71,7 +71,7 @@ export function EquippedLocker({
               </span>
 
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-[10px] font-black uppercase tracking-[1.2px] text-white/45">
+                <span className="block truncate arena-tag text-white/45">
                   {COSMETIC_CATEGORY_LABELS[category]}
                 </span>
                 <span

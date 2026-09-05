@@ -36,7 +36,7 @@ function CompareRow({
 
   return (
     <div className="rounded-2xl border border-white/[0.07] bg-white/[0.04] p-3">
-      <p className="text-center text-[10px] font-black uppercase tracking-[1.6px] text-white/45">
+      <p className="text-center text-[10px] font-black uppercase tracking-[0.16em] text-white/45">
         {label}
       </p>
       <div className="mt-2 flex items-center gap-3">
@@ -54,7 +54,7 @@ function CompareRow({
           }>
           <span
             className={cn(
-              'text-[10px] font-black uppercase tracking-[1.4px]',
+              'arena-label',
               viewerWins ? 'text-electric-green' : 'text-white/45',
             )}>
             You
@@ -86,7 +86,7 @@ function CompareRow({
           style={targetWins ? { boxShadow: `0 0 10px ${THEME_COLORS.gold}52` } : undefined}>
           <span
             className={cn(
-              'text-[10px] font-black uppercase tracking-[1.4px]',
+              'arena-label',
               targetWins ? 'text-gold' : 'text-white/45',
             )}>
             Them
@@ -129,11 +129,11 @@ export function Comparison({ comparison }: { comparison: MemberComparison }) {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <GitCompare aria-hidden className="h-3.5 w-3.5 text-electric-green" />
-            <h2 className="text-[10px] font-black uppercase tracking-[2.5px] text-electric-green">
+            <h2 className="text-[10px] font-black uppercase tracking-[0.25em] text-electric-green">
               Head to Head
             </h2>
           </div>
-          <span className="rounded-full border border-gold/40 bg-gold/15 px-3 py-1 text-[10px] font-black uppercase tracking-[1.4px] text-gold">
+          <span className="rounded-full border border-gold/40 bg-gold/15 px-3 py-1 arena-label text-gold">
             {h2hLabel}
           </span>
         </div>

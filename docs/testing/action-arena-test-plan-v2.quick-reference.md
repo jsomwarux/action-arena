@@ -20,11 +20,12 @@ Use this file as the fast map. Use the full extract when exact step wording matt
 ## Current Product Notes
 
 - The PDF still says "Lock of the Week" in several places. In current UI/business wording, this is "Pick of the Week" (`bets.is_lock` in DB).
-- The PDF has older same-game/duplicate wording in Test 6.5 and Test 7.3. Current conflict rule blocks direct contradictions plus same-team moneyline/spread pairings:
-  - blocked: both teams' moneylines, both sides of the same spread, both sides of the same total, same-team moneyline + spread
-  - allowed: moneyline + total and spread + total from the same game
+- The PDF has older same-game/duplicate wording in Test 6.5 and Test 7.3. The current conflict rule blocks direct contradictions only:
+  - blocked: both teams' moneylines, both sides of the same spread, both sides of the same total
+  - allowed: moneyline + total and spread + total from the same game, and same-team moneyline + spread
+  - the same-team moneyline/spread case was added by `20260520120000_block_same_team_ml_spread_conflicts.sql` and then removed again by the later `20260530120000_pick_board_triple_conflict_rules.sql`, which replaced `pick_conflict_kind` wholesale. Web and mobile agree with the current function.
 - Opponent card visibility is now gated until the league/week first kickoff. Before first kickoff, own card is visible; opponent details are redacted.
-- Post-submit editing exists until the relevant lock rule fires. Straight picks lock when their game starts; multi-pick cards lock according to current implementation when a leg's game has started.
+- Post-submit editing exists until the relevant lock rule fires. Straight picks lock when their game starts; a multi-leg pick locks as soon as any one of its legs' games has started.
 - POTW swaps after submission are allowed only before the league/week first kickoff and only onto editable picks.
 
 ## Test Index

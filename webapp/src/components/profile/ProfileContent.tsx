@@ -24,6 +24,8 @@ import { PickHistory } from './PickHistory';
 export type ProfileContentProps = {
   comparison?: MemberComparison;
   data: ProfileData;
+  /** Shown in place of the pick list when the viewer is allowed to see nothing. */
+  emptyHistoryHint?: string;
   initialLeagueId?: string | 'all';
   readOnlyLeague?: boolean;
   title: string;
@@ -55,7 +57,7 @@ function LeagueSelector({
 
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-[10px] font-black uppercase tracking-[1.6px] text-white/45">
+      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/45">
         League Scope
       </p>
       <div className="flex flex-wrap gap-2">
@@ -65,7 +67,7 @@ function LeagueSelector({
           return (
             <button
               className={cn(
-                'rounded-full border px-3 py-2 text-[10px] font-black uppercase tracking-[1.2px]',
+                'rounded-full border px-3 py-2 arena-tag',
                 'transition duration-150 ease-arena',
                 active
                   ? 'border-electric-green/55 bg-electric-green/15 text-electric-green'
@@ -98,6 +100,7 @@ function LeagueSelector({
 export function ProfileContent({
   comparison,
   data,
+  emptyHistoryHint,
   initialLeagueId = 'all',
   readOnlyLeague = false,
   title,
@@ -189,6 +192,7 @@ export function ProfileContent({
 
       <PickHistory
         bets={summary.bets}
+        emptyHint={emptyHistoryHint}
         leagueId={resolvedLeagueId}
         leagueNameById={leagueNameById}
         scopeLabel={scopeLabel}

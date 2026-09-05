@@ -12,6 +12,7 @@ import {
 import { Link, useNavigate } from 'react-router-dom';
 
 import { ConfirmDialog } from '@/components/picks/dialogs';
+import { PushScopeNotice } from '@/components/notifications/PushScopeNotice';
 import { ToggleRow } from '@/components/settings/ToggleRow';
 import { IOS_ONLY_RESTORE_LABEL, IosOnlyNotice } from '@/components/store/IosOnlyNotice';
 import { Badge, Button, Card, Notice, Skeleton, TextInput } from '@/components/ui';
@@ -374,6 +375,10 @@ export function SettingsPage() {
                   Full alert control
                 </Link>
               </div>
+
+              {/* The same toggles live on /notifications/preferences behind this
+                  disclosure. They must not travel without it. */}
+              <PushScopeNotice compact />
 
               {preferences
                 ? NOTIFICATION_PREFERENCE_LABELS.map((preference) => (

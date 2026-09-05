@@ -57,6 +57,7 @@ import { ARENA_SPRING, MeterBar, Pill, TotalDirectionChip } from './atoms';
 import {
   calculateParlayReward,
   formatTeaserMovement,
+  getAllocatedCents,
   getDisplayedPotentialPayout,
   getParlayOdds,
   getPickAmountError,
@@ -67,6 +68,7 @@ import {
   PARLAY_MAX_LEGS,
   PARLAY_MIN_LEGS,
   QUICK_AMOUNTS,
+  WEEKLY_BUDGET_CENTS,
   type BetMode,
   type SlipBet,
   type SlipLeg,
@@ -86,6 +88,9 @@ function isOverLeg(leg: SlipLeg) {
 // ============================================================
 // Coin field
 // ============================================================
+
+/** Coins are a two-decimal quantity, so the field's smallest legal nudge is 0.01. */
+const COIN_STEP = 0.01;
 
 /**
  * The coin amount field, plus one-click amounts.
@@ -118,10 +123,23 @@ function CoinField({
         inputMode="decimal"
         label={label}
         max={MAX_SINGLE_BET}
-        min={1}
+        // The rule is "greater than 0, at most 35, decimals allowed" — client
+        // (`getPickAmountError`) and database (`submit_bets`: `amount > 35 or
+        // amount <= 0`) both. `min={1}`/`step={1}` advertised whole coins and
+        // marked legal stakes like 20.50 as `:invalid`.
+        min={COIN_STEP}
+        onBlur={() => {
+          // The pick is worth `Number(amount.toFixed(2))`, so the field has to
+          // show that and not the raw keystrokes: typing 20.999 left a pick
+          // worth 21 sitting under a field reading 20.999.
+          const parsed = Number(amountText);
+          if (amountText.trim().length === 0 || !Number.isFinite(parsed)) return;
+          const canonical = String(Number(parsed.toFixed(2)));
+          if (canonical !== amountText) onChange(canonical);
+        }}
         onChange={(event) => onChange(event.target.value)}
         placeholder="20"
-        step={1}
+        step={COIN_STEP}
         type="number"
         value={amountText}
       />
@@ -156,17 +174,20 @@ function CoinField({
 // ============================================================
 
 export function BudgetMeter({
+  allocatedCents,
   pickCount,
-  totalAllocated,
 }: {
+  allocatedCents: number;
   pickCount: number;
-  totalAllocated: number;
 }) {
-  const remaining = WEEKLY_BUDGET - totalAllocated;
-  const overBudget = remaining < 0;
-  const fullyAllocated = totalAllocated === WEEKLY_BUDGET;
+  // Cents, not the float sum: "Fully Allocated" has to light up on exactly the
+  // cards `submit_bets` accepts, and `99.999999999999986 === 100` is false.
+  const totalAllocated = allocatedCents / 100;
+  const remaining = (WEEKLY_BUDGET_CENTS - allocatedCents) / 100;
+  const overBudget = allocatedCents > WEEKLY_BUDGET_CENTS;
+  const fullyAllocated = allocatedCents === WEEKLY_BUDGET_CENTS;
   const minimumMet = pickCount >= MINIMUM_BETS_PER_WEEK;
-  const progress = Math.min(Math.max(totalAllocated / WEEKLY_BUDGET, 0), 1);
+  const progress = Math.min(Math.max(allocatedCents / WEEKLY_BUDGET_CENTS, 0), 1);
 
   const barColor = overBudget
     ? THEME_COLORS.coralRed
@@ -333,7 +354,7 @@ export function ParlayBuilder({
       tone="default">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <p className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-amber-accent">
+          <p className="flex items-center gap-1.5 arena-eyebrow text-amber-accent">
             <Link2 aria-hidden className="h-3.5 w-3.5" />
             Parlay Builder
           </p>
@@ -432,7 +453,7 @@ export function TeaserBuilder({
     <Card className="flex flex-col gap-4 border-cyan-accent/30 bg-cyan-accent/[0.05]">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <p className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-cyan-accent">
+          <p className="flex items-center gap-1.5 arena-eyebrow text-cyan-accent">
             <TrendingUp aria-hidden className="h-3.5 w-3.5" />
             Teaser Builder
           </p>
@@ -581,7 +602,7 @@ function StagedPickCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <Badge betType={bet.bet_type} />
-            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-white/45">
+            <span className="arena-label text-white/45">
               {formatAmericanOdds(bet.odds)}
             </span>
           </div>
@@ -649,7 +670,7 @@ function StagedPickCard({
       </div>
 
       <div className="mt-3 flex items-center justify-between gap-2">
-        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-white/45">Reward</p>
+        <p className="arena-label text-white/45">Reward</p>
         <p
           className="text-base font-black tracking-[-0.01em]"
           style={{ color: isLock ? THEME_COLORS.gold : accentHex }}>
@@ -719,7 +740,8 @@ export function LineupRail({
   };
   validation: ValidationState;
 }) {
-  const totalAllocated = slipBets.reduce((sum, bet) => sum + bet.amount, 0);
+  const allocatedCents = getAllocatedCents(slipBets);
+  const totalAllocated = allocatedCents / 100;
   const totalReward = slipBets.reduce((sum, bet) => sum + getDisplayedPotentialPayout(bet), 0);
   const lockBet = slipBets.find((bet) => bet.is_lock);
   const hasAnyLock = Boolean(lockBet);
@@ -729,13 +751,13 @@ export function LineupRail({
     <div className="flex max-h-[calc(100vh-6rem)] flex-col overflow-hidden rounded-2xl border border-white/10 bg-arena-surface/70 shadow-[0_8px_28px_rgba(0,0,0,0.35)] backdrop-blur-xl">
       <header className="shrink-0 border-b border-white/[0.08] p-4">
         <div className="mb-3.5 flex items-center justify-between gap-2">
-          <p className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-electric-green">
+          <p className="flex items-center gap-1.5 arena-eyebrow text-electric-green">
             <Wallet aria-hidden className="h-3.5 w-3.5" />
             Lineup
           </p>
           {slipBets.length > 0 ? (
             <button
-              className="flex items-center gap-1 rounded-lg px-1.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-white/45 transition hover:bg-coral-red/10 hover:text-coral-red"
+              className="flex items-center gap-1 rounded-lg px-1.5 py-1 arena-tag text-white/45 transition hover:bg-coral-red/10 hover:text-coral-red"
               onClick={onClearAll}
               type="button">
               <Trash2 aria-hidden className="h-3 w-3" />
@@ -743,7 +765,7 @@ export function LineupRail({
             </button>
           ) : null}
         </div>
-        <BudgetMeter pickCount={slipBets.length} totalAllocated={totalAllocated} />
+        <BudgetMeter allocatedCents={allocatedCents} pickCount={slipBets.length} />
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
@@ -775,7 +797,7 @@ export function LineupRail({
               <Layers aria-hidden className="h-3.5 w-3.5" />
               Staged picks
             </p>
-            <span className="text-[10px] font-black uppercase tracking-[0.12em] text-white/35">
+            <span className="arena-tag text-white/35">
               {slipBets.length}
             </span>
           </div>
@@ -820,7 +842,7 @@ export function LineupRail({
             )}>
             <p
               className={cn(
-                'flex shrink-0 items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.14em]',
+                'flex shrink-0 items-center gap-1.5 arena-label',
                 lockBet ? 'text-gold' : 'text-white/55',
               )}>
               <Star aria-hidden className={cn('h-3 w-3', lockBet && 'fill-current')} />

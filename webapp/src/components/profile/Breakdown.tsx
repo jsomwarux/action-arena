@@ -47,7 +47,7 @@ function BreakdownRow({ breakdown }: { breakdown: BetTypeBreakdown }) {
           />
         </div>
         <div className="mt-2 flex items-center justify-between gap-3">
-          <span className="text-[10px] font-black uppercase tracking-[1.4px] text-white/45">
+          <span className="arena-label text-white/45">
             Win Rate
           </span>
           <span className={cn('text-[11px] font-black uppercase tracking-[1.2px]', meta.textClass)}>
@@ -67,7 +67,7 @@ function TeaserSpread({ teasers }: { teasers: TeaserPointBreakdown[] }) {
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-2">
         <TrendingUp aria-hidden className="h-3 w-3 text-cyan-accent" />
-        <p className="text-[10px] font-black uppercase tracking-[2px] text-cyan-accent">
+        <p className="arena-eyebrow text-cyan-accent">
           Teaser Sizes
         </p>
       </div>
@@ -86,7 +86,7 @@ function TeaserSpread({ teasers }: { teasers: TeaserPointBreakdown[] }) {
               key={teaser.points}>
               <p
                 className={cn(
-                  'text-[10px] font-black uppercase tracking-[1.5px]',
+                  'text-[10px] font-black uppercase tracking-[0.15em]',
                   hasBets ? 'text-cyan-accent' : 'text-white/45',
                 )}>
                 {teaser.points} pts

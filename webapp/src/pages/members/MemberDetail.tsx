@@ -4,7 +4,7 @@ import { ArrowLeft } from 'lucide-react';
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
 
 import { ProfileContent } from '@/components/profile';
-import { Card, LiveRefreshBadge, Skeleton } from '@/components/ui';
+import { Card, LiveRefreshBadge, QueryErrorState, Skeleton } from '@/components/ui';
 import { useAuth } from '@/hooks/use-auth';
 import { buildMemberComparison, useProfileData } from '@/hooks/use-profile-stats';
 import { logAnalyticsEvent } from '@/lib/analytics';
@@ -62,6 +62,8 @@ export function MemberDetailPage() {
     });
   }, [leagueId, memberId, userId]);
 
+  const isOwnProfile = Boolean(memberId) && memberId === userId;
+
   const comparison =
     profileQuery.data && leagueId && userId && memberId && userId !== memberId
       ? buildMemberComparison(profileQuery.data, leagueId, memberId, userId)
@@ -107,13 +109,34 @@ export function MemberDetailPage() {
         <ProfileContent
           comparison={comparison}
           data={profileQuery.data}
+          // The server redacts an opponent's pending picks until the week's
+          // first kickoff — RLS returns zero rows, not an error — so an empty
+          // list here is usually "sealed", not "never played". Saying so is the
+          // same fix as the matchup screen's: an empty state has to mean empty.
+          emptyHistoryHint={
+            isOwnProfile
+              ? undefined
+              : 'No picks are visible yet. Opponent cards stay sealed until each week’s first kickoff, and revealed picks show up here automatically.'
+          }
           initialLeagueId={leagueId ?? 'all'}
           readOnlyLeague={Boolean(leagueId)}
           title="Member Profile"
         />
       ) : null}
 
-      {!profileQuery.isLoading && !profileQuery.data ? (
+      {!profileQuery.isLoading && profileQuery.isError ? (
+        <Card>
+          <QueryErrorState
+            error={profileQuery.error}
+            fallback="We could not load this member's profile right now."
+            onRetry={() => void profileQuery.refetch()}
+            retrying={profileQuery.isFetching}
+            title="Profile Unavailable"
+          />
+        </Card>
+      ) : null}
+
+      {!profileQuery.isLoading && !profileQuery.isError && !profileQuery.data ? (
         <Card>
           <p className="text-base font-semibold text-white/55">Member profile is unavailable.</p>
         </Card>

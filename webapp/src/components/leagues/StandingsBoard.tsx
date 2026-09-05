@@ -1,7 +1,7 @@
 import { ChevronRight, ShieldCheck, ShieldX, BarChart3 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-import { Badge, Card } from '@/components/ui';
+import { Badge, Card, StaggeredItem } from '@/components/ui';
 import type { LeagueDetail } from '@/hooks/use-leagues';
 import { cn } from '@/lib/cn';
 import { formatProfit, formatRecord, getProfitTone } from '@/lib/format';
@@ -158,7 +158,7 @@ export function StandingsBoard({
   return (
     <Card className="overflow-hidden" padded={false}>
       <div className="flex items-center justify-between gap-3 px-5 pt-5">
-        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-electric-green">
+        <p className="arena-eyebrow text-electric-green">
           Standings Through Week {resolvedStandingsWeekNumber}
         </p>
         <Badge label={badgeLabel} tone={badgeLabel === 'Live' ? 'green' : 'gold'} />
@@ -185,57 +185,63 @@ export function StandingsBoard({
             : `Week ${standing.week_number} ${formatProfit(standing.weekly_profit)}`;
 
           return (
-            <li key={standing.id}>
-              <Link
-                className={cn(
-                  'flex items-center gap-3 px-5 py-4 transition hover:bg-white/[0.04]',
-                  isCurrentUser && 'border-l-[3px] border-l-electric-green bg-electric-green/[0.06]',
-                  !lastRow && 'border-b border-white/[0.05]',
-                )}
-                state={{ leagueId }}
-                to={buildRoute.member(standing.user_id)}>
-                <span
+            <StaggeredItem index={index} key={standing.id} perItemDelay={35}>
+              <li>
+                <Link
                   className={cn(
-                    'flex h-9 w-9 shrink-0 items-center justify-center rounded-full border',
-                    accent.bg,
-                    accent.ring,
-                  )}>
-                  {standing.rank === 1 ? (
-                    <TrophySkinIcon cosmetics={cosmeticsByUserId[standing.user_id]} size={14} />
-                  ) : (
-                    <span className={cn('text-sm font-black', accent.text)}>{standing.rank}</span>
+                    'flex items-center gap-3 px-5 py-4 transition duration-150 ease-arena',
+                    isCurrentUser
+                      ? 'border-l-[3px] border-l-electric-green bg-electric-green/[0.06] hover:bg-electric-green/[0.12]'
+                      : 'hover:bg-white/[0.07]',
+                    !lastRow && 'border-b border-white/[0.05]',
                   )}
-                </span>
-
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-center gap-2">
-                    <span className="truncate text-base font-black text-white">{primaryName}</span>
-                    {isCurrentUser ? (
-                      <span className="rounded-full border border-electric-green/40 bg-electric-green/15 px-2 py-[2px] text-[9px] font-black uppercase tracking-[0.1em] text-electric-green">
-                        You
-                      </span>
-                    ) : null}
-                    <PlayoffStatusIcon status={playoffStatusForStanding(detail, standing)} />
-                  </span>
-                  <span className="mt-1 block truncate text-[11px] font-semibold text-white/45">
-                    {secondaryName ? `${secondaryName} · ${standingSummary}` : standingSummary}
-                  </span>
-                </span>
-
-                <span className="flex shrink-0 items-center gap-2">
+                  state={{ leagueId }}
+                  to={buildRoute.member(standing.user_id)}>
                   <span
                     className={cn(
-                      'text-base font-black',
-                      isH2H ? 'text-white' : getProfitTone(standing.total_profit),
+                      'flex h-9 w-9 shrink-0 items-center justify-center rounded-full border',
+                      accent.bg,
+                      accent.ring,
                     )}>
-                    {isH2H
-                      ? formatRecord(standing.wins, standing.losses, standing.ties)
-                      : formatProfit(standing.total_profit)}
+                    {standing.rank === 1 ? (
+                      <TrophySkinIcon cosmetics={cosmeticsByUserId[standing.user_id]} size={14} />
+                    ) : (
+                      <span className={cn('text-sm font-black', accent.text)}>{standing.rank}</span>
+                    )}
                   </span>
-                  <ChevronRight aria-hidden className="h-4 w-4 text-white/35" />
-                </span>
-              </Link>
-            </li>
+
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-2">
+                      <span className="truncate text-base font-black text-white">
+                        {primaryName}
+                      </span>
+                      {isCurrentUser ? (
+                        <span className="rounded-full border border-electric-green/40 bg-electric-green/15 px-2 py-[2px] text-[9px] font-black uppercase tracking-[0.1em] text-electric-green">
+                          You
+                        </span>
+                      ) : null}
+                      <PlayoffStatusIcon status={playoffStatusForStanding(detail, standing)} />
+                    </span>
+                    <span className="mt-1 block truncate text-[11px] font-semibold text-white/45">
+                      {secondaryName ? `${secondaryName} · ${standingSummary}` : standingSummary}
+                    </span>
+                  </span>
+
+                  <span className="flex shrink-0 items-center gap-2">
+                    <span
+                      className={cn(
+                        'text-base font-black',
+                        isH2H ? 'text-white' : getProfitTone(standing.total_profit),
+                      )}>
+                      {isH2H
+                        ? formatRecord(standing.wins, standing.losses, standing.ties)
+                        : formatProfit(standing.total_profit)}
+                    </span>
+                    <ChevronRight aria-hidden className="h-4 w-4 text-white/35" />
+                  </span>
+                </Link>
+              </li>
+            </StaggeredItem>
           );
         })}
       </ul>

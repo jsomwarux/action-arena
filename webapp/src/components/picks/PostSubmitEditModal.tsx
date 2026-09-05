@@ -199,7 +199,7 @@ function EditSelectionGrid({
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.035] p-3">
       <div>
-        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-white/45">
+        <p className="arena-label text-white/45">
           NFL · {formatGameTime(game.commenceTime)}
         </p>
         <p className="mt-1 text-base font-black uppercase leading-tight text-white">
@@ -408,7 +408,7 @@ export function PostSubmitEditModal({
             </span>
           </div>
           <div className="flex items-center justify-between border-t border-white/[0.08] pt-3">
-            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-white/45">
+            <p className="arena-label text-white/45">
               New Reward
             </p>
             <p className="text-base font-black" style={{ color: accent }}>

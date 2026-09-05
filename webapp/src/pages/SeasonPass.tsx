@@ -71,7 +71,7 @@ function HeroCard({ hasPass }: { hasPass: boolean }) {
     <div className="overflow-hidden rounded-2xl border-2 border-gold bg-gold/[0.10] shadow-[0_10px_22px_rgba(255,215,0,0.55)]">
       <div className="flex items-center justify-center gap-2 border-b border-gold/40 bg-gold/15 py-2">
         <Ribbon aria-hidden className="h-3 w-3 text-gold" />
-        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gold">
+        <p className="arena-eyebrow text-gold">
           Season {CURRENT_SEASON_YEAR} Pass
         </p>
         <Ribbon aria-hidden className="h-3 w-3 text-gold" />
@@ -322,19 +322,30 @@ export function SeasonPassPage() {
           </div>
 
           <p className="text-sm font-medium leading-6 text-white/60">
-            A one-time Apple purchase unlocks Season {CURRENT_SEASON_YEAR} cosmetics, analytics,
-            early Pick Board access, and future ad-free hooks.
+            {hasPass
+              ? `Season ${CURRENT_SEASON_YEAR} cosmetics, advanced analytics, early Pick Board access and future ad-free hooks are unlocked on this account, on web and on iOS.`
+              : `A one-time Apple purchase unlocks Season ${CURRENT_SEASON_YEAR} cosmetics, analytics, early Pick Board access, and future ad-free hooks.`}
           </p>
 
-          <IosOnlyNotice message={seasonPassPurchase.error} />
+          {/* An active holder has nothing left to buy, restore or redeem, so
+              none of the purchase surface renders for them — it used to, and
+              told someone whose badge already read PASS ACTIVE to go redeem a
+              code. */}
+          {!hasPass ? (
+            <>
+              <IosOnlyNotice message={seasonPassPurchase.error} />
 
-          {/* Both disabled on purpose — see IosOnlyNotice. Redeem below is live. */}
-          <div className="grid gap-3 sm:grid-cols-2">
-            {!hasPass ? (
-              <Button disabled title={IOS_ONLY_BUY_LABEL} variant="secondary" />
-            ) : null}
-            <Button disabled title={IOS_ONLY_RESTORE_LABEL} variant="secondary" />
-          </div>
+              {/* Both disabled on purpose — see IosOnlyNotice. Redeem below is live. */}
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Button disabled title={IOS_ONLY_BUY_LABEL} variant="secondary" />
+                <Button disabled title={IOS_ONLY_RESTORE_LABEL} variant="secondary" />
+              </div>
+            </>
+          ) : (
+            <Notice tone="success">
+              Season Pass active. Nothing else to buy — every perk below is already yours.
+            </Notice>
+          )}
 
           {!hasPass ? (
             <div className="flex flex-col gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.04] p-4">

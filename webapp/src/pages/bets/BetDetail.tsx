@@ -6,11 +6,16 @@ import { useParams } from 'react-router-dom';
 
 import { LockEffect } from '@/components/cosmetics';
 import { BET_TYPE_META, LockPill, marketCopy } from '@/components/profile';
-import { Badge, Button, Card, Notice, Skeleton, type BadgeTone } from '@/components/ui';
+import { Badge, Button, Card, Notice, QueryErrorState, Skeleton, type BadgeTone } from '@/components/ui';
 import { useAuth } from '@/hooks/use-auth';
 import { useUserCosmetics } from '@/hooks/use-cosmetics';
 import { useShareBetToChat } from '@/hooks/use-league-chat';
-import { getOutcomeRewardTone, getRealizedReward, isSettledResult } from '@/lib/bet-outcome';
+import {
+  getDisplayedPotentialReward,
+  getOutcomeRewardTone,
+  getRealizedReward,
+  isSettledResult,
+} from '@/lib/bet-outcome';
 import { cn } from '@/lib/cn';
 import {
   formatAmericanOdds,
@@ -78,7 +83,7 @@ function MoneyTile({
 }) {
   return (
     <div className="min-w-0 flex-1 rounded-2xl border border-white/[0.07] bg-white/[0.04] p-4">
-      <p className="text-[10px] font-black uppercase tracking-[1.4px] text-white/45">{label}</p>
+      <p className="arena-label text-white/45">{label}</p>
       <p className={cn('mt-1 truncate text-xl font-black text-white', tone)}>{value}</p>
     </div>
   );
@@ -163,18 +168,16 @@ export function BetDetailPage() {
                       <Badge betType={bet.bet_type} />
                       {bet.is_lock ? <LockPill /> : null}
                       <Badge label={bet.result} tone={RESULT_BADGE_TONE[bet.result]} />
-                      <span className="text-[10px] font-black uppercase tracking-[1.2px] text-white/45">
+                      <span className="arena-tag text-white/45">
                         {formatAmericanOdds(bet.odds)}
                       </span>
                     </div>
                     <h2 className="mt-3 text-4xl font-black uppercase leading-tight tracking-[-0.7px] text-white">
                       {formatPickTitle(bet)}
                     </h2>
-                    {bet.bet_type === 'teaser' && bet.teaser_points !== null ? (
-                      <p className="mt-2 text-sm font-black uppercase tracking-[1.2px] text-cyan-accent">
-                        {bet.teaser_points}-point teaser · {bet.bet_legs.length} legs
-                      </p>
-                    ) : null}
+                    {/* The point size now rides in the title itself, so it is
+                        present on every screen a teaser appears on rather than
+                        only this one. */}
                   </div>
                   <Receipt aria-hidden className="h-6 w-6 shrink-0 text-electric-green" />
                 </div>
@@ -186,8 +189,10 @@ export function BetDetailPage() {
                     tone={
                       isSettled ? getOutcomeRewardTone(bet.result) : 'text-electric-green'
                     }
+                    // The Lock multiplies profit, so a pending Pick of the Week
+                    // pays 1.5x — the badge above already claims it.
                     value={formatCurrency(
-                      isSettled ? getRealizedReward(bet) : bet.potential_payout,
+                      isSettled ? getRealizedReward(bet) : getDisplayedPotentialReward(bet),
                     )}
                   />
                   <MoneyTile
@@ -234,7 +239,7 @@ export function BetDetailPage() {
                           }}>
                           {index + 1}
                         </span>
-                        <span className="text-[10px] font-black uppercase tracking-[1.5px] text-white/45">
+                        <span className="text-[10px] font-black uppercase tracking-[0.15em] text-white/45">
                           Leg {index + 1}
                         </span>
                       </span>
@@ -268,7 +273,7 @@ export function BetDetailPage() {
                       </span>
                       <span
                         className={cn(
-                          'shrink-0 text-[10px] font-black uppercase tracking-[1.2px]',
+                          'shrink-0 arena-tag',
                           leg.locked ? 'text-gold' : 'text-white/45',
                         )}>
                         {leg.locked ? 'Locked' : 'Open'}
@@ -282,19 +287,28 @@ export function BetDetailPage() {
         </>
       ) : null}
 
-      {!betQuery.isLoading && !bet ? (
+      {!betQuery.isLoading && betQuery.isError ? (
+        <Card>
+          <QueryErrorState
+            error={betQuery.error}
+            fallback="This pick could not be loaded."
+            onRetry={() => void betQuery.refetch()}
+            retrying={betQuery.isFetching}
+            title="Pick Unavailable"
+          />
+        </Card>
+      ) : null}
+
+      {/* A clean fetch that came back with nothing is a different answer from a
+          failed one — this pick does not exist, or is not visible to you. */}
+      {!betQuery.isLoading && !betQuery.isError && !bet ? (
         <Card>
           <div className="flex flex-col items-center gap-3 py-6">
-            <AlertCircle aria-hidden className="h-6 w-6 text-coral-red" />
+            <AlertCircle aria-hidden className="h-6 w-6 text-white/40" />
             <p className="text-center text-base font-semibold text-white/55">
-              This pick could not be loaded.
+              This pick is not available. It may have been removed, or it belongs to an opponent
+              whose card has not revealed yet.
             </p>
-            <Button
-              fullWidth={false}
-              onClick={() => void betQuery.refetch()}
-              title="Retry"
-              variant="secondary"
-            />
           </div>
         </Card>
       ) : null}

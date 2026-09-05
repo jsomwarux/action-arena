@@ -14,7 +14,6 @@
  */
 
 import {
-  LOCK_OF_THE_WEEK_MULTIPLIER,
   MAX_SINGLE_BET,
   MINIMUM_BETS_PER_WEEK,
   PARLAY_PAYOUT_CAP,
@@ -23,14 +22,23 @@ import {
   TEASER_ODDS_LOOKUP,
   WEEKLY_BUDGET,
 } from '@/constants/rules';
-import { THEME_COLORS } from '@/constants/theme';
+import {
+  BET_TYPE_THEME,
+  betTypeHex,
+  betTypeTone,
+  type BetTone,
+} from '@/lib/bet-type-theme';
 import type {
   BetEditSubmissionLeg,
   BetSubmissionLeg,
   MixedBetSubmission,
   PlacedBet,
 } from '@/hooks/use-straight-bets';
-import { getRealizedReward, isSettledResult } from '@/lib/bet-outcome';
+import {
+  getDisplayedPotentialReward,
+  getRealizedReward,
+  isSettledResult,
+} from '@/lib/bet-outcome';
 import {
   americanOddsToDecimal,
   calculatePotentialPayout,
@@ -60,7 +68,6 @@ export const PARLAY_MIN_LEGS = 2;
 export const PARLAY_MAX_LEGS = 6;
 
 /** NFL regular season length, matching the mobile week navigator's ceiling. */
-export const REGULAR_SEASON_WEEKS = 14;
 
 /** One-click amounts offered beside every coin field. */
 export const QUICK_AMOUNTS = [5, 10, 20, MAX_SINGLE_BET] as const;
@@ -260,38 +267,39 @@ export function getLegSelectionKey(
 // ============================================================
 // Bet-type colour language (AGENTS.md Design System)
 // ============================================================
+//
+// The table itself lives in `lib/bet-type-theme` — one definition read by the
+// pick board, matchup detail, profile stats and league chat alike. What stays
+// here are the board's own names for it, so its call sites keep reading in the
+// board's vocabulary ("mode") rather than the shared one.
 
-export type BetTone = 'green' | 'amber' | 'cyan';
+export type { BetTone };
 
 export function getModeTone(mode: BetMode): BetTone {
-  if (mode === 'parlay') return 'amber';
-  if (mode === 'teaser') return 'cyan';
-  return 'green';
+  return betTypeTone(mode);
 }
 
 export function modeAccentHex(mode: BetMode) {
-  if (mode === 'parlay') return THEME_COLORS.amberAccent;
-  if (mode === 'teaser') return THEME_COLORS.cyanAccent;
-  return THEME_COLORS.electricGreen;
+  return betTypeHex(mode);
 }
 
 /** Tailwind text colour per bet type, for the places a class beats a hex. */
 export const BET_TYPE_TEXT_CLASS: Record<BetType, string> = {
-  parlay: 'text-amber-accent',
-  straight: 'text-electric-green',
-  teaser: 'text-cyan-accent',
+  parlay: BET_TYPE_THEME.parlay.textClass,
+  straight: BET_TYPE_THEME.straight.textClass,
+  teaser: BET_TYPE_THEME.teaser.textClass,
 };
 
 export const BET_TYPE_LABEL: Record<BetType, string> = {
-  parlay: 'Parlay',
-  straight: 'Straight',
-  teaser: 'Teaser',
+  parlay: BET_TYPE_THEME.parlay.label,
+  straight: BET_TYPE_THEME.straight.label,
+  teaser: BET_TYPE_THEME.teaser.label,
 };
 
 export const BET_TYPE_GROUP_LABEL: Record<BetType, string> = {
-  parlay: 'Parlays',
-  straight: 'Straight Picks',
-  teaser: 'Teasers',
+  parlay: BET_TYPE_THEME.parlay.groupLabel,
+  straight: BET_TYPE_THEME.straight.groupLabel,
+  teaser: BET_TYPE_THEME.teaser.groupLabel,
 };
 
 // ============================================================
@@ -522,37 +530,51 @@ export function getUpdatedSlipBetAfterLegRemoval(
 // Payout display
 // ============================================================
 
-/** The Pick of the Week pays and costs 1.5x, so the rail shows the boosted number. */
+/**
+ * The Pick of the Week pays and costs 1.5x, so the rail shows the boosted
+ * number. One definition, in `lib/bet-outcome`, shared with the matchup card
+ * and the bet detail — those two used to print the raw payout under a 1.5x
+ * badge.
+ */
 export function getDisplayedPotentialPayout(
   bet: Pick<SlipBet, 'amount' | 'is_lock' | 'potential_payout'>,
 ) {
-  if (!bet.is_lock) {
-    return bet.potential_payout;
-  }
+  return getDisplayedPotentialReward(bet);
+}
 
-  return bet.amount + (bet.potential_payout - bet.amount) * LOCK_OF_THE_WEEK_MULTIPLIER;
+/**
+ * Was this parlay's payout actually cut by the $500 cap?
+ *
+ * "Capped" means the true payout *exceeded* the cap — a parlay that pays
+ * exactly $500 was never capped. The staged and placed predicates used to
+ * disagree on that boundary (`>` while staging, `>=` after submitting), so the
+ * "capped" label appeared on submit for a bet that had not been capped.
+ *
+ * The staged bet still knows its raw reward. A placed one does not — the stored
+ * `potential_payout` is already the capped figure — so it is recomputed from
+ * the stake and the combined odds, which is what produced the raw figure in the
+ * first place.
+ */
+function exceedsParlayCap(rawPayout: number) {
+  return rawPayout > PARLAY_PAYOUT_CAP;
 }
 
 export function isCappedParlay(
   bet: Pick<SlipBet, 'bet_type' | 'potential_payout' | 'rawPotentialReward'>,
 ) {
   return (
-    bet.bet_type === 'parlay' && (bet.rawPotentialReward ?? bet.potential_payout) > PARLAY_PAYOUT_CAP
+    bet.bet_type === 'parlay' && exceedsParlayCap(bet.rawPotentialReward ?? bet.potential_payout)
   );
 }
 
 export function getDisplayedPlacedPayout(
   bet: Pick<PlacedBet, 'amount' | 'is_lock' | 'potential_payout'>,
 ) {
-  if (!bet.is_lock) {
-    return bet.potential_payout;
-  }
-
-  return bet.amount + (bet.potential_payout - bet.amount) * LOCK_OF_THE_WEEK_MULTIPLIER;
+  return getDisplayedPotentialReward(bet);
 }
 
-export function isCappedPlacedParlay(bet: Pick<PlacedBet, 'bet_type' | 'potential_payout'>) {
-  return bet.bet_type === 'parlay' && bet.potential_payout >= PARLAY_PAYOUT_CAP;
+export function isCappedPlacedParlay(bet: Pick<PlacedBet, 'amount' | 'bet_type' | 'odds'>) {
+  return bet.bet_type === 'parlay' && exceedsParlayCap(calculatePotentialPayout(bet.amount, bet.odds));
 }
 
 export function isSettledPick(
@@ -701,6 +723,43 @@ export function findDuplicateLegInBet(bet: SlipBet) {
 // Validation
 // ============================================================
 
+/**
+ * The exact-$100 rule is decimal, not binary.
+ *
+ * `public.submit_bets` compares `sum((value ->> 'amount')::numeric) <> 100` in
+ * Postgres `numeric`, which is exact decimal. A JS float `reduce` over legal
+ * amounts is not: `0.1 + 0.1 + 30.2 + 34.8 + 34.8` lands on
+ * 99.999999999999986, so the client refused cards the database accepts and
+ * then told the player to "allocate 0 coins more" — a state with no way out.
+ *
+ * Coins are a two-decimal quantity (`updateSlipBetAmount` stores
+ * `Number(amount.toFixed(2))`), so summing in integer cents reproduces the
+ * database's semantics exactly. Every budget comparison on the board goes
+ * through these two helpers; none of them may compare the float sums.
+ */
+export const WEEKLY_BUDGET_CENTS = Math.round(WEEKLY_BUDGET * 100);
+
+export function toCents(amount: number) {
+  return Math.round(amount * 100);
+}
+
+export function getAllocatedCents(slipBets: Pick<SlipBet, 'amount'>[]) {
+  return slipBets.reduce((sum, bet) => sum + toCents(bet.amount), 0);
+}
+
+export function isFullyAllocated(slipBets: Pick<SlipBet, 'amount'>[]) {
+  return getAllocatedCents(slipBets) === WEEKLY_BUDGET_CENTS;
+}
+
+/**
+ * `formatCurrency` rounds to whole coins, which is right for a headline figure
+ * and wrong for a budget delta: a 40-cent shortfall must not render as
+ * "0 coins". Sub-coin remainders keep their two decimals.
+ */
+function formatCoins(cents: number) {
+  return cents % 100 === 0 ? formatCurrency(cents / 100) : `${(cents / 100).toFixed(2)} coins`;
+}
+
 export function getPickAmountError(amountText: string) {
   if (amountText.length === 0) return undefined;
 
@@ -726,7 +785,7 @@ export function getPickAmountError(amountText: string) {
  * up front is the same rule, surfaced before the round trip.
  */
 export function getValidationState(slipBets: SlipBet[], now = Date.now()): ValidationState {
-  const totalAllocated = slipBets.reduce((sum, bet) => sum + bet.amount, 0);
+  const allocatedCents = getAllocatedCents(slipBets);
   const lockCount = slipBets.filter((bet) => bet.is_lock).length;
   const { contradictorySelections } = getConflictSummaries(slipBets);
   const errors: string[] = [];
@@ -753,14 +812,14 @@ export function getValidationState(slipBets: SlipBet[], now = Date.now()): Valid
     errors.push(`No single pick can exceed ${formatCurrency(MAX_SINGLE_BET)}.`);
   }
 
-  if (totalAllocated < WEEKLY_BUDGET) {
+  if (allocatedCents < WEEKLY_BUDGET_CENTS) {
     errors.push(
-      `Allocate ${formatCurrency(WEEKLY_BUDGET - totalAllocated)} more of your weekly budget.`,
+      `Allocate ${formatCoins(WEEKLY_BUDGET_CENTS - allocatedCents)} more of your weekly budget.`,
     );
   }
 
-  if (totalAllocated > WEEKLY_BUDGET) {
-    errors.push(`You are ${formatCurrency(totalAllocated - WEEKLY_BUDGET)} over the weekly budget.`);
+  if (allocatedCents > WEEKLY_BUDGET_CENTS) {
+    errors.push(`You are ${formatCoins(allocatedCents - WEEKLY_BUDGET_CENTS)} over the weekly budget.`);
   }
 
   errors.push(...contradictorySelections);

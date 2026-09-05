@@ -5,12 +5,12 @@ import { Link, useNavigate } from 'react-router-dom';
 
 import { CosmeticAvatar } from '@/components/cosmetics';
 import { useCurrentWeekMatchups, type CurrentWeekMatchupCard } from '@/components/matchups';
-import { Badge, Button, Card, Skeleton, StaggeredItem } from '@/components/ui';
+import { AnimatedProfit, Badge, Button, Card, QueryErrorState, Skeleton, StaggeredItem } from '@/components/ui';
 import { useAuth } from '@/hooks/use-auth';
 import { useEquippedCosmeticsForUsers } from '@/hooks/use-cosmetics';
 import { useLeagueDetail } from '@/hooks/use-leagues';
 import { cn } from '@/lib/cn';
-import { formatProfit, formatRecord, getProfitTone } from '@/lib/format';
+import { formatRecord } from '@/lib/format';
 import { getLeagueMemberPrimaryName } from '@/lib/league-member-display';
 import { getMatchupSideStatus, getProfitSwingHeadline } from '@/lib/matchup-language';
 import { ROUTES, buildRoute } from '@/lib/routes';
@@ -45,9 +45,7 @@ function SideRow({
           You
         </span>
       ) : null}
-      <span className={cn('shrink-0 text-sm font-black tabular-nums', getProfitTone(profit))}>
-        {formatProfit(profit)}
-      </span>
+      <AnimatedProfit className="shrink-0 text-sm font-black tabular-nums" value={profit} />
     </div>
   );
 }
@@ -77,7 +75,7 @@ function CurrentWeekCard({
     <Card className="flex h-full flex-col gap-4 p-5">
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-[2px] text-electric-green">
+          <p className="arena-eyebrow text-electric-green">
             Week {league.current_week}
           </p>
           <h3 className="mt-1 truncate text-lg font-black tracking-[-0.3px] text-white">
@@ -91,7 +89,7 @@ function CurrentWeekCard({
         ) : viewerStatus ? (
           <span
             className={cn(
-              'shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[1.2px]',
+              'shrink-0 rounded-full border px-2.5 py-1 arena-tag',
               STATUS_TONE[viewerStatus],
             )}>
             {viewerStatus}
@@ -138,7 +136,7 @@ function CurrentWeekCard({
             />
             <div className="flex items-center gap-3">
               <span aria-hidden className="h-px flex-1 bg-white/[0.08]" />
-              <span className="text-[10px] font-black uppercase tracking-[1.4px] text-white/35">
+              <span className="arena-label text-white/35">
                 {isBye ? 'Bye' : 'vs'}
               </span>
               <span aria-hidden className="h-px flex-1 bg-white/[0.08]" />
@@ -260,6 +258,20 @@ function MatchupHistory({
     );
   }
 
+  if (leagueDetailQuery.isError) {
+    return (
+      <Card className="p-8">
+        <QueryErrorState
+          error={leagueDetailQuery.error}
+          fallback="We could not load this league's matchup history."
+          onRetry={() => void leagueDetailQuery.refetch()}
+          retrying={leagueDetailQuery.isFetching}
+          title="History Unavailable"
+        />
+      </Card>
+    );
+  }
+
   if (rows.length === 0) {
     return (
       <Card className="p-8">
@@ -294,7 +306,7 @@ function MatchupHistory({
             className={cn(
               HISTORY_GRID,
               'items-center gap-3 px-5 py-3.5',
-              'transition duration-150 ease-arena hover:bg-white/[0.05]',
+              'arena-row-interactive',
               index > 0 && 'border-t border-white/[0.05]',
             )}
             to={buildRoute.matchup(row.matchup.id)}>
@@ -314,17 +326,18 @@ function MatchupHistory({
                 </span>
               ) : null}
             </span>
-            <span className={cn('text-sm font-black tabular-nums', getProfitTone(row.viewerProfit))}>
-              {formatProfit(row.viewerProfit)}
-            </span>
-            <span
-              className={cn('text-sm font-black tabular-nums', getProfitTone(row.opponentProfit))}>
-              {formatProfit(row.opponentProfit)}
-            </span>
+            <AnimatedProfit
+              className="text-sm font-black tabular-nums"
+              value={row.viewerProfit}
+            />
+            <AnimatedProfit
+              className="text-sm font-black tabular-nums"
+              value={row.opponentProfit}
+            />
             <span className="text-right">
               <span
                 className={cn(
-                  'inline-flex rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[1.2px]',
+                  'inline-flex rounded-full border px-2.5 py-1 arena-tag',
                   row.status
                     ? STATUS_TONE[row.status]
                     : 'border-white/15 bg-white/[0.05] text-white/55',
@@ -397,6 +410,18 @@ export function MatchupsIndexPage() {
               <Skeleton height={240} key={item} radius={20} />
             ))}
           </div>
+        ) : cardsQuery.isError ? (
+          // `cards` falls back to [], so a failed fetch used to render
+          // "No Leagues Yet — join or create one" to a player who has leagues.
+          <Card className="p-8">
+            <QueryErrorState
+              error={cardsQuery.error}
+              fallback="We could not load this week's matchups."
+              onRetry={() => void cardsQuery.refetch()}
+              retrying={cardsQuery.isFetching}
+              title="Matchups Unavailable"
+            />
+          </Card>
         ) : cards.length === 0 ? (
           <Card className="p-8">
             <div className="flex flex-col items-center gap-5">

@@ -11,8 +11,7 @@ import { MembersPanel } from '@/components/leagues/MembersPanel';
 import { SchedulePanel } from '@/components/leagues/SchedulePanel';
 import { StandingsBoard } from '@/components/leagues/StandingsBoard';
 import { WeeklyAwardsCard } from '@/components/leagues/WeeklyAwardsCard';
-import { Badge, Button, Card, Modal, Notice, Skeleton, WeekNavigator } from '@/components/ui';
-import { NFL_REGULAR_SEASON_WEEKS } from '@/constants/rules';
+import { Badge, Button, Card, Modal, Notice, QueryErrorState, Skeleton, WeekNavigator } from '@/components/ui';
 import { useEquippedCosmeticsForUsers } from '@/hooks/use-cosmetics';
 import { useAuth } from '@/hooks/use-auth';
 import { useReportContentMutation } from '@/hooks/use-content-moderation';
@@ -23,6 +22,7 @@ import {
   getLeagueMemberPrimaryName,
   getLeagueMemberSecondaryName,
 } from '@/lib/league-member-display';
+import { useDocumentTitle } from '@/lib/page-title';
 import { ROUTES } from '@/lib/routes';
 import type { StandingRow } from '@/types/database';
 
@@ -124,6 +124,10 @@ export function LeagueDetailPage() {
   const selectedWeekLeagueRef = useRef<string | undefined>(undefined);
 
   const detail = detailQuery.data;
+
+  // A player with three leagues open on a Sunday should be able to tell the
+  // tabs apart. Undefined while loading, so the generic route title stands.
+  useDocumentTitle(detail?.league.name);
   const selectedWeekNumber = selectedWeek ?? detail?.league.current_week ?? 1;
   const selectedWeekAwardsNumber =
     detail && selectedWeekNumber <= detail.league.current_week ? selectedWeekNumber : undefined;
@@ -163,6 +167,24 @@ export function LeagueDetailPage() {
 
   if (detailQuery.isLoading) {
     return <DetailSkeleton />;
+  }
+
+  // A failed fetch is not "you are not a member" — it used to be reported as one.
+  if (detailQuery.isError) {
+    return (
+      <section className="flex flex-col gap-6">
+        <BackLink />
+        <Card className="py-10">
+          <QueryErrorState
+            error={detailQuery.error}
+            fallback="We could not load this league right now."
+            onRetry={() => void detailQuery.refetch()}
+            retrying={detailQuery.isFetching}
+            title="League Unavailable"
+          />
+        </Card>
+      </section>
+    );
   }
 
   if (!detail || !user) {
@@ -274,7 +296,6 @@ export function LeagueDetailPage() {
         </div>
 
         <WeekNavigator
-          maxWeek={NFL_REGULAR_SEASON_WEEKS}
           onChange={setSelectedWeek}
           week={selectedWeekNumber}
         />

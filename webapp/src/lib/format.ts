@@ -26,7 +26,26 @@ export function formatCurrency(value: number) {
   return `${sign}${formatWholeCoins(value)} coins`;
 }
 
+/**
+ * Past this, an odds figure stops being information and starts being noise.
+ *
+ * `makeParlaySlipBet` stores true combined odds alongside a payout the $500 cap
+ * has already cut, so a six-leg +900 parlay carried `odds: 99999900` next to
+ * `potential_payout: 500` and the board printed both. Clamping the *display*
+ * leaves the stored value alone — nothing downstream reads this string — and
+ * real NFL parlays never come near the ceiling.
+ */
+const ODDS_DISPLAY_CEILING = 99999;
+
 export function formatAmericanOdds(odds: number) {
+  if (odds > ODDS_DISPLAY_CEILING) {
+    return `+${ODDS_DISPLAY_CEILING}+`;
+  }
+
+  if (odds < -ODDS_DISPLAY_CEILING) {
+    return `-${ODDS_DISPLAY_CEILING}+`;
+  }
+
   return odds > 0 ? `+${odds}` : `${odds}`;
 }
 

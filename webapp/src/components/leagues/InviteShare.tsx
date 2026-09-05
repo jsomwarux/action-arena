@@ -75,7 +75,7 @@ export function InviteShare({
     <Card className="flex flex-col gap-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/45">
+          <p className="arena-eyebrow text-white/45">
             Invite Code
           </p>
           <p className="mt-1 font-mono text-3xl font-black tracking-[0.28em] text-electric-green">

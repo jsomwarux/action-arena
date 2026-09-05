@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 
 import { CosmeticAvatar } from '@/components/cosmetics';
-import { Card } from '@/components/ui';
+import { AnimatedProfit, Card } from '@/components/ui';
 import { LOCK_OF_THE_WEEK_MULTIPLIER } from '@/constants/rules';
 import { THEME_COLORS } from '@/constants/theme';
 import type { BetWithLegs, MatchupDetail, MatchupPickVisibility } from '@/hooks/use-matchups';
@@ -27,9 +27,9 @@ import {
   BetCard,
   DidNotSubmitPlaceholder,
   EmptyBets,
+  getPickVisibilityState,
   HiddenPicksPlaceholder,
   NoLockFiledPlaceholder,
-  revealMessage,
 } from './bet-card';
 import { AnimatedNumber, Badge, StaggeredItem } from '@/components/ui';
 
@@ -93,7 +93,7 @@ function PlayerSide({
 
       <div className="flex w-full flex-col items-center gap-1">
         <div className="flex items-center gap-1.5">
-          <span className="text-[10px] font-black uppercase tracking-[1.5px] text-white/45">
+          <span className="text-[10px] font-black uppercase tracking-[0.15em] text-white/45">
             {isUser ? 'You' : side === 'home' ? 'Home' : 'Opponent'}
           </span>
           {statusTone && status ? (
@@ -154,7 +154,7 @@ export function FightCardHeader({
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <span aria-hidden className="h-2 w-2 rounded-full bg-electric-green" />
-              <span className="text-[10px] font-black uppercase tracking-[2.5px] text-electric-green">
+              <span className="text-[10px] font-black uppercase tracking-[0.25em] text-electric-green">
                 Week {detail.matchup.week_number} · Matchup
               </span>
             </div>
@@ -261,14 +261,14 @@ export function ProfitTug({
       <div className="flex flex-col gap-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-black uppercase tracking-[1.8px] text-white/45">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/45">
               Profit Swing
             </p>
             <p className="mt-1 text-lg font-black tracking-[-0.3px] text-white">{headline}</p>
           </div>
           <span
             className={cn(
-              'shrink-0 rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[1.2px]',
+              'shrink-0 rounded-full border px-3 py-1 arena-tag',
               diff > 0
                 ? 'border-electric-green/40 bg-electric-green/15 text-electric-green'
                 : diff < 0
@@ -299,9 +299,11 @@ export function ProfitTug({
                   {row.name}
                 </span>
               </div>
-              <span className="shrink-0 text-[11px] font-black uppercase tracking-[1.2px] text-white/55">
-                {formatProfit(row.profit)}
-              </span>
+              <AnimatedProfit
+                className="shrink-0 text-[11px] font-black uppercase tracking-[1.2px] text-white/55"
+                toned={false}
+                value={row.profit}
+              />
             </div>
           ))}
         </div>
@@ -329,20 +331,22 @@ function LockShowdownSide({
   sideLabel: string;
   visibility: MatchupPickVisibility;
 }) {
-  const hidden = !isUser && !visibility.isVisible;
+  const state = getPickVisibilityState(visibility, isUser);
 
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-2">
       <div className="flex items-center justify-between gap-3">
-        <span className="text-[10px] font-black uppercase tracking-[1.5px] text-white/55">
+        <span className="text-[10px] font-black uppercase tracking-[0.15em] text-white/55">
           {sideLabel}
         </span>
         <span className="min-w-0 flex-1 truncate text-right text-base font-black tracking-[-0.2px] text-white">
           {name}
         </span>
       </div>
-      {hidden ? (
-        <HiddenPicksPlaceholder revealAt={visibility.revealAt} submitted={visibility.isSubmitted} />
+      {state === 'sealed' ? (
+        <HiddenPicksPlaceholder revealAt={visibility.revealAt} />
+      ) : state === 'did_not_submit' ? (
+        <DidNotSubmitPlaceholder />
       ) : bet ? (
         <BetCard
           bet={bet}
@@ -351,8 +355,6 @@ function LockShowdownSide({
           liveScoresByGameId={liveScoresByGameId}
           onOpen={onBetPress ? () => onBetPress(bet) : undefined}
         />
-      ) : !visibility.isSubmitted && visibility.isVisible ? (
-        <DidNotSubmitPlaceholder />
       ) : (
         <NoLockFiledPlaceholder />
       )}
@@ -411,7 +413,7 @@ export function LockShowdown({
         <div className="flex flex-col items-center gap-2">
           <div className="flex items-center gap-2">
             <Star aria-hidden className="h-3 w-3 text-gold" fill={THEME_COLORS.gold} />
-            <span className="text-[10px] font-black uppercase tracking-[2px] text-gold">
+            <span className="arena-eyebrow text-gold">
               Headline Fight
             </span>
             <Star aria-hidden className="h-3 w-3 text-gold" fill={THEME_COLORS.gold} />
@@ -487,17 +489,14 @@ export function BetColumnSection({
     : side === 'home'
       ? THEME_COLORS.cyanAccent
       : THEME_COLORS.coralRed;
-  const hidden = !isUser && !visibility.isVisible;
-  const notSubmittedRevealed = !isUser && visibility.isVisible && !visibility.isSubmitted;
-  const statusLabel = hidden
-    ? visibility.isSubmitted
+  const state = getPickVisibilityState(visibility, isUser);
+  const statusLabel =
+    state === 'sealed'
       ? 'Submitted'
-      : 'Not submitted'
-    : notSubmittedRevealed
-      ? 'Not submitted'
-      : `${bets.length} ${bets.length === 1 ? 'pick' : 'picks'}`;
-  const hiddenMessage = hidden ? revealMessage(visibility.revealAt) : null;
-  const resolvedSubtitle = hidden || notSubmittedRevealed ? null : subtitle;
+      : state === 'did_not_submit'
+        ? 'Not submitted'
+        : `${bets.length} ${bets.length === 1 ? 'pick' : 'picks'}`;
+  const resolvedSubtitle = state === 'sealed' || state === 'did_not_submit' ? null : subtitle;
   const HeadIcon = isUser ? UserCheck : User;
 
   return (
@@ -511,14 +510,14 @@ export function BetColumnSection({
           </span>
           <div className="min-w-0">
             <p
-              className="text-[10px] font-black uppercase tracking-[2px]"
+              className="arena-eyebrow"
               style={{ color: accentColor }}>
               {isUser ? 'Your Card' : 'Opponent Card'}
             </p>
             <p className="truncate text-base font-black tracking-[-0.3px] text-white">{title}</p>
           </div>
         </div>
-        <span className="shrink-0 rounded-full border border-white/10 bg-white/[0.05] px-2 py-1 text-[10px] font-black uppercase tracking-[1.2px] text-white/65">
+        <span className="shrink-0 rounded-full border border-white/10 bg-white/[0.05] px-2 py-1 arena-tag text-white/65">
           {statusLabel}
         </span>
       </header>
@@ -527,18 +526,9 @@ export function BetColumnSection({
         <p className="text-xs font-semibold text-white/45">{resolvedSubtitle}</p>
       ) : null}
 
-      {hiddenMessage ? (
-        <div className="flex flex-col gap-0.5">
-          <p className="text-xs font-semibold text-white/55">{hiddenMessage.body}</p>
-          <p className="text-[10px] font-black uppercase tracking-[1.2px] text-electric-green">
-            {hiddenMessage.time}
-          </p>
-        </div>
-      ) : null}
-
-      {hidden ? (
-        <HiddenPicksPlaceholder revealAt={visibility.revealAt} submitted={visibility.isSubmitted} />
-      ) : notSubmittedRevealed ? (
+      {state === 'sealed' ? (
+        <HiddenPicksPlaceholder revealAt={visibility.revealAt} />
+      ) : state === 'did_not_submit' ? (
         <DidNotSubmitPlaceholder compact />
       ) : bets.length === 0 ? (
         <EmptyBets side={emptyVariant} />
@@ -602,7 +592,7 @@ export function ByeWeekBanner({ weekNumber }: { weekNumber: number }) {
           <PauseCircle aria-hidden className="h-5 w-5 text-cyan-accent" />
         </span>
         <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-[2px] text-cyan-accent">
+          <p className="arena-eyebrow text-cyan-accent">
             Week {weekNumber} · Bye
           </p>
           <h2 className="arena-heading mt-2 text-3xl leading-none">You&rsquo;re on bye this week.</h2>

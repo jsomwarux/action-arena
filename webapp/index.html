@@ -4,6 +4,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
+    <!-- The .ico exists so the browser's implicit /favicon.ico probe does not
+         404 on every page load; browsers that understand the SVG prefer it. -->
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+    <link rel="mask-icon" href="/favicon.svg" color="#00FF87" />
+
+    <!-- The real title is set per route by <DocumentTitle> (src/lib/page-title.ts).
+         This is what shows before the bundle boots and what a crawler reads. -->
     <title>Action Arena</title>
     <meta name="description" content="Action Arena — the desktop client for your NFL pick league." />
     <meta name="theme-color" content="#0A0E1A" />

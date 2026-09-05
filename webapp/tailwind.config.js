@@ -30,9 +30,15 @@ export default {
         mono: ['ui-monospace', '"SF Mono"', 'SFMono-Regular', 'Menlo', 'monospace'],
       },
       transitionTimingFunction: {
+        // DEFAULT so a bare `transition` uses the house curve. Without it,
+        // `transition` and `transition duration-150 ease-arena` — both used
+        // widely across these screens — were two subtly different motions on
+        // adjacent controls.
+        DEFAULT: 'cubic-bezier(0.4, 0, 0.2, 1)',
         arena: 'cubic-bezier(0.4, 0, 0.2, 1)',
       },
       transitionDuration: {
+        DEFAULT: '150ms',
         650: '650ms',
       },
       keyframes: {
@@ -41,9 +47,17 @@ export default {
           '0%': { transform: 'translateX(-100%)' },
           '100%': { transform: 'translateX(100%)' },
         },
+        // Card and row entrance. The resting state is the `to` frame, so a
+        // starved rAF or a disabled-animation extension leaves the element
+        // exactly where it belongs.
+        'arena-enter': {
+          from: { opacity: '0', transform: 'translateY(14px)' },
+          to: { opacity: '1', transform: 'none' },
+        },
       },
       animation: {
         'arena-shimmer': 'arena-shimmer 1.3s ease-in-out infinite',
+        'arena-enter': 'arena-enter 350ms cubic-bezier(0.4, 0, 0.2, 1)',
       },
       spacing: {
         sidebar: '15rem', // fixed left nav width; main content offsets by this
