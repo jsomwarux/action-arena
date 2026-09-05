@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 
 import {
   AlertCircle,
@@ -41,6 +41,7 @@ import { isGlobalWeekFixture } from '@/lib/league-settings';
 import { formatPickTitle } from '@/lib/pick-labels';
 import { isParentPickLocked } from '@/lib/pick-locking';
 import { ROUTES, buildRoute } from '@/lib/routes';
+import { useFocusedLeagueId } from '@/providers/focused-league';
 
 function hasLiveBets(bets: BetWithLegs[]) {
   return bets.some((bet) => bet.result === 'pending' && isParentPickLocked(bet));
@@ -500,7 +501,7 @@ export function HomePage() {
   const { user } = useAuth();
   const dashboardQuery = useHomeDashboard(user?.id);
   const oddsQuery = useUpcomingNflOdds();
-  const [focusedLeagueId, setFocusedLeagueId] = useState<string | null>(null);
+  // Focus is shared with the top bar and every other league-aware screen.
 
   const cards = dashboardQuery.data?.cards ?? [];
   const hasFixtureCard = cards.some((card) => isGlobalWeekFixture(card.league));
@@ -510,22 +511,15 @@ export function HomePage() {
     (oddsQuery.data?.length ?? 0) === 0 &&
     !hasFixtureCard;
 
-  // Default the focus to the league that needs picks most urgently, so the
-  // cockpit opens on the thing the player has to act on.
-  useEffect(() => {
-    if (cards.length === 0) {
-      return;
-    }
-
-    setFocusedLeagueId((current) => {
-      if (current && cards.some((card) => card.league.id === current)) {
-        return current;
-      }
-
-      const urgent = cards.find((card) => remainingBetsNeeded(card.betsPlaced) > 0);
-      return (urgent ?? cards[0]).league.id;
-    });
-  }, [cards]);
+  // With nothing focused yet the cockpit opens on the league that needs picks
+  // most urgently, so it lands on the thing the player has to act on. An
+  // explicit choice — here or in the top bar — outranks that.
+  const { focusedLeagueId, setFocusedLeagueId } = useFocusedLeagueId(
+    useMemo(() => cards.map((card) => card.league.id), [cards]),
+    {
+      fallbackId: cards.find((card) => remainingBetsNeeded(card.betsPlaced) > 0)?.league.id,
+    },
+  );
 
   const focusedCard = cards.find((card) => card.league.id === focusedLeagueId) ?? cards[0] ?? null;
 

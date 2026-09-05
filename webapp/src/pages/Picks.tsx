@@ -19,7 +19,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { AlertCircle, CalendarClock, CalendarX, Clock, Receipt } from 'lucide-react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 import {
   BoardModeToggle,
@@ -96,13 +96,11 @@ import type { OddsGame, OddsSelection } from '@/lib/odds-api';
 import { areConflictingPicks, findConflictingPick, findPickConflict } from '@/lib/pick-conflicts';
 import { formatPickTitle } from '@/lib/pick-labels';
 import { ROUTES } from '@/lib/routes';
+import { useFocusedLeagueId } from '@/providers/focused-league';
 import type { TeaserPoints } from '@/types/database';
 
 export function PicksPage() {
   const { user } = useAuth();
-  const [searchParams] = useSearchParams();
-  const requestedLeagueId = searchParams.get('leagueId') ?? undefined;
-
   const leaguesQuery = useMyLeagues(user?.id);
   const leagueSummaries = leaguesQuery.data ?? [];
   const leagues = useMemo(
@@ -110,7 +108,11 @@ export function PicksPage() {
     [leagueSummaries],
   );
 
-  const [selectedLeagueId, setSelectedLeagueId] = useState<string | undefined>();
+  const leagueIds = useMemo(() => leagues.map((league) => league.id), [leagues]);
+  // Shared with the top bar. The board's own picker and the shell switcher are
+  // two views of the same value now, so they cannot disagree.
+  const { focusedLeagueId: selectedLeagueId, setFocusedLeagueId: setSelectedLeagueId } =
+    useFocusedLeagueId(leagueIds);
   const [selectedWeek, setSelectedWeek] = useState<number | undefined>();
   const [mode, setMode] = useState<BetMode>('straight');
 
@@ -129,7 +131,6 @@ export function PicksPage() {
   const [sharingBetId, setSharingBetId] = useState<string | null>(null);
 
   const messageIdRef = useRef(0);
-  const lastAppliedRouteLeagueIdRef = useRef<string | null>(null);
 
   const selectedLeague = leagues.find((league) => league.id === selectedLeagueId) ?? leagues[0];
   const appStoreCaptureMode = getAppStoreCaptureMode(selectedLeague);
@@ -213,28 +214,9 @@ export function PicksPage() {
     return () => window.clearTimeout(timeout);
   }, [message]);
 
-  // Route param wins once, then the picker owns the choice — same precedence as
-  // the mobile board's leagueId param.
-  useEffect(() => {
-    if (leagues.length === 0) {
-      return;
-    }
-
-    const requestedLeague = requestedLeagueId
-      ? leagues.find((league) => league.id === requestedLeagueId)
-      : undefined;
-
-    if (requestedLeague && lastAppliedRouteLeagueIdRef.current !== requestedLeagueId) {
-      lastAppliedRouteLeagueIdRef.current = requestedLeagueId ?? null;
-      setSelectedLeagueId(requestedLeague.id);
-      return;
-    }
-
-    const selectedIsAvailable = leagues.some((league) => league.id === selectedLeagueId);
-    if (!selectedLeagueId || !selectedIsAvailable) {
-      setSelectedLeagueId(leagues[0].id);
-    }
-  }, [leagues, requestedLeagueId, selectedLeagueId]);
+  // The `?leagueId=` deep link and the "fall back to a league that exists"
+  // rule both live in FocusedLeagueProvider / useFocusedLeagueId now, so the
+  // board no longer keeps its own copy of either.
 
   useEffect(() => {
     if (selectedLeague) {

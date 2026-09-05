@@ -7,25 +7,34 @@ import { useAuth } from '@/hooks/use-auth';
 import { useMyLeagues } from '@/hooks/use-leagues';
 import { cn } from '@/lib/cn';
 import { ROUTES, buildRoute } from '@/lib/routes';
+import { useFocusedLeague } from '@/providers/focused-league';
 
 /**
  * The top bar's league selector.
  *
- * "Current league" is read from the URL rather than held in shell state: the
- * league hub is the one route that names a league, and deriving it from the
- * path means the selector can never disagree with the page under it. Choosing a
- * league navigates to its hub.
+ * "Current league" comes from the shared focus in providers/focused-league,
+ * not from the URL. Deriving it from the path meant only `/leagues/:leagueId`
+ * could answer the question, so everywhere else this read "Select a league"
+ * while the page beside it was showing a league perfectly well — on the Pick
+ * Board, two league controls disagreeing in one viewport.
+ *
+ * Choosing a league sets that shared focus, which is what the pages read, so
+ * the current screen re-renders for the new league. It only navigates when the
+ * league hub is already on screen, because that route names a league in its
+ * path and would otherwise keep showing the old one.
  */
 export function LeagueSwitcher() {
   const { user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const leaguesQuery = useMyLeagues(user?.id);
+  const { focusedLeagueId, setFocusedLeagueId } = useFocusedLeague();
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const leagues = leaguesQuery.data ?? [];
-  const activeLeagueId = matchPath(ROUTES.league, location.pathname)?.params.leagueId ?? null;
+  const isOnLeagueHub = Boolean(matchPath(ROUTES.league, location.pathname));
+  const activeLeagueId = focusedLeagueId ?? null;
   const activeLeague = leagues.find((summary) => summary.league.id === activeLeagueId) ?? null;
 
   useEffect(() => {
@@ -116,7 +125,14 @@ export function LeagueSwitcher() {
                       )}
                       onClick={() => {
                         setIsOpen(false);
-                        navigate(buildRoute.league(league.id));
+                        setFocusedLeagueId(league.id);
+
+                        // The hub keeps the league in its path, so it has to be
+                        // navigated. Every other screen reads the focus and
+                        // re-renders where it stands.
+                        if (isOnLeagueHub) {
+                          navigate(buildRoute.league(league.id));
+                        }
                       }}
                       role="menuitem"
                       type="button">

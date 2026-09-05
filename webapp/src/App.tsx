@@ -9,6 +9,7 @@ import { AuthShell, type AuthShellWidth } from '@/components/layout/AuthShell';
 import { DocumentTitle } from '@/components/layout/DocumentTitle';
 import { FullPageLoader } from '@/components/layout/FullPageLoader';
 import { ROUTES } from '@/lib/routes';
+import { FocusedLeagueProvider } from '@/providers/focused-league';
 import { NotFoundPage } from '@/pages/NotFound';
 import { OnboardingPage } from '@/pages/Onboarding';
 import { ForgotPasswordPage } from '@/pages/auth/ForgotPassword';
@@ -137,8 +138,9 @@ function bare(
 export default function App() {
   return (
     <BrowserRouter>
-      <DocumentTitle />
-      <Suspense fallback={<FullPageLoader />}>
+      <FocusedLeagueProvider>
+        <DocumentTitle />
+        <Suspense fallback={<FullPageLoader />}>
         <Routes>
           {/* Auth — outside the app shell.
 
@@ -235,8 +237,9 @@ export default function App() {
 
             <Route element={<NotFoundPage />} path="*" />
           </Route>
-        </Routes>
-      </Suspense>
+          </Routes>
+        </Suspense>
+      </FocusedLeagueProvider>
     </BrowserRouter>
   );
 }

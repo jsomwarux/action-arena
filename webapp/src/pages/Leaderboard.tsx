@@ -18,6 +18,7 @@ import {
   getLeagueMemberSecondaryName,
 } from '@/lib/league-member-display';
 import { ROUTES, buildRoute } from '@/lib/routes';
+import { useFocusedLeague, useFocusedLeagueId } from '@/providers/focused-league';
 import type { EquippedCosmeticsByCategory } from '@/types/database';
 
 type BoardView = 'season' | 'week';
@@ -278,15 +279,21 @@ export function LeaderboardPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const userId = user?.id;
-  const [selectedLeagueId, setSelectedLeagueId] = useState<string | undefined>();
   const [boardView, setBoardView] = useState<BoardView>('season');
   const [sortKey, setSortKey] = useState<SortKey>('rank');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
-  const leaderboardQuery = useLeaderboardData(userId, selectedLeagueId);
+  // Raw focus feeds the query; the resolved one below reconciles it against the
+  // leagues this board actually has rows for, and writes the answer back so the
+  // top bar names the same league these tabs highlight.
+  const { focusedLeagueId: requestedLeagueId } = useFocusedLeague();
+  const leaderboardQuery = useLeaderboardData(userId, requestedLeagueId);
   const seasonPassQuery = useSeasonPass(userId);
   const adHookTriggered = useRef(false);
   const leagues = useMemo(() => leaderboardQuery.data?.leagues ?? [], [leaderboardQuery.data]);
+  const leagueIds = useMemo(() => leagues.map((league) => league.id), [leagues]);
+  const { focusedLeagueId: selectedLeagueId, setFocusedLeagueId: setSelectedLeagueId } =
+    useFocusedLeagueId(leagueIds);
   const selectedLeague = useMemo(
     () => leagues.find((league) => league.id === selectedLeagueId) ?? leagues[0] ?? null,
     [leagues, selectedLeagueId],

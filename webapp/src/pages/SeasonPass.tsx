@@ -81,14 +81,15 @@ function HeroCard({ hasPass }: { hasPass: boolean }) {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
             <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gold/85">
-              All-Access Pass
+              {hasPass ? 'Your All-Access Pass' : 'All-Access Pass'}
             </p>
             <h2 className="mt-1.5 text-2xl font-extrabold tracking-[-0.01em] text-white">
-              Buy your ticket to the season.
+              {hasPass ? 'Your season is unlocked.' : 'Buy your ticket to the season.'}
             </h2>
             <p className="mt-1.5 max-w-2xl text-sm font-medium leading-6 text-white/65">
-              Season {CURRENT_SEASON_YEAR} pass holders join the founders’ class. Four perks unlock
-              for the full season — detailed below.
+              {hasPass
+                ? `You are in the Season ${String(CURRENT_SEASON_YEAR)} founders’ class. All four perks are live for the full season — detailed below.`
+                : `Season ${String(CURRENT_SEASON_YEAR)} pass holders join the founders’ class. Four perks unlock for the full season — detailed below.`}
             </p>
           </div>
 
@@ -293,9 +294,13 @@ export function SeasonPassPage() {
           <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-gold" />
           Season {CURRENT_SEASON_YEAR} Pass
         </p>
-        <h1 className="arena-heading mt-1 text-5xl leading-none">All-Access Pass</h1>
+        <h1 className="arena-heading mt-1 text-5xl leading-none">
+          {hasPass ? 'Your Season Pass' : 'All-Access Pass'}
+        </h1>
         <p className="mt-2 max-w-2xl text-textMuted">
-          One ticket. The whole season unlocked.
+          {hasPass
+            ? 'Everything below is already yours for the season.'
+            : 'One ticket. The whole season unlocked.'}
         </p>
       </header>
 
@@ -383,10 +388,10 @@ export function SeasonPassPage() {
 
       <div>
         <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-electric-green">
-          What's inside
+          {hasPass ? "What you've got" : "What's inside"}
         </p>
         <p className="mt-0.5 text-base font-bold tracking-[-0.01em] text-white">
-          Four perks · launch-ready preview
+          {hasPass ? 'Four perks · all active' : 'Four perks · launch-ready preview'}
         </p>
       </div>
 

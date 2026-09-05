@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 
 import { CalendarClock, ChevronRight, Swords, Trophy } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -14,6 +14,7 @@ import { formatRecord } from '@/lib/format';
 import { getLeagueMemberPrimaryName } from '@/lib/league-member-display';
 import { getMatchupSideStatus, getProfitSwingHeadline } from '@/lib/matchup-language';
 import { ROUTES, buildRoute } from '@/lib/routes';
+import { useFocusedLeagueId } from '@/providers/focused-league';
 import type { EquippedCosmeticsByCategory } from '@/types/database';
 
 const HISTORY_GRID = 'grid grid-cols-[5rem_minmax(9rem,1fr)_7rem_7rem_6rem]';
@@ -366,19 +367,14 @@ export function MatchupsIndexPage() {
   const userId = user?.id;
   const cardsQuery = useCurrentWeekMatchups(userId);
   const cards = useMemo(() => cardsQuery.data ?? [], [cardsQuery.data]);
-  const [activeLeagueId, setActiveLeagueId] = useState<string | undefined>();
   const h2hLeagues = useMemo(
     () => cards.filter((card) => card.league.type === 'h2h'),
     [cards],
   );
-
-  useEffect(() => {
-    if (activeLeagueId || h2hLeagues.length === 0) {
-      return;
-    }
-
-    setActiveLeagueId(h2hLeagues[0].league.id);
-  }, [activeLeagueId, h2hLeagues]);
+  // Only head-to-head leagues have a history table here, so those are the ones
+  // the shared focus is reconciled against.
+  const { focusedLeagueId: activeLeagueId, setFocusedLeagueId: setActiveLeagueId } =
+    useFocusedLeagueId(useMemo(() => h2hLeagues.map((card) => card.league.id), [h2hLeagues]));
 
   const cosmeticsQuery = useEquippedCosmeticsForUsers(
     cards.flatMap((card) => [card.homeUserId, card.awayUserId, userId ?? null]),
